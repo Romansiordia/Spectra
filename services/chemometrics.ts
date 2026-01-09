@@ -368,6 +368,7 @@ export function runPlsAnalysis(
             secv: statsCV.rmse,
             slope: statsCal.slope,
             offset: statsCal.offset,
+            plsIntercept: calModel.intercept, // AÑADIDO: Intercepto real del modelo PLS
             correlation: {
                 actual: Y_raw,
                 predicted: calPredictions,

@@ -33,7 +33,8 @@ export interface ModelResults {
         sec: number; // Standard Error of Calibration
         secv: number; // Standard Error of Cross Validation
         slope: number;
-        offset: number; // Intercepto/Bias
+        offset: number; // Intercepto/Bias de la regresión Y vs Y_pred
+        plsIntercept: number; // Intercepto de la ecuación PLS (B0)
         correlation: {
             actual: number[];
             predicted: number[];

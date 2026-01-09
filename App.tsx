@@ -10,6 +10,7 @@ import SpectraViewer from './components/SpectraViewer';
 import PreprocessingEditor from './components/PreprocessingEditor';
 import ModelGenerator, { ModelParams } from './components/ModelGenerator';
 import ResultsViewer from './components/ResultsViewer';
+import ModelPredictor from './components/ModelPredictor';
 import Card from './components/Card';
 
 const App: React.FC = () => {
@@ -122,6 +123,7 @@ const App: React.FC = () => {
                             onToggle={handleToggleSample}
                             onToggleAll={handleToggleAllSamples}
                         />
+                        <ModelPredictor />
                     </div>
 
                     {/* Visualization Column */}
