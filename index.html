@@ -14,20 +14,74 @@
         tailwind.config = {
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
                     colors: {
-                        'brand-primary': '#2563EB', // Blue 600
-                        'brand-secondary': '#3B82F6', // Blue 500
-                        'brand-accent': '#10B981', // Emerald 500
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7', // Professional Blue
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        slate: {
+                            50: '#f8fafc', // Main Background
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1', // Borders
+                            600: '#475569', // Subtitles
+                            800: '#1e293b', // Main Text
+                            900: '#0f172a', // Chart Backgrounds
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
+                        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                        'inner-dark': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.6)',
                     }
                 }
             }
         }
+        
+        // Defaults generales (se sobreescriben en componentes específicos)
+        Chart.defaults.font.family = 'Inter';
     </script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Slate 50 - Fondo limpio */
+            color: #1e293b; /* Slate 800 - Texto legible */
         }
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 <script type="importmap">
 {
@@ -40,7 +94,7 @@
 }
 </script>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-900">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

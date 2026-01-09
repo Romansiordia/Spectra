@@ -1,27 +1,37 @@
-
 import React from 'react';
 
 const Header: React.FC = () => {
     return (
-        <header className="bg-white shadow-sm p-4 flex items-center gap-4 border-b border-gray-200">
-            <div className="h-10 w-10 flex-shrink-0">
-                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                    <defs>
-                        <linearGradient id="logoGradientHeader" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#EF4444" />
-                            <stop offset="25%" stopColor="#F59E0B" />
-                            <stop offset="50%" stopColor="#10B981" />
-                            <stop offset="75%" stopColor="#3B82F6" />
-                            <stop offset="100%" stopColor="#8B5CF6" />
-                        </linearGradient>
-                    </defs>
-                    <path d="M10 60 Q 30 20, 50 60 T 90 60" stroke="url(#logoGradientHeader)" strokeWidth="12" fill="none" strokeLinecap="round"/>
-                    <path d="M10 60 Q 30 100, 50 60 T 90 60" stroke="url(#logoGradientHeader)" strokeWidth="12" fill="none" strokeLinecap="round" opacity="0.6"/>
-                </svg>
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm backdrop-blur-sm bg-white/95">
+            <div className="max-w-[1920px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 bg-brand-600 rounded-lg flex items-center justify-center text-white shadow-md shadow-brand-500/30">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-800 tracking-tight leading-none">
+                            Spectra<span className="text-brand-600">Pro</span>
+                        </h1>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">
+                            Scientific Analysis
+                        </p>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                    <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        v2.3 Lab
+                    </span>
+                    <div className="h-9 w-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-white hover:shadow-md cursor-pointer transition-all" title="Perfil de Usuario">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                </div>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">
-                Spectra <span className="text-brand-primary font-normal text-xl">- Plataforma Quimiométrica NIR</span>
-            </h1>
         </header>
     );
 };

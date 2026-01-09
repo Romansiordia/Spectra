@@ -40,7 +40,6 @@ const App: React.FC = () => {
     
     const handleLoadDemoData = () => {
         setLoadingMessage('Cargando datos de demostración...');
-        // Simulate async loading for UX
         setTimeout(() => {
             parseCSV(DEMO_DATA_STRING, (results) => {
                 handleDataLoaded(results);
@@ -79,7 +78,6 @@ const App: React.FC = () => {
         }
         setLoadingMessage(`Generando modelo ${params.type.toUpperCase()}...`);
         
-        // Timeout para permitir que la UI muestre el loader
         setTimeout(() => {
             try {
                 const results = runPlsAnalysis(activeSamples, preprocessingSteps, params.nComponents);
@@ -96,9 +94,7 @@ const App: React.FC = () => {
     
     const handleDeactivateOutliers = (outlierIds: (string|number)[]) => {
          setSamples(prev => prev.map(s => outlierIds.includes(s.id) ? { ...s, active: false } : s));
-         // Automatically rerun model after deactivating if results exist
          if (modelResults) {
-             // Defer execution
              setTimeout(() => {
                 const params: ModelParams = { type: 'pls', nComponents: modelResults.nComponents };
                 handleRunModel(params);
@@ -115,11 +111,11 @@ const App: React.FC = () => {
     return (
         <>
             {loadingMessage && <Loader message={loadingMessage} />}
-            <div className="min-h-screen flex flex-col bg-gray-50 text-gray-800">
+            <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
                 <Header />
-                <main className="flex-grow p-4 lg:p-6 grid grid-cols-1 xl:grid-cols-4 gap-4 lg:gap-6">
+                <main className="flex-grow p-4 lg:p-6 grid grid-cols-1 xl:grid-cols-4 gap-6">
                     {/* Controls Column */}
-                    <div className="xl:col-span-1 flex flex-col gap-4 lg:gap-6">
+                    <div className="xl:col-span-1 flex flex-col gap-6">
                         <DataUploader onFileSelected={handleFileSelected} onLoadDemo={handleLoadDemoData} />
                         <SampleManager
                             samples={samples}
@@ -129,7 +125,7 @@ const App: React.FC = () => {
                     </div>
 
                     {/* Visualization Column */}
-                    <div className="xl:col-span-3 flex flex-col gap-4 lg:gap-6">
+                    <div className="xl:col-span-3 flex flex-col gap-6">
                         <SpectraViewer
                             wavelengths={wavelengths}
                             samples={spectraToDisplay}
@@ -144,7 +140,6 @@ const App: React.FC = () => {
                             disabled={activeSamples.length === 0}
                         />
                         
-                        {/* Modified to accept data for internal optimization */}
                         <ModelGenerator 
                             onRunModel={handleRunModel} 
                             disabled={activeSamples.length < 3}
@@ -163,8 +158,12 @@ const App: React.FC = () => {
                             />
                         ) : (
                             <Card>
-                                <div className="flex items-center justify-center h-40">
-                                    <p className="text-gray-400">Genere un modelo PLS para ver los resultados estadísticos (R, SEC, SECV).</p>
+                                <div className="flex flex-col items-center justify-center h-48 text-slate-400 bg-slate-50/50 rounded-lg m-4 border border-dashed border-slate-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <p className="font-medium">Resultados del Modelo</p>
+                                    <p className="text-sm">Genere un modelo PLS para ver el análisis estadístico.</p>
                                 </div>
                             </Card>
                         )}

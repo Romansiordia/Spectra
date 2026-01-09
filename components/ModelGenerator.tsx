@@ -4,7 +4,6 @@ import Button from './Button';
 import { runPlsOptimization } from '../services/chemometrics';
 import { OptimizationResult, Sample, PreprocessingStep } from '../types';
 
-// Access to global variables from index.html
 declare var Chart: any;
 
 export type ModelParams = 
@@ -13,20 +12,12 @@ export type ModelParams =
 interface ModelGeneratorProps {
     onRunModel: (params: ModelParams) => void;
     disabled: boolean;
-    // We need access to samples and preprocessing steps to run optimization locally inside component
-    // Alternatively, we could lift state up, but passing a callback or context is cleaner.
-    // For now, let's assume this component triggers the main app to run model, 
-    // but for optimization, we might need data. 
-    // To solve this cleanly without prop drilling activeSamples everywhere if not present:
-    // Let's rely on the parent updating, but wait... ModelGenerator in App.tsx doesn't receive data.
-    // I need to modify App.tsx to pass samples/steps OR lift optimization to App.tsx.
-    // Let's modify App.tsx to pass data here for optimization.
     activeSamples?: Sample[];
     preprocessingSteps?: PreprocessingStep[];
 }
 
 const GenerateIcon: React.FC = () => (
-     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-primary">
+     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-600">
         <circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path>
     </svg>
 );
@@ -67,7 +58,6 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
         }
 
         setIsOptimizing(true);
-        // Small timeout to allow UI to render spinner
         setTimeout(() => {
             try {
                 const maxLVs = Math.min(15, activeSamples.length - 1);
@@ -98,8 +88,8 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                             {
                                 label: 'SEC (Calibración)',
                                 data: optimizationData.map(d => d.sec),
-                                borderColor: '#3B82F6', // Blue
-                                backgroundColor: '#3B82F6',
+                                borderColor: '#0ea5e9', // Sky 500
+                                backgroundColor: '#0ea5e9',
                                 tension: 0.1,
                                 pointRadius: 4,
                                 pointHoverRadius: 6
@@ -107,8 +97,8 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                             {
                                 label: 'SECV (Validación)',
                                 data: optimizationData.map(d => d.secv),
-                                borderColor: '#10B981', // Green
-                                backgroundColor: '#10B981',
+                                borderColor: '#10b981', // Emerald 500
+                                backgroundColor: '#10b981',
                                 tension: 0.1,
                                 pointRadius: 4,
                                 pointHoverRadius: 6
@@ -123,8 +113,16 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                             intersect: false,
                         },
                         plugins: {
-                            title: { display: true, text: 'Error vs. Número de Componentes (Click para seleccionar)' },
+                            legend: { labels: { color: '#64748b' } },
+                            title: { display: true, text: 'Error vs. LVs', color: '#64748b' },
                             tooltip: {
+                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                titleColor: '#0f172a',
+                                bodyColor: '#334155',
+                                borderColor: '#e2e8f0',
+                                borderWidth: 1,
+                                padding: 10,
+                                titleFont: { family: 'Inter', size: 13 },
                                 callbacks: {
                                     footer: (tooltipItems: any[]) => {
                                         return 'Click para usar este valor.';
@@ -133,8 +131,16 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                             }
                         },
                         scales: {
-                            x: { title: { display: true, text: 'Variables Latentes (LVs)' } },
-                            y: { title: { display: true, text: 'RMSE (Error)' } }
+                            x: { 
+                                title: { display: true, text: 'Variables Latentes (LVs)', color: '#94a3b8' },
+                                ticks: { color: '#64748b' },
+                                grid: { color: '#e2e8f0' }
+                            },
+                            y: { 
+                                title: { display: true, text: 'RMSE (Error)', color: '#94a3b8' },
+                                ticks: { color: '#64748b' },
+                                grid: { color: '#e2e8f0' }
+                            }
                         },
                         onClick: (e: any, elements: any[]) => {
                             if (elements && elements.length > 0) {
@@ -153,14 +159,13 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
         };
     }, [optimizationData]);
 
-    // Determine suggestion (min SECV)
     const suggestedLV = optimizationData 
         ? optimizationData.reduce((prev, curr) => curr.secv < prev.secv ? curr : prev).components 
         : null;
 
     return (
         <Card>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
                 <GenerateIcon />
                 4. Generación de Modelo (PLS)
             </h2>
@@ -168,7 +173,7 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
             <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 items-end">
                     <div>
-                         <label htmlFor="lv-input" className="block text-sm text-gray-500 mb-1">Variables Latentes (LV):</label>
+                         <label htmlFor="lv-input" className="block text-xs font-bold text-slate-500 mb-1">Variables Latentes (LV)</label>
                         <input
                             type="number"
                             id="lv-input"
@@ -176,7 +181,7 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                             onChange={(e) => setNComponents(e.target.value)}
                             min="1"
                             max="20"
-                            className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                            className="w-full bg-white border border-slate-300 text-slate-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
                         />
                     </div>
                     <Button variant="secondary" onClick={handleOptimize} disabled={disabled || isOptimizing} className="h-[38px] text-xs">
@@ -189,13 +194,13 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                 </div>
                 
                 {optimizationData && (
-                    <div className="border rounded-md p-2 bg-gray-50 animate-fade-in">
+                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 animate-fade-in shadow-inner">
                         <div className="h-48 relative">
                             <canvas ref={chartRef}></canvas>
                         </div>
                         {suggestedLV && (
-                            <p className="text-xs text-center mt-2 text-gray-600">
-                                Mínimo error de validación en <span className="font-bold text-brand-primary">{suggestedLV} LVs</span>.
+                            <p className="text-xs text-center mt-2 text-slate-500">
+                                Mínimo error de validación en <span className="font-bold text-brand-600">{suggestedLV} LVs</span>.
                             </p>
                         )}
                     </div>
