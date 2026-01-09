@@ -1,0 +1,5 @@
+{
+  "name": "Spectra Pro - Plataforma Quimiométrica NIR",
+  "description": "Una plataforma web interactiva para el análisis quimiométrico de datos espectrales NIR. Permite cargar datos, aplicar pre-procesamientos, visualizar espectros y generar modelos de regresión Ridge para predicciones cuantitativas.",
+  "requestFramePermissions": []
+}
