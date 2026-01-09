@@ -123,7 +123,6 @@ const App: React.FC = () => {
                             onToggle={handleToggleSample}
                             onToggleAll={handleToggleAllSamples}
                         />
-                        <ModelPredictor />
                     </div>
 
                     {/* Visualization Column */}
@@ -169,6 +168,9 @@ const App: React.FC = () => {
                                 </div>
                             </Card>
                         )}
+
+                        {/* Model Predictor Moved Here for Better Visibility */}
+                        <ModelPredictor />
                     </div>
                 </main>
             </div>

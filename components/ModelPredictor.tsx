@@ -136,19 +136,20 @@ const ModelPredictor: React.FC = () => {
                 {predictions.length > 0 && (
                     <div className="animate-fade-in">
                         <h3 className="text-sm font-bold text-slate-800 mb-3">Resultados de Predicción</h3>
-                        <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg">
+                        {/* Increased max-height from max-h-60 to max-h-[500px] for better visibility */}
+                        <div className="max-h-[500px] overflow-y-auto custom-scrollbar border border-slate-200 rounded-lg bg-white shadow-inner">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0">
+                                <thead className="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 shadow-sm z-10">
                                     <tr>
-                                        <th className="px-4 py-2">ID Muestra</th>
-                                        <th className="px-4 py-2 text-right">Valor Predicho</th>
+                                        <th className="px-6 py-3 font-bold border-b border-slate-200">ID Muestra</th>
+                                        <th className="px-6 py-3 text-right font-bold border-b border-slate-200">Valor Predicho</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 bg-white">
+                                <tbody className="divide-y divide-slate-100">
                                     {predictions.map((p, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50">
-                                            <td className="px-4 py-2 font-medium text-slate-700">{p.id}</td>
-                                            <td className="px-4 py-2 text-right font-mono text-brand-600 font-bold">{p.value.toFixed(4)}</td>
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-3 font-medium text-slate-700">{p.id}</td>
+                                            <td className="px-6 py-3 text-right font-mono text-brand-600 font-bold text-base">{p.value.toFixed(4)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
