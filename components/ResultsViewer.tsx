@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import Card from './Card';
 import Button from './Button';
@@ -30,6 +31,13 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
     const residuals = results.model.residuals;
     const outliers = results.mahalanobis.distances.filter(d => d.isOutlier);
     const [selectedOutliers, setSelectedOutliers] = useState<Set<string|number>>(new Set());
+    const [manualSelection, setManualSelection] = useState<Set<string | number>>(new Set());
+
+    useEffect(() => {
+        // Reset selections when model results change
+        setSelectedOutliers(new Set());
+        setManualSelection(new Set());
+    }, [results]);
 
     useEffect(() => {
         if (activeTab === 'correlation' && chartRef.current) {
@@ -42,6 +50,26 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                         maintainAspectRatio: false,
                         responsive: true,
                         animation: false,
+                        onClick: (evt: any) => {
+                            const points = chartInstance.getElementsAtEventForMode(evt, 'point', { intersect: true }, true);
+                            if (points.length > 0) {
+                                const point = points[0];
+                                const dataset = chartInstance.data.datasets[point.datasetIndex];
+                                const dataPoint = (dataset.data[point.index] as any);
+                                if (dataPoint && dataPoint.id !== undefined) {
+                                    const sampleId = dataPoint.id;
+                                    setManualSelection(prev => {
+                                        const newSet = new Set(prev);
+                                        if (newSet.has(sampleId)) {
+                                            newSet.delete(sampleId);
+                                        } else {
+                                            newSet.add(sampleId);
+                                        }
+                                        return newSet;
+                                    });
+                                }
+                            }
+                        },
                         plugins: {
                             legend: { 
                                 position: 'bottom',
@@ -57,11 +85,14 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                 padding: 10,
                                 titleFont: { family: 'Inter', size: 13, weight: 'bold' },
                                 callbacks: {
+                                    title: (context: any) => {
+                                        const dataPoint = context[0].dataset.data[context[0].dataIndex] as any;
+                                        return `Muestra: ${dataPoint.id}`;
+                                    },
                                     label: (context: any) => {
-                                        const label = context.dataset.label || '';
                                         const x = context.parsed.x;
                                         const y = context.parsed.y;
-                                        return `${label}: Ref ${x.toFixed(2)} / Pred ${y.toFixed(2)}`;
+                                        return `Ref ${x.toFixed(2)} / Pred ${y.toFixed(2)}`;
                                     }
                                 }
                             }
@@ -82,64 +113,6 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                 });
                 
                 chartInstanceRef.current = chartInstance;
-
-                if (results) {
-                    const { actual, predicted } = results.model.correlation;
-                    const inliersData: {x: number, y: number}[] = [];
-                    const outliersData: {x: number, y: number}[] = [];
-                    
-                    results.mahalanobis.distances.forEach((d, i) => {
-                        const point = { x: actual[i], y: predicted[i] };
-                        if (d.isOutlier) outliersData.push(point);
-                        else inliersData.push(point);
-                    });
-
-                    const allValues = [...actual, ...predicted];
-                    if (allValues.length > 0) {
-                        const minVal = Math.min(...allValues);
-                        const maxVal = Math.max(...allValues);
-                        const padding = (maxVal - minVal) * 0.1;
-
-                        chartInstance.data.datasets = [
-                            { 
-                                label: 'Muestras Válidas', 
-                                data: inliersData, 
-                                backgroundColor: '#0ea5e9', // Brand 500
-                                borderColor: '#0284c7', 
-                                borderWidth: 1,
-                                pointRadius: 5,
-                                pointHoverRadius: 7
-                            },
-                            { 
-                                label: 'Posibles Outliers', 
-                                data: outliersData, 
-                                backgroundColor: '#ef4444', 
-                                borderColor: '#b91c1c', 
-                                borderWidth: 1,
-                                pointRadius: 6, 
-                                pointStyle: 'triangle',
-                                pointHoverRadius: 8
-                            },
-                            { 
-                                type: 'line', 
-                                label: 'Línea Ideal (1:1)', 
-                                data: [{x: minVal - padding, y: minVal - padding}, {x: maxVal + padding, y: maxVal + padding}], 
-                                borderColor: '#64748b', 
-                                borderWidth: 2, 
-                                borderDash: [6, 6], 
-                                pointRadius: 0, 
-                                fill: false 
-                            }
-                        ];
-                        
-                        chartInstance.options.scales.x.min = minVal - padding;
-                        chartInstance.options.scales.x.max = maxVal + padding;
-                        chartInstance.options.scales.y.min = minVal - padding;
-                        chartInstance.options.scales.y.max = maxVal + padding;
-                        
-                        chartInstance.update();
-                    }
-                }
             }
         }
 
@@ -149,7 +122,66 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                 chartInstanceRef.current = null;
             }
         };
-    }, [activeTab, results]);
+    }, [activeTab]);
+
+    useEffect(() => {
+        const chartInstance = chartInstanceRef.current;
+        if (chartInstance && results) {
+            const allDataPoints = results.model.correlation.actual.map((act, i) => ({
+                x: act,
+                y: results.model.correlation.predicted[i],
+                id: results.model.residuals[i].id,
+                isOutlier: results.mahalanobis.distances.find(d => d.id === results.model.residuals[i].id)?.isOutlier || false
+            }));
+
+            const inliersData = allDataPoints.filter(p => !p.isOutlier);
+            const outliersData = allDataPoints.filter(p => p.isOutlier);
+
+            const allValues = [...results.model.correlation.actual, ...results.model.correlation.predicted];
+            if (allValues.length > 0) {
+                const minVal = Math.min(...allValues);
+                const maxVal = Math.max(...allValues);
+                const padding = (maxVal - minVal) * 0.1;
+
+                chartInstance.data.datasets = [
+                    { 
+                        label: 'Muestras Válidas', 
+                        data: inliersData, 
+                        backgroundColor: '#0ea5e9',
+                        pointRadius: (ctx: any) => manualSelection.has(ctx.raw.id) ? 8 : 5,
+                        borderWidth: (ctx: any) => manualSelection.has(ctx.raw.id) ? 3 : 1,
+                        borderColor: (ctx: any) => manualSelection.has(ctx.raw.id) ? '#f59e0b' : '#0284c7'
+                    },
+                    { 
+                        label: 'Posibles Outliers', 
+                        data: outliersData, 
+                        backgroundColor: '#ef4444', 
+                        pointStyle: 'triangle',
+                        pointRadius: (ctx: any) => manualSelection.has(ctx.raw.id) ? 9 : 6,
+                        borderWidth: (ctx: any) => manualSelection.has(ctx.raw.id) ? 3 : 1,
+                        borderColor: (ctx: any) => manualSelection.has(ctx.raw.id) ? '#f59e0b' : '#b91c1c'
+                    },
+                    { 
+                        type: 'line', 
+                        label: 'Línea Ideal (1:1)', 
+                        data: [{x: minVal - padding, y: minVal - padding}, {x: maxVal + padding, y: maxVal + padding}], 
+                        borderColor: '#64748b', 
+                        borderWidth: 2, 
+                        borderDash: [6, 6], 
+                        pointRadius: 0, 
+                        fill: false 
+                    }
+                ];
+                
+                chartInstance.options.scales.x.min = minVal - padding;
+                chartInstance.options.scales.x.max = maxVal + padding;
+                chartInstance.options.scales.y.min = minVal - padding;
+                chartInstance.options.scales.y.max = maxVal + padding;
+                
+                chartInstance.update();
+            }
+        }
+    }, [results, manualSelection, activeTab, propertyName]);
 
     const handleExportConfig = () => {
         const config = {
@@ -198,6 +230,12 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
         onDeactivateOutliers(Array.from(selectedOutliers));
         setSelectedOutliers(new Set());
     };
+
+    const handleDeactivateManualClick = () => {
+        if (manualSelection.size === 0) return;
+        onDeactivateOutliers(Array.from(manualSelection));
+        setManualSelection(new Set());
+    };
     
     const TabButton = ({ tabId, label, icon }: { tabId: string; label: string; icon?: React.ReactNode }) => (
         <button
@@ -214,7 +252,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
             <div className="bg-white border-b border-slate-200">
                 <div className="flex overflow-x-auto no-scrollbar">
                     <TabButton tabId="correlation" label="Diagnóstico Gráfico" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>} />
-                    <TabButton tabId="stats" label="Métricas & Outliers" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>} />
+                    <TabButton tabId="stats" label="Métricas de Regresión" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>} />
                     <TabButton tabId="residuals" label="Tabla Residuos" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>} />
                     <TabButton tabId="full-data" label="Exportar" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>} />
                 </div>
@@ -222,10 +260,10 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
 
             <div className="p-6 bg-slate-50 min-h-[400px]">
                 {activeTab === 'correlation' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
-                        {/* KPI Column */}
-                        <div className="lg:col-span-3 space-y-4">
-                            <div className="bg-slate-800 text-white p-6 rounded-xl shadow-xl border border-slate-700 relative overflow-hidden group">
+                    <div className="flex flex-col gap-6 animate-fade-in">
+                        {/* Top Stats Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="lg:col-span-2 bg-slate-800 text-white p-6 rounded-xl shadow-xl border border-slate-700 relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                     <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                 </div>
@@ -242,45 +280,37 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-                                <StatCard label="SEC (Calibración)" value={results.model.sec.toFixed(4)} colorClass="text-brand-600" />
-                                <StatCard label="SECV (Validación)" value={results.model.secv.toFixed(4)} colorClass="text-emerald-600" subtext="Target Minimization" />
-                            </div>
+                             <StatCard label="SEC (Calibración)" value={results.model.sec.toFixed(4)} colorClass="text-brand-600" />
+                             <StatCard label="SECV (Validación)" value={results.model.secv.toFixed(4)} colorClass="text-emerald-600" subtext="Target Minimization" />
                         </div>
                         
-                        {/* Chart Column - Dark Themed */}
-                        <div className="lg:col-span-9 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner-dark relative h-[500px]">
+                        {/* Chart */}
+                        <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner-dark relative h-[500px]">
                             <canvas ref={chartRef}></canvas>
                         </div>
-                    </div>
-                )}
 
-                {activeTab === 'stats' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-                         <div className="bg-white rounded-xl border border-slate-200 shadow-card overflow-hidden">
-                            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                                <h4 className="font-bold text-slate-700">Parámetros de Regresión</h4>
-                            </div>
-                            <div className="p-6 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                                        <div className="text-xs font-bold text-slate-400 uppercase mb-2">Pendiente (Slope)</div>
-                                        <div className="font-mono text-xl font-semibold text-slate-700">{results.model.slope.toFixed(5)}</div>
-                                    </div>
-                                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                                        <div className="text-xs font-bold text-slate-400 uppercase mb-2">Offset (Bias)</div>
-                                        <div className="font-mono text-xl font-semibold text-slate-700">{results.model.offset.toFixed(5)}</div>
-                                    </div>
+                        {/* Manual Outlier Selection */}
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-card p-6">
+                            <h4 className="font-bold text-slate-700 mb-2">Selección Manual de Outliers</h4>
+                            <p className="text-sm text-slate-500 mb-4">Haga clic en los puntos del gráfico para seleccionarlos/deseleccionarlos. Una vez seleccionados, puede desactivarlos para recalcular el modelo.</p>
+                            {manualSelection.size > 0 && 
+                                <div className="text-sm text-slate-700 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
+                                    <span className="font-bold">{manualSelection.size}</span> muestra(s) seleccionada(s): <span className="font-mono bg-amber-100 px-1 py-0.5 rounded">{Array.from(manualSelection).slice(0, 5).join(', ')}{manualSelection.size > 5 ? '...' : ''}</span>
                                 </div>
-                                <div className="text-sm text-slate-600 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                    <p className="mb-2"><strong>Validación de Sesgo:</strong> Compruebe si la pendiente es cercana a 1.0 y el offset cercano a 0.0 para asegurar robustez.</p>
-                                    <p><strong>Ratio Desempeño:</strong> {results.model.sec > 0 ? `RPD ≈ ${(results.model.secv / results.model.sec).toFixed(2)}` : 'N/A'}</p>
-                                </div>
-                            </div>
-                         </div>
-                         
-                         <div className="bg-white rounded-xl border border-slate-200 shadow-card overflow-hidden flex flex-col">
+                            }
+                            <Button 
+                                onClick={handleDeactivateManualClick} 
+                                disabled={manualSelection.size === 0}
+                                className="w-full"
+                                variant="danger"
+                            >
+                                Desactivar {manualSelection.size > 0 ? `${manualSelection.size} ` : ''}Muestra(s) Seleccionada(s) y Recalcular
+                            </Button>
+                        </div>
+
+
+                        {/* Outlier Management Table */}
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-card overflow-hidden flex flex-col">
                             <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
                                 <h4 className="font-bold text-slate-700">Detección de Outliers (Mahalanobis)</h4>
                                 {outliers.length > 0 && <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">{outliers.length} Detectados</span>}
@@ -320,7 +350,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                         </div>
                                         <div className="p-4 border-t border-slate-200 bg-slate-50">
                                             <Button onClick={handleDeactivateClick} variant="danger" size="sm" className="w-full">
-                                                Desactivar Outliers Seleccionados
+                                                Desactivar Outliers Seleccionados y Recalcular
                                             </Button>
                                         </div>
                                     </>
@@ -333,6 +363,32 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                         <p className="text-sm text-slate-500 mt-1">No se detectaron outliers espectrales significativos.</p>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'stats' && (
+                    <div className="animate-fade-in max-w-2xl mx-auto">
+                         <div className="bg-white rounded-xl border border-slate-200 shadow-card overflow-hidden">
+                            <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                                <h4 className="font-bold text-slate-700">Parámetros de Regresión</h4>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                        <div className="text-xs font-bold text-slate-400 uppercase mb-2">Pendiente (Slope)</div>
+                                        <div className="font-mono text-xl font-semibold text-slate-700">{results.model.slope.toFixed(5)}</div>
+                                    </div>
+                                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                        <div className="text-xs font-bold text-slate-400 uppercase mb-2">Offset (Bias)</div>
+                                        <div className="font-mono text-xl font-semibold text-slate-700">{results.model.offset.toFixed(5)}</div>
+                                    </div>
+                                </div>
+                                <div className="text-sm text-slate-600 bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                    <p className="mb-2"><strong>Validación de Sesgo:</strong> Compruebe si la pendiente es cercana a 1.0 y el offset cercano a 0.0 para asegurar robustez.</p>
+                                    <p><strong>Ratio Desempeño:</strong> {results.model.sec > 0 ? `RPD ≈ ${(results.model.secv / results.model.sec).toFixed(2)}` : 'N/A'}</p>
+                                </div>
                             </div>
                          </div>
                     </div>
@@ -353,7 +409,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {residuals.map((r, idx) => {
-                                        const relError = (Math.abs(r.residual) / Math.abs(r.actual)) * 100;
+                                        const relError = Math.abs(r.actual) > 1e-9 ? (Math.abs(r.residual) / Math.abs(r.actual)) * 100 : 0;
                                         const isHighError = Math.abs(r.residual) > results.model.sec * 2;
                                         return (
                                             <tr key={r.id} className={`hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>

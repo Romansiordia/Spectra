@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Card from './Card';
 import Button from './Button';
@@ -25,9 +26,6 @@ const PREPROCESSING_METHODS = {
     'detrend': { name: 'Detrend', params: [] },
 };
 
-const EditIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-600"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
-);
 const VisualizeIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.14 10.28-9.23-9.23a1.5 1.5 0 0 0-2.12 0l-9.23 9.23a1.5 1.5 0 0 0 0 2.12l9.23 9.23a1.5 1.5 0 0 0 2.12 0l9.23-9.23a1.5 1.5 0 0 0 0-2.12z"></path><path d="M12 22V2"></path></svg>
 );
@@ -68,50 +66,64 @@ const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSte
     };
 
     return (
-        <Card>
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800"><EditIcon />3. Pre-procesamiento</h2>
-            <div className="space-y-3 mb-4">
-                {steps.map((step, index) => {
-                    const methodInfo = PREPROCESSING_METHODS[step.method];
-                    return (
-                        <div key={index} className="p-3 border border-slate-200 rounded-lg bg-slate-50 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <select
-                                    value={step.method}
-                                    onChange={(e) => handleMethodChange(index, e.target.value as PreprocessingStep['method'])}
-                                    className="w-full bg-white border border-slate-300 text-slate-700 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
-                                >
-                                    {Object.entries(PREPROCESSING_METHODS).map(([key, value]) => (
-                                        <option key={key} value={key}>{value.name}</option>
-                                    ))}
-                                </select>
-                                <button onClick={() => removeStep(index)} className="ml-2 p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                    <RemoveIcon />
-                                </button>
-                            </div>
-                             {methodInfo.params.length > 0 && (
-                                <div className="grid grid-cols-3 gap-3 mt-3">
-                                    {(methodInfo.params as any[]).map(param => (
-                                        <div key={param.id} className="text-xs">
-                                            <label htmlFor={`${param.id}-${index}`} className="text-slate-500 font-medium mb-1 block">{param.name}</label>
-                                            <input
-                                                type={param.type}
-                                                id={`${param.id}-${index}`}
-                                                value={step.params[param.id] || ''}
-                                                onChange={(e) => handleParamChange(index, param.id, e.target.value)}
-                                                className="w-full bg-white border border-slate-300 text-slate-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                                            />
-                                        </div>
-                                    ))}
+        <Card className="h-full">
+            <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between gap-3 mb-4 border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="h-7 w-7 bg-brand-50 text-brand-600 border border-brand-100 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">2</div>
+                        <h3 className="text-lg font-bold text-slate-800">Pre-procesamiento</h3>
+                    </div>
+                    <Button onClick={onVisualize} disabled={disabled} size="sm" variant="primary">
+                        <VisualizeIcon />
+                        Visualizar
+                    </Button>
+                </div>
+                
+                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 min-h-[8rem]">
+                    {steps.map((step, index) => {
+                        const methodInfo = PREPROCESSING_METHODS[step.method];
+                        return (
+                            <div key={index} className="p-3 border border-slate-200 rounded-lg bg-slate-50 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <select
+                                        value={step.method}
+                                        onChange={(e) => handleMethodChange(index, e.target.value as PreprocessingStep['method'])}
+                                        className="w-full bg-white border border-slate-300 text-slate-700 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
+                                    >
+                                        {Object.entries(PREPROCESSING_METHODS).map(([key, value]) => (
+                                            <option key={key} value={key}>{value.name}</option>
+                                        ))}
+                                    </select>
+                                    <button onClick={() => removeStep(index)} className="ml-2 p-1 text-slate-400 hover:text-red-500 transition-colors">
+                                        <RemoveIcon />
+                                    </button>
                                 </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-            <div className="flex flex-col gap-2">
-                <Button onClick={onVisualize} disabled={disabled}><VisualizeIcon />Visualizar Pre-procesamiento</Button>
-                <Button variant="secondary" onClick={addStep} disabled={disabled}><AddIcon />Añadir Paso</Button>
+                                 {methodInfo.params.length > 0 && (
+                                    <div className="grid grid-cols-3 gap-3 mt-3">
+                                        {(methodInfo.params as any[]).map(param => (
+                                            <div key={param.id} className="text-xs">
+                                                <label htmlFor={`${param.id}-${index}`} className="text-slate-500 font-medium mb-1 block">{param.name}</label>
+                                                <input
+                                                    type={param.type}
+                                                    id={`${param.id}-${index}`}
+                                                    value={step.params[param.id] || ''}
+                                                    onChange={(e) => handleParamChange(index, param.id, e.target.value)}
+                                                    className="w-full bg-white border border-slate-300 text-slate-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+                
+                <div className="pt-4">
+                    <Button variant="secondary" onClick={addStep} disabled={disabled} className="w-full">
+                        <AddIcon />Añadir Paso
+                    </Button>
+                </div>
             </div>
         </Card>
     );

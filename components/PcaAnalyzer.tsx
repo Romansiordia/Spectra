@@ -13,7 +13,7 @@ interface PcaAnalyzerProps {
 }
 
 const PcaIcon: React.FC = () => (
-     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-primary">
+     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-600">
         <circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle>
     </svg>
 );
@@ -76,7 +76,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({ onRunPca, pcaResults, disable
     return (
         <Card>
             <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-primary"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-600"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
                 Análisis Exploratorio (PCA)
             </h2>
             <p className="text-sm text-gray-500 mb-4">Genere un gráfico de scores PCA (simulado) para visualizar la similitud y agrupamiento entre las muestras activas.</p>

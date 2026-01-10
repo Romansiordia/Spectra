@@ -1,6 +1,7 @@
+
 import React, { useState, useCallback } from 'react';
 import { Sample, PreprocessingStep, ModelResults } from './types';
-import { parseCSV, DEMO_DATA_STRING } from './services/csvParser';
+import { parseCSV } from './services/csvParser';
 import { applyPreprocessingLogic, runPlsAnalysis } from './services/chemometrics';
 import Header from './components/Header';
 import Loader from './components/Loader';
@@ -40,16 +41,6 @@ const App: React.FC = () => {
             handleDataLoaded(results);
             setLoadingMessage(null);
         });
-    };
-    
-    const handleLoadDemoData = () => {
-        setLoadingMessage('Cargando datos de demostración...');
-        setTimeout(() => {
-            parseCSV(DEMO_DATA_STRING, (results) => {
-                handleDataLoaded(results);
-                setLoadingMessage(null);
-            });
-        }, 100);
     };
 
     const handleToggleSample = (index: number) => {
@@ -142,60 +133,67 @@ const App: React.FC = () => {
                     
                     {/* VISTA DE CALIBRACIÓN */}
                     {currentView === 'calibration' && (
-                        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 animate-fade-in">
-                            {/* Controls Column */}
-                            <div className="xl:col-span-1 flex flex-col gap-6">
-                                <DataUploader onFileSelected={handleFileSelected} onLoadDemo={handleLoadDemoData} />
-                                <SampleManager
-                                    samples={samples}
-                                    onToggle={handleToggleSample}
-                                    onToggleAll={handleToggleAllSamples}
-                                />
-                            </div>
-
-                            {/* Visualization Column */}
-                            <div className="xl:col-span-3 flex flex-col gap-6">
-                                <SpectraViewer
-                                    wavelengths={wavelengths}
-                                    samples={spectraToDisplay}
-                                    isProcessed={!!processedSpectra}
-                                    onReset={handleResetVisualization}
-                                />
-                                
-                                <PreprocessingEditor
-                                    steps={preprocessingSteps}
-                                    setSteps={setPreprocessingSteps}
-                                    onVisualize={handleVisualizePreprocessing}
-                                    disabled={activeSamples.length === 0}
-                                />
-                                
-                                <ModelGenerator 
-                                    onRunModel={handleRunModel} 
-                                    disabled={activeSamples.length < 3}
-                                    activeSamples={activeSamples}
-                                    preprocessingSteps={preprocessingSteps}
-                                />
-                                
-                                {modelResults ? (
-                                    <ResultsViewer 
-                                        results={modelResults}
-                                        propertyName={analyticalProperty}
-                                        preprocessingSteps={preprocessingSteps}
-                                        activeSamples={activeSamples.map(s => s.id)}
-                                        onDeactivateOutliers={handleDeactivateOutliers}
-                                        wavelengths={wavelengths}
+                        <div className="flex flex-col gap-6 animate-fade-in">
+                            {/* Main Workspace: Controls & Visualization */}
+                            <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+                                {/* Left Column: Workflow Steps 1, 2 & 3 */}
+                                <div className="flex flex-col gap-6 lg:col-span-2">
+                                    <DataUploader onFileSelected={handleFileSelected} />
+                                    <PreprocessingEditor
+                                        steps={preprocessingSteps}
+                                        setSteps={setPreprocessingSteps}
+                                        onVisualize={handleVisualizePreprocessing}
+                                        disabled={activeSamples.length === 0}
                                     />
-                                ) : (
-                                    <Card>
-                                        <div className="flex flex-col items-center justify-center h-48 text-slate-400 bg-slate-50/50 rounded-lg m-4 border border-dashed border-slate-300">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            <p className="font-medium">Resultados del Modelo</p>
-                                            <p className="text-sm">Genere un modelo PLS para ver el análisis estadístico.</p>
+                                    <ModelGenerator 
+                                        onRunModel={handleRunModel} 
+                                        disabled={activeSamples.length < 3}
+                                        activeSamples={activeSamples}
+                                        preprocessingSteps={preprocessingSteps}
+                                    />
+                                </div>
+
+                                {/* Right Column: Data Interaction */}
+                                <div className="flex flex-col gap-6 lg:col-span-5">
+                                    <SpectraViewer
+                                        wavelengths={wavelengths}
+                                        samples={spectraToDisplay}
+                                        isProcessed={!!processedSpectra}
+                                        onReset={handleResetVisualization}
+                                    />
+                                    <SampleManager
+                                        samples={samples}
+                                        onToggle={handleToggleSample}
+                                        onToggleAll={handleToggleAllSamples}
+                                    />
+                                    {/* Final Step: Results (Now inside the main grid) */}
+                                    <div>
+                                        <div className="flex items-center gap-3 mb-4">
+                                             <div className="h-7 w-7 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">4</div>
+                                             <h2 className="text-lg font-bold text-slate-800">Análisis de Resultados del Modelo</h2>
                                         </div>
-                                    </Card>
-                                )}
+                                        {modelResults ? (
+                                            <ResultsViewer 
+                                                results={modelResults}
+                                                propertyName={analyticalProperty}
+                                                preprocessingSteps={preprocessingSteps}
+                                                activeSamples={activeSamples.map(s => s.id)}
+                                                onDeactivateOutliers={handleDeactivateOutliers}
+                                                wavelengths={wavelengths}
+                                            />
+                                        ) : (
+                                            <Card>
+                                                <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-300">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                    <p className="font-semibold text-slate-600 text-lg">Resultados del Modelo</p>
+                                                    <p className="text-sm text-slate-500 mt-1">Genere un modelo en el paso 3 para ver el análisis estadístico aquí.</p>
+                                                </div>
+                                            </Card>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

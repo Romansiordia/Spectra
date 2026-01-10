@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import Card from './Card';
 import Button from './Button';
@@ -15,12 +16,6 @@ interface ModelGeneratorProps {
     activeSamples?: Sample[];
     preprocessingSteps?: PreprocessingStep[];
 }
-
-const GenerateIcon: React.FC = () => (
-     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-600">
-        <circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path>
-    </svg>
-);
 
 const RunIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -164,53 +159,55 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
         : null;
 
     return (
-        <Card>
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
-                <GenerateIcon />
-                4. Generación de Modelo (PLS)
-            </h2>
-            
-            <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 items-end">
-                    <div>
-                         <label htmlFor="lv-input" className="block text-xs font-bold text-slate-500 mb-1">Variables Latentes (LV)</label>
-                        <input
-                            type="number"
-                            id="lv-input"
-                            value={nComponents}
-                            onChange={(e) => setNComponents(e.target.value)}
-                            min="1"
-                            max="20"
-                            className="w-full bg-white border border-slate-300 text-slate-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
-                        />
-                    </div>
-                    <Button variant="secondary" onClick={handleOptimize} disabled={disabled || isOptimizing} className="h-[38px] text-xs">
-                        {isOptimizing ? 'Analizando...' : (
-                            <>
-                                <OptimizeIcon /> Analizar Componentes
-                            </>
-                        )}
-                    </Button>
+        <Card className="h-full">
+            <div className="flex flex-col h-full">
+                <div className="flex items-center gap-3 mb-4 border-b border-slate-200 pb-3">
+                    <div className="h-7 w-7 bg-brand-50 text-brand-600 border border-brand-100 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">3</div>
+                    <h3 className="text-lg font-bold text-slate-800">Generación de Modelo (PLS)</h3>
                 </div>
                 
-                {optimizationData && (
-                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 animate-fade-in shadow-inner">
-                        <div className="h-48 relative">
-                            <canvas ref={chartRef}></canvas>
+                <div className="flex-1 flex flex-col space-y-4">
+                    <div className="grid grid-cols-2 gap-4 items-end">
+                        <div>
+                             <label htmlFor="lv-input" className="block text-xs font-bold text-slate-500 mb-1">Variables Latentes (LV)</label>
+                            <input
+                                type="number"
+                                id="lv-input"
+                                value={nComponents}
+                                onChange={(e) => setNComponents(e.target.value)}
+                                min="1"
+                                max="20"
+                                className="w-full bg-white border border-slate-300 text-slate-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
+                            />
                         </div>
-                        {suggestedLV && (
-                            <p className="text-xs text-center mt-2 text-slate-500">
-                                Mínimo error de validación en <span className="font-bold text-brand-600">{suggestedLV} LVs</span>.
-                            </p>
-                        )}
+                        <Button variant="secondary" onClick={handleOptimize} disabled={disabled || isOptimizing} className="h-[38px] text-xs">
+                            {isOptimizing ? 'Analizando...' : (
+                                <>
+                                    <OptimizeIcon /> Analizar Componentes
+                                </>
+                            )}
+                        </Button>
                     </div>
-                )}
+                    
+                    {optimizationData && (
+                        <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 animate-fade-in shadow-inner">
+                            <div className="h-48 relative">
+                                <canvas ref={chartRef}></canvas>
+                            </div>
+                            {suggestedLV && (
+                                <p className="text-xs text-center mt-2 text-slate-500">
+                                    Mínimo error de validación en <span className="font-bold text-brand-600">{suggestedLV} LVs</span>.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                <div className="pt-2">
-                    <Button onClick={handleRun} disabled={disabled} className="w-full">
-                        <RunIcon />
-                        Generar Modelo PLS Final
-                    </Button>
+                    <div className="pt-2 mt-auto">
+                        <Button onClick={handleRun} disabled={disabled} className="w-full">
+                            <RunIcon />
+                            Generar Modelo PLS Final
+                        </Button>
+                    </div>
                 </div>
             </div>
         </Card>
