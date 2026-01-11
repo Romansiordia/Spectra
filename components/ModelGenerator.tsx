@@ -1,11 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import Card from './Card';
 import Button from './Button';
 import { runPlsOptimization } from '../services/chemometrics';
-import { OptimizationResult, Sample, PreprocessingStep } from '../types';
-
-declare var Chart: any;
+import { Sample, PreprocessingStep } from '../types';
 
 export type ModelParams = 
     | { type: 'pls'; nComponents: number };
@@ -32,10 +30,7 @@ const OptimizeIcon: React.FC = () => (
 const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, activeSamples, preprocessingSteps }) => {
     const [nComponents, setNComponents] = useState('5');
     const [isOptimizing, setIsOptimizing] = useState(false);
-    const [optimizationData, setOptimizationData] = useState<OptimizationResult[] | null>(null);
-    
-    const chartRef = useRef<HTMLCanvasElement>(null);
-    const chartInstanceRef = useRef<any>(null);
+    const [suggestedLV, setSuggestedLV] = useState<number | null>(null);
 
     const handleRun = () => {
         const lv = parseInt(nComponents);
@@ -53,11 +48,20 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
         }
 
         setIsOptimizing(true);
+        setSuggestedLV(null);
         setTimeout(() => {
             try {
                 const maxLVs = Math.min(15, activeSamples.length - 1);
                 const results = runPlsOptimization(activeSamples, preprocessingSteps, maxLVs);
-                setOptimizationData(results);
+                
+                if (results.length > 0) {
+                    const bestResult = results.reduce((prev, curr) => curr.secv < prev.secv ? curr : prev);
+                    setSuggestedLV(bestResult.components);
+                    setNComponents(bestResult.components.toString());
+                } else {
+                    alert("No se pudo determinar un valor óptimo.");
+                }
+
             } catch (e) {
                 console.error(e);
                 alert("Error durante la optimización.");
@@ -67,97 +71,6 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
         }, 50);
     };
 
-    useEffect(() => {
-        if (optimizationData && chartRef.current) {
-            if (chartInstanceRef.current) {
-                chartInstanceRef.current.destroy();
-            }
-
-            const ctx = chartRef.current.getContext('2d');
-            if (ctx) {
-                chartInstanceRef.current = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: optimizationData.map(d => d.components),
-                        datasets: [
-                            {
-                                label: 'SEC (Calibración)',
-                                data: optimizationData.map(d => d.sec),
-                                borderColor: '#0ea5e9', // Sky 500
-                                backgroundColor: '#0ea5e9',
-                                tension: 0.1,
-                                pointRadius: 4,
-                                pointHoverRadius: 6
-                            },
-                            {
-                                label: 'SECV (Validación)',
-                                data: optimizationData.map(d => d.secv),
-                                borderColor: '#10b981', // Emerald 500
-                                backgroundColor: '#10b981',
-                                tension: 0.1,
-                                pointRadius: 4,
-                                pointHoverRadius: 6
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        },
-                        plugins: {
-                            legend: { labels: { color: '#64748b' } },
-                            title: { display: true, text: 'Error vs. LVs', color: '#64748b' },
-                            tooltip: {
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                titleColor: '#0f172a',
-                                bodyColor: '#334155',
-                                borderColor: '#e2e8f0',
-                                borderWidth: 1,
-                                padding: 10,
-                                titleFont: { family: 'Inter', size: 13 },
-                                callbacks: {
-                                    footer: (tooltipItems: any[]) => {
-                                        return 'Click para usar este valor.';
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: { 
-                                title: { display: true, text: 'Variables Latentes (LVs)', color: '#94a3b8' },
-                                ticks: { color: '#64748b' },
-                                grid: { color: '#e2e8f0' }
-                            },
-                            y: { 
-                                title: { display: true, text: 'RMSE (Error)', color: '#94a3b8' },
-                                ticks: { color: '#64748b' },
-                                grid: { color: '#e2e8f0' }
-                            }
-                        },
-                        onClick: (e: any, elements: any[]) => {
-                            if (elements && elements.length > 0) {
-                                const index = elements[0].index;
-                                const selectedComps = optimizationData[index].components;
-                                setNComponents(selectedComps.toString());
-                            }
-                        }
-                    }
-                });
-            }
-        }
-        
-        return () => {
-             // Cleanup if needed
-        };
-    }, [optimizationData]);
-
-    const suggestedLV = optimizationData 
-        ? optimizationData.reduce((prev, curr) => curr.secv < prev.secv ? curr : prev).components 
-        : null;
-
     return (
         <Card className="h-full">
             <div className="flex flex-col h-full">
@@ -166,7 +79,8 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                     <h3 className="text-lg font-bold text-slate-800">Generación de Modelo (PLS)</h3>
                 </div>
                 
-                <div className="flex-1 flex flex-col space-y-4">
+                {/* Scrollable Content Area */}
+                <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 pb-2 min-h-0">
                     <div className="grid grid-cols-2 gap-4 items-end">
                         <div>
                              <label htmlFor="lv-input" className="block text-xs font-bold text-slate-500 mb-1">Variables Latentes (LV)</label>
@@ -189,25 +103,24 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                         </Button>
                     </div>
                     
-                    {optimizationData && (
-                        <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 animate-fade-in shadow-inner">
-                            <div className="h-48 relative">
-                                <canvas ref={chartRef}></canvas>
-                            </div>
-                            {suggestedLV && (
-                                <p className="text-xs text-center mt-2 text-slate-500">
-                                    Mínimo error de validación en <span className="font-bold text-brand-600">{suggestedLV} LVs</span>.
-                                </p>
-                            )}
+                    {suggestedLV !== null && (
+                         <div className="border border-green-200 rounded-lg p-3 bg-green-50 animate-fade-in shadow-inner text-center">
+                            <p className="text-sm text-green-800">
+                                <span className="font-bold">💡 Sugerencia:</span> El valor óptimo de LVs es <strong>{suggestedLV}</strong>.
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                                El campo de entrada ha sido actualizado.
+                            </p>
                         </div>
                     )}
+                </div>
 
-                    <div className="pt-2 mt-auto">
-                        <Button onClick={handleRun} disabled={disabled} className="w-full">
-                            <RunIcon />
-                            Generar Modelo PLS Final
-                        </Button>
-                    </div>
+                {/* Static Footer with Final Button */}
+                <div className="pt-4 border-t border-slate-200">
+                    <Button onClick={handleRun} disabled={disabled} className="w-full">
+                        <RunIcon />
+                        Generar Modelo PLS Final
+                    </Button>
                 </div>
             </div>
         </Card>
