@@ -344,7 +344,13 @@ export function runPlsAnalysis(
     // Estadísticas de Validación (SECV)
     const statsCV = calculateStats(Y_raw, cvPredictions);
 
-    // 4. Detección de Outliers (Mahalanobis simulado sobre Scores)
+    // 4. Calcular Q² (Poder Predictivo)
+    const yMean = Y_raw.reduce((a, b) => a + b, 0) / N;
+    const press = Y_raw.reduce((sum, actual, i) => sum + Math.pow(actual - cvPredictions[i], 2), 0);
+    const ssy = Y_raw.reduce((sum, actual) => sum + Math.pow(actual - yMean, 2), 0);
+    const q2 = ssy > 1e-9 ? 1 - (press / ssy) : 0;
+
+    // 5. Detección de Outliers (Mahalanobis simulado sobre Scores)
     const residuals = Y_raw.map((y, i) => y - calPredictions[i]);
     const stdRes = statsCal.rmse;
     
@@ -364,11 +370,12 @@ export function runPlsAnalysis(
         model: {
             r: statsCal.r,
             r2: statsCal.r2,
+            q2: q2,
             sec: statsCal.rmse,
             secv: statsCV.rmse,
             slope: statsCal.slope,
             offset: statsCal.offset,
-            plsIntercept: calModel.intercept, // AÑADIDO: Intercepto real del modelo PLS
+            plsIntercept: calModel.intercept,
             correlation: {
                 actual: Y_raw,
                 predicted: calPredictions,

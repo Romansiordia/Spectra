@@ -262,8 +262,8 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                 {activeTab === 'correlation' && (
                     <div className="flex flex-col gap-6 animate-fade-in">
                         {/* Top Stats Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="lg:col-span-2 bg-slate-800 text-white p-6 rounded-xl shadow-xl border border-slate-700 relative overflow-hidden group">
+                        <div className="grid grid-cols-1 gap-4">
+                            <div className="bg-slate-800 text-white p-6 rounded-xl shadow-xl border border-slate-700 relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                     <svg className="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                 </div>
@@ -271,19 +271,20 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                 <div className="text-4xl font-bold font-mono tracking-tight">{results.nComponents} <span className="text-lg font-normal text-slate-400 font-sans">LVs</span></div>
                                 <div className="mt-6 pt-4 border-t border-slate-700 flex flex-col gap-2">
                                     <div className="flex justify-between text-sm items-center">
-                                        <span className="text-slate-300">R² Score</span>
-                                        <span className="font-mono text-brand-400 font-bold bg-slate-900 px-2 py-0.5 rounded">{results.model.r2.toFixed(4)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm items-center">
                                         <span className="text-slate-300">Correlación (r)</span>
                                         <span className="font-mono text-white">{results.model.r.toFixed(4)}</span>
                                     </div>
                                 </div>
                             </div>
-                             <StatCard label="SEC (Calibración)" value={results.model.sec.toFixed(4)} colorClass="text-brand-600" />
-                             <StatCard label="SECV (Validación)" value={results.model.secv.toFixed(4)} colorClass="text-emerald-600" subtext="Target Minimization" />
                         </div>
                         
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <StatCard label="R² (Ajuste)" value={results.model.r2.toFixed(4)} colorClass="text-sky-600" />
+                            <StatCard label="Q² (Predicción)" value={results.model.q2.toFixed(4)} colorClass={results.model.q2 > 0.5 ? 'text-purple-600' : 'text-amber-600'} subtext="Poder Predictivo" />
+                            <StatCard label="SEC (Calibración)" value={results.model.sec.toFixed(4)} colorClass="text-brand-600" />
+                            <StatCard label="SECV (Validación)" value={results.model.secv.toFixed(4)} colorClass="text-emerald-600" subtext="Target Minimization" />
+                        </div>
+
                         {/* Chart */}
                         <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner-dark relative h-[500px]">
                             <canvas ref={chartRef}></canvas>

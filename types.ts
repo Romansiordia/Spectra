@@ -30,6 +30,7 @@ export interface ModelResults {
     model: {
         r: number; // Correlación
         r2: number; // Coeficiente de determinación
+        q2: number; // Coeficiente de predicción (Q-cuadrado)
         sec: number; // Standard Error of Calibration
         secv: number; // Standard Error of Cross Validation
         slope: number;
