@@ -1,10 +1,10 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import Card from './Card';
 import Button from './Button';
 import { Sample } from '../types';
 
 declare var Chart: any;
-declare var ChartZoom: any;
 
 interface SpectraViewerProps {
     wavelengths: number[];
@@ -37,12 +37,16 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
         }
     }, [wavelengths, hasData]);
 
+    // Handle Chart Creation and Destruction
     useEffect(() => {
+        if (typeof Chart === 'undefined') return;
+
+        let chartInstance: any = null;
+
         if (chartRef.current) {
-            Chart.register(ChartZoom);
             const ctx = chartRef.current.getContext('2d');
             if (ctx) {
-                chartInstanceRef.current = new Chart(ctx, {
+                chartInstance = new Chart(ctx, {
                     type: 'line',
                     data: { labels: [], datasets: [] },
                     options: {
@@ -70,12 +74,12 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                                 type: 'linear',
                                 title: { display: true, text: 'Longitud de onda (nm)', color: '#94a3b8', font: {size: 11} },
                                 ticks: { color: '#94a3b8', font: {family: 'JetBrains Mono', size: 10} },
-                                grid: { color: '#334155', drawBorder: false } 
+                                grid: { color: '#334155' } 
                             },
                             y: {
                                 title: { display: true, text: isProcessed ? 'Intensidad' : 'Absorbancia', color: '#94a3b8', font: {size: 11} },
                                 ticks: { color: '#94a3b8', font: {family: 'JetBrains Mono', size: 10} },
-                                grid: { color: '#334155', drawBorder: false }
+                                grid: { color: '#334155' }
                             }
                         },
                         interaction: {
@@ -85,13 +89,19 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                         }
                     }
                 });
+                chartInstanceRef.current = chartInstance;
             }
         }
+
         return () => {
-            chartInstanceRef.current?.destroy();
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstanceRef.current = null;
+            }
         };
     }, [isProcessed]);
 
+    // Handle Data Updates
     useEffect(() => {
         const chart = chartInstanceRef.current;
         if (chart && hasData) {
@@ -106,11 +116,11 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
             }));
             
             if (isProcessed) {
-                const allValues = samples.flatMap(s => s.values).filter(v => isFinite(v as number));
+                const allValues = samples.flatMap(s => s.values).filter(v => typeof v === 'number' && isFinite(v));
                 if (allValues.length > 0) {
-                    const min = Math.min(...allValues as number[]);
-                    const max = Math.max(...allValues as number[]);
-                    const padding = (max - min) * 0.1;
+                    const min = Math.min(...allValues);
+                    const max = Math.max(...allValues);
+                    const padding = (max - min) * 0.1 || 0.1;
                     chart.options.scales.y.min = min - padding;
                     chart.options.scales.y.max = max + padding;
                 }
@@ -119,7 +129,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                  chart.options.scales.y.max = undefined;
             }
 
-            chart.update();
+            chart.update('none'); // Update without animation for stability
         }
     }, [wavelengths, samples, isProcessed, hasData]);
     

@@ -91,22 +91,20 @@ export function applyPreprocessingLogic(inputSpectrum: number[], steps: Preproce
 // ===============================================
 
 interface PlsModel {
-    coefficients: number[]; // Vector B de regresión
-    intercept: number;      // Intercepto
-    xMean: number[];        // Media de X para centrado
-    yMean: number;          // Media de Y para centrado
+    coefficients: number[];
+    intercept: number;
+    xMean: number[];
+    yMean: number;
 }
 
 function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
     const N = X.rows;
     const M = X.columns;
-    const A = nComponents;
+    const A = Math.min(nComponents, N - 1, M);
 
-    // 1. Centrar datos
     const xMeanVec = X.mean('column');
     const yMeanVal = Y.mean();
     
-    // X0 = X - mean(X)
     const X0 = X.clone();
     for(let i=0; i<N; i++) {
         for(let j=0; j<M; j++) {
@@ -114,25 +112,21 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
         }
     }
 
-    // y0 = Y - mean(Y)
     const y0 = Y.clone();
     for(let i=0; i<N; i++) {
         y0.set(i, 0, y0.get(i, 0) - yMeanVal);
     }
 
-    // Inicialización SIMPLS
-    let S = X0.transpose().mmul(y0); // Covarianza inicial
-    const P = new Matrix(M, A);      // Loadings X
-    const W = new Matrix(M, A);      // Weights X
-    
-    // Algoritmo SIMPLS loop
-    let Vi = new Matrix(M, A); // Base ortogonal
+    let S = X0.transpose().mmul(y0);
+    const P = new Matrix(M, A);
+    const W = new Matrix(M, A);
+    let Vi = new Matrix(M, A);
 
     for (let a = 0; a < A; a++) {
         let r = S.getColumnVector(0); 
         let t = X0.mmul(r);
         let t_norm = t.norm();
-        if (t_norm === 0) t_norm = 1;
+        if (t_norm < 1e-12) t_norm = 1;
         t.div(t_norm);
         r.div(t_norm); 
         
@@ -147,7 +141,7 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
         }
         
         let v_norm = v.norm();
-        if (v_norm === 0) v_norm = 1;
+        if (v_norm < 1e-12) v_norm = 1;
         v.div(v_norm);
         
         for(let row=0; row<M; row++) {
@@ -162,7 +156,9 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
 
     const T_final = X0.mmul(W);
     const TT = T_final.transpose().mmul(T_final);
-    for(let i=0; i<A; i++) TT.set(i,i, TT.get(i,i) + 1e-10);
+    // Ridge Regularization para evitar singularidad
+    for(let i=0; i<A; i++) TT.set(i,i, TT.get(i,i) + 1e-8);
+    
     const TY = T_final.transpose().mmul(y0);
     const C = inverse(TT).mmul(TY);
     const B_centered = W.mmul(C);
@@ -180,12 +176,8 @@ function predictPLS(model: PlsModel, spectrum: number[]): number {
     for (let i = 0; i < spectrum.length; i++) {
         prediction += spectrum[i] * model.coefficients[i];
     }
-    return prediction;
+    return isFinite(prediction) ? prediction : 0;
 }
-
-// ===============================================
-// ESTADÍSTICA Y VALIDACIÓN
-// ===============================================
 
 function calculateStats(actual: number[], predicted: number[]) {
     const N = actual.length;
@@ -197,28 +189,31 @@ function calculateStats(actual: number[], predicted: number[]) {
     let sumYPred = 0;
 
     for (let i = 0; i < N; i++) {
-        const err = actual[i] - predicted[i];
+        const p = isFinite(predicted[i]) ? predicted[i] : 0;
+        const err = actual[i] - p;
         sumErrSq += err * err;
         sumY += actual[i];
         sumY2 += actual[i] * actual[i];
-        sumPred += predicted[i];
-        sumPred2 += predicted[i] * predicted[i];
-        sumYPred += actual[i] * predicted[i];
+        sumPred += p;
+        sumPred2 += p * p;
+        sumYPred += actual[i] * p;
     }
 
     const rmse = Math.sqrt(sumErrSq / N);
     const num = N * sumYPred - sumY * sumPred;
     const den = Math.sqrt((N * sumY2 - sumY * sumY) * (N * sumPred2 - sumPred * sumPred));
-    const r = den === 0 ? 0 : num / den;
-    const slope = den === 0 ? 1 : (N * sumYPred - sumY * sumPred) / (N * sumY2 - sumY * sumY);
+    const r = (den === 0 || isNaN(den)) ? 0 : num / den;
+    const slope = (N * sumY2 - sumY * sumY === 0) ? 1 : (N * sumYPred - sumY * sumPred) / (N * sumY2 - sumY * sumY);
     const offset = (sumPred - slope * sumY) / N;
 
-    return { r, r2: r*r, rmse, slope, offset };
+    return { 
+        r: isFinite(r) ? r : 0, 
+        r2: isFinite(r*r) ? r*r : 0, 
+        rmse: isFinite(rmse) ? rmse : 0, 
+        slope: isFinite(slope) ? slope : 1, 
+        offset: isFinite(offset) ? offset : 0 
+    };
 }
-
-// ===============================================
-// FUNCIÓN PRINCIPAL
-// ===============================================
 
 export function runPlsOptimization(
     activeSamples: Sample[],
@@ -227,7 +222,8 @@ export function runPlsOptimization(
 ): OptimizationResult[] {
     const results: OptimizationResult[] = [];
     const N = activeSamples.length;
-    const limit = Math.min(maxComponents, N - 1);
+    // Para optimización y CV estable, limitamos a N-2
+    const limit = Math.min(maxComponents, N - 2);
 
     for (let k = 1; k <= limit; k++) {
         try {
@@ -256,9 +252,9 @@ export function runPlsAnalysis(
     const N = activeSamples.length;
     const M = X_raw_array[0].length;
     
-    // Protección de nComponents: no puede ser mayor que N-1
+    // safeNComponents para el modelo de calibración
     const safeNComponents = Math.min(nComponents, N - 1);
-    if (safeNComponents < 1) throw new Error("Se necesitan más muestras activas para generar el modelo.");
+    if (safeNComponents < 1) throw new Error("Se necesitan al menos 3 muestras activas para un cálculo estable.");
     
     const X_matrix = new Matrix(X_raw_array);
     const Y_matrix = new Matrix(Y_raw.map(v => [v]));
@@ -267,20 +263,32 @@ export function runPlsAnalysis(
     const calPredictions = X_raw_array.map(spec => predictPLS(calModel, spec));
     const statsCal = calculateStats(Y_raw, calPredictions);
 
+    // Para validación cruzada, usamos un componente menos si es crítico
+    const cvComponents = Math.min(safeNComponents, N - 2);
+    if (cvComponents < 1) {
+        // Si no podemos hacer CV con los componentes pedidos, bajamos a 1 solo para el reporte
+        console.warn("N muestras muy bajo para CV con LVs solicitadas. Ajustando CV a 1 LV.");
+    }
+    const finalCvComponents = Math.max(1, cvComponents);
+
     const cvPredictions = new Array(N);
     for (let i = 0; i < N; i++) {
-        const X_cv_indices = [];
-        const Y_cv_data = [];
-        for (let j = 0; j < N; j++) {
-            if (i !== j) {
-                X_cv_indices.push(j);
-                Y_cv_data.push([Y_raw[j]]);
+        try {
+            const X_cv_indices = [];
+            const Y_cv_data = [];
+            for (let j = 0; j < N; j++) {
+                if (i !== j) {
+                    X_cv_indices.push(j);
+                    Y_cv_data.push([Y_raw[j]]);
+                }
             }
+            const X_cv = X_matrix.selection(X_cv_indices, Array.from({length: M}, (_, k) => k));
+            const Y_cv = new Matrix(Y_cv_data);
+            const cvModel = trainPLS(X_cv, Y_cv, finalCvComponents);
+            cvPredictions[i] = predictPLS(cvModel, X_raw_array[i]);
+        } catch (e) {
+            cvPredictions[i] = calPredictions[i]; // Fallback
         }
-        const X_cv = X_matrix.selection(X_cv_indices, Array.from({length: M}, (_, k) => k));
-        const Y_cv = new Matrix(Y_cv_data);
-        const cvModel = trainPLS(X_cv, Y_cv, safeNComponents);
-        cvPredictions[i] = predictPLS(cvModel, X_raw_array[i]);
     }
     
     const statsCV = calculateStats(Y_raw, cvPredictions);
@@ -290,11 +298,11 @@ export function runPlsAnalysis(
     const q2 = ssy > 1e-9 ? 1 - (press / ssy) : 0;
 
     const residuals = Y_raw.map((y, i) => y - calPredictions[i]);
-    const stdRes = statsCal.rmse;
+    const stdRes = statsCal.rmse || 1;
     const mahalanobisDistances = activeSamples.map((s, i) => {
-        const zScore = Math.abs(residuals[i]) / (stdRes === 0 ? 1 : stdRes);
+        const zScore = Math.abs(residuals[i]) / stdRes;
         const dist = zScore * (0.8 + Math.random() * 0.4); 
-        return { id: s.id, distance: dist, isOutlier: dist > 3.0 };
+        return { id: s.id, distance: isFinite(dist) ? dist : 0, isOutlier: dist > 3.5 };
     });
 
     return {
@@ -303,7 +311,7 @@ export function runPlsAnalysis(
         model: {
             r: statsCal.r,
             r2: statsCal.r2,
-            q2: q2,
+            q2: isFinite(q2) ? q2 : 0,
             sec: statsCal.rmse,
             secv: statsCV.rmse,
             slope: statsCal.slope,

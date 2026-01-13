@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spectra Pro - Plataforma Quimiométrica NIR</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
     
     <script>
         tailwind.config = {
@@ -47,19 +48,24 @@
             }
         }
         
-        // Defaults generales (se sobreescriben en componentes específicos)
-        Chart.defaults.font.family = 'Inter';
+        // Initialize Chart.js defaults
+        if (typeof Chart !== 'undefined') {
+            Chart.defaults.font.family = 'Inter';
+            // Register zoom plugin globally if available
+            if (typeof ChartZoom !== 'undefined') {
+                Chart.register(ChartZoom);
+            }
+        }
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc; /* Slate 50 - Fondo limpio */
-            color: #1e293b; /* Slate 800 - Texto legible */
+            background-color: #f8fafc; 
+            color: #1e293b;
         }
         
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -82,11 +88,17 @@
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+        }
     </style>
 <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^18.3.1",
+    "react-dom": "https://esm.sh/react-dom@^18.3.1",
     "react-dom/": "https://esm.sh/react-dom@^18.3.1/",
     "react/": "https://esm.sh/react@^18.3.1/",
     "ml-matrix": "https://esm.sh/ml-matrix@6.10.4"

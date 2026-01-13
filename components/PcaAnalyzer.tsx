@@ -23,10 +23,14 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({ onRunPca, pcaResults, disable
     const chartInstanceRef = useRef<any>(null);
 
     useEffect(() => {
+        if (typeof Chart === 'undefined') return;
+        
+        let chartInstance: any = null;
+
         if (chartRef.current) {
             const ctx = chartRef.current.getContext('2d');
             if (ctx) {
-                chartInstanceRef.current = new Chart(ctx, {
+                chartInstance = new Chart(ctx, {
                     type: 'scatter',
                     data: { datasets: [] },
                     options: {
@@ -49,26 +53,34 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({ onRunPca, pcaResults, disable
                         }
                     }
                 });
+                chartInstanceRef.current = chartInstance;
             }
         }
-        return () => chartInstanceRef.current?.destroy();
+
+        return () => {
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstanceRef.current = null;
+            }
+        };
     }, []);
 
     useEffect(() => {
-        if (chartInstanceRef.current && pcaResults) {
+        const chart = chartInstanceRef.current;
+        if (chart && pcaResults) {
             const variancePC1 = 85.4 + Math.random() * 5;
             const variancePC2 = 9.1 + Math.random() * 2;
-            chartInstanceRef.current.options.scales.x.title.text = `PC1 (${variancePC1.toFixed(1)}% Varianza)`;
-            chartInstanceRef.current.options.scales.y.title.text = `PC2 (${variancePC2.toFixed(1)}% Varianza)`;
-            chartInstanceRef.current.data.datasets = [{
+            chart.options.scales.x.title.text = `PC1 (${variancePC1.toFixed(1)}% Varianza)`;
+            chart.options.scales.y.title.text = `PC2 (${variancePC2.toFixed(1)}% Varianza)`;
+            chart.data.datasets = [{
                 label: 'PCA Scores',
                 data: pcaResults,
-                rawData: pcaResults, // Store original data for tooltip
+                rawData: pcaResults, 
                 backgroundColor: pcaResults.map(s => s.color + 'BF'),
                 borderColor: pcaResults.map(s => s.color),
                 pointRadius: 6
             }];
-            chartInstanceRef.current.update();
+            chart.update();
         }
     }, [pcaResults]);
 
