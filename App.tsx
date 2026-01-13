@@ -65,35 +65,47 @@ const App: React.FC = () => {
         setProcessedSpectra(null);
     }, []);
 
-    const handleRunModel = async (params: ModelParams) => {
-        const activeSamples = samples.filter(s => s.active);
-        if (activeSamples.length < 3) {
-            alert('Se necesitan al menos 3 muestras activas para generar el modelo PLS y validación cruzada.');
+    const handleRunModel = async (params: ModelParams, samplesOverride?: Sample[]) => {
+        // Usar las muestras pasadas directamente o las del estado
+        const currentSamples = samplesOverride || samples;
+        const activeSamplesToUse = currentSamples.filter(s => s.active);
+
+        if (activeSamplesToUse.length < 3) {
+            alert('Se necesitan al menos 3 muestras activas para generar el modelo.');
             return;
         }
+
         setLoadingMessage(`Generando modelo ${params.type.toUpperCase()}...`);
         
+        // Timeout para permitir que el loader se muestre antes de la carga pesada de CPU
         setTimeout(() => {
             try {
-                const results = runPlsAnalysis(activeSamples, preprocessingSteps, params.nComponents);
+                const results = runPlsAnalysis(activeSamplesToUse, preprocessingSteps, params.nComponents);
                 setModelResults(results);
             } catch (error) {
                 console.error(`Error during ${params.type} run:`, error);
                 const errorMessage = error instanceof Error ? error.message : "Ocurrió un error desconocido.";
-                alert(`Ocurrió un error al generar el modelo: ${errorMessage}`);
+                alert(`Error al generar el modelo: ${errorMessage}`);
             } finally {
                 setLoadingMessage(null);
             }
-        }, 100);
+        }, 50);
     };
     
     const handleDeactivateOutliers = (outlierIds: (string|number)[]) => {
-         setSamples(prev => prev.map(s => outlierIds.includes(s.id) ? { ...s, active: false } : s));
+         // Calcular las nuevas muestras inmediatamente para evitar usar el estado viejo
+         const updatedSamples = samples.map(s => outlierIds.includes(s.id) ? { ...s, active: false } : s);
+         
+         // Actualizar el estado para la UI
+         setSamples(updatedSamples);
+         
+         // Resetear visualización de pre-procesamiento si existía
+         setProcessedSpectra(null);
+
          if (modelResults) {
-             setTimeout(() => {
-                const params: ModelParams = { type: 'pls', nComponents: modelResults.nComponents };
-                handleRunModel(params);
-             }, 100);
+             // Iniciar el recálculo inmediatamente con los nuevos datos inyectados
+             const params: ModelParams = { type: 'pls', nComponents: modelResults.nComponents };
+             handleRunModel(params, updatedSamples);
          }
     }
     
@@ -109,7 +121,6 @@ const App: React.FC = () => {
             <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
                 <Header />
                 
-                {/* Navigation Tabs */}
                 <div className="bg-white border-b border-slate-200 sticky top-16 z-20">
                     <div className="max-w-[1920px] mx-auto px-4 lg:px-6 flex gap-8">
                         <button 
@@ -131,12 +142,9 @@ const App: React.FC = () => {
 
                 <main className="flex-grow p-4 lg:p-6">
                     
-                    {/* VISTA DE CALIBRACIÓN */}
                     {currentView === 'calibration' && (
                         <div className="flex flex-col gap-6 animate-fade-in">
-                            {/* Main Workspace: Controls & Visualization */}
                             <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-                                {/* Left Column: Workflow Steps 1, 2 & 3 */}
                                 <div className="flex flex-col gap-6 lg:col-span-2">
                                     <DataUploader onFileSelected={handleFileSelected} />
                                     <PreprocessingEditor
@@ -153,7 +161,6 @@ const App: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Right Column: Data Interaction */}
                                 <div className="flex flex-col gap-6 lg:col-span-5">
                                     <SpectraViewer
                                         wavelengths={wavelengths}
@@ -166,7 +173,6 @@ const App: React.FC = () => {
                                         onToggle={handleToggleSample}
                                         onToggleAll={handleToggleAllSamples}
                                     />
-                                    {/* Final Step: Results (Now inside the main grid) */}
                                     <div>
                                         <div className="flex items-center gap-3 mb-4">
                                              <div className="h-7 w-7 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">4</div>
@@ -198,7 +204,6 @@ const App: React.FC = () => {
                         </div>
                     )}
 
-                    {/* VISTA DE PREDICCIÓN */}
                     {currentView === 'prediction' && (
                         <div className="max-w-5xl mx-auto animate-fade-in">
                             <div className="mb-6 text-center">

@@ -1,3 +1,4 @@
+
 import { PreprocessingStep, Sample, ModelResults, OptimizationResult } from '../types';
 import { Matrix, inverse, solve } from 'ml-matrix';
 
@@ -96,12 +97,6 @@ interface PlsModel {
     yMean: number;          // Media de Y para centrado
 }
 
-/**
- * Entrena un modelo PLS usando el algoritmo SIMPLS.
- * @param X Matriz de espectros (N muestras x M longitudes de onda)
- * @param Y Vector de propiedad (N muestras)
- * @param nComponents Número de variables latentes
- */
 function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
     const N = X.rows;
     const M = X.columns;
@@ -134,28 +129,16 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
     let Vi = new Matrix(M, A); // Base ortogonal
 
     for (let a = 0; a < A; a++) {
-        // 1. Vector de pesos r (o w)
-        // r = S
         let r = S.getColumnVector(0); 
-        
-        // 2. Scores t
         let t = X0.mmul(r);
-        
-        // Normalizar t
         let t_norm = t.norm();
         if (t_norm === 0) t_norm = 1;
         t.div(t_norm);
         r.div(t_norm); 
         
-        // 3. Loadings p
-        // p = X0' * t
         let p = X0.transpose().mmul(t);
-        
-        // 4. Update orthogonal base V (Gram-Schmidt para deflación implícita)
         let v = p.clone();
         if (a > 0) {
-            // Proyección ortogonal respecto a loadings anteriores
-            // v = v - V * V' * p
             for (let j = 0; j < a; j++) {
                 const vj = Vi.getColumnVector(j);
                 const projection = vj.transpose().mmul(p).get(0,0);
@@ -167,41 +150,26 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
         if (v_norm === 0) v_norm = 1;
         v.div(v_norm);
         
-        // Guardar vectores
         for(let row=0; row<M; row++) {
             W.set(row, a, r.get(row, 0));
             P.set(row, a, p.get(row, 0));
             Vi.set(row, a, v.get(row, 0));
         }
 
-        // Deflación de S
         const v_t_S = v.transpose().mmul(S).get(0,0);
         S = S.sub(v.mul(v_t_S));
     }
 
-    // Calcular vector de regresión B
     const T_final = X0.mmul(W);
-    
-    // Calculamos coeficientes de regresión de Y sobre los scores T
     const TT = T_final.transpose().mmul(T_final);
-    // Añadir pequeña regularización diagonal para estabilidad
     for(let i=0; i<A; i++) TT.set(i,i, TT.get(i,i) + 1e-10);
-    
     const TY = T_final.transpose().mmul(y0);
-    
-    // Usamos el método funcional inverse() de ml-matrix
-    const C = inverse(TT).mmul(TY); // Coeficientes para T
-    
-    // Coeficientes finales B para X (centrado): B = W * C
+    const C = inverse(TT).mmul(TY);
     const B_centered = W.mmul(C);
-    
-    // El vector B final
     const coefficients = B_centered.getColumn(0);
     
-    // Intercepto: y_mean - x_mean * B
     let xMeanDotB = 0;
     for(let i=0; i<M; i++) xMeanDotB += xMeanVec[i] * coefficients[i];
-    
     const intercept = yMeanVal - xMeanDotB;
 
     return { coefficients, intercept, xMean: xMeanVec, yMean: yMeanVal };
@@ -231,7 +199,6 @@ function calculateStats(actual: number[], predicted: number[]) {
     for (let i = 0; i < N; i++) {
         const err = actual[i] - predicted[i];
         sumErrSq += err * err;
-        
         sumY += actual[i];
         sumY2 += actual[i] * actual[i];
         sumPred += predicted[i];
@@ -239,15 +206,10 @@ function calculateStats(actual: number[], predicted: number[]) {
         sumYPred += actual[i] * predicted[i];
     }
 
-    // RMSE (SEC o SECV dependiendo de los datos de entrada)
     const rmse = Math.sqrt(sumErrSq / N);
-
-    // Pearson Correlation (R)
     const num = N * sumYPred - sumY * sumPred;
     const den = Math.sqrt((N * sumY2 - sumY * sumY) * (N * sumPred2 - sumPred * sumPred));
     const r = den === 0 ? 0 : num / den;
-
-    // Slope & Offset
     const slope = den === 0 ? 1 : (N * sumYPred - sumY * sumPred) / (N * sumY2 - sumY * sumY);
     const offset = (sumPred - slope * sumY) / N;
 
@@ -265,15 +227,10 @@ export function runPlsOptimization(
 ): OptimizationResult[] {
     const results: OptimizationResult[] = [];
     const N = activeSamples.length;
-    
-    // Limitar maxComponents a N-1 si hay pocas muestras
     const limit = Math.min(maxComponents, N - 1);
 
     for (let k = 1; k <= limit; k++) {
         try {
-            // Ejecutamos el análisis completo para k componentes
-            // Nota: Esto podría optimizarse reutilizando matrices, pero para mantener la consistencia
-            // usaremos la función principal que ya realiza la validación cruzada.
             const result = runPlsAnalysis(activeSamples, preprocessingSteps, k);
             results.push({
                 components: k,
@@ -285,7 +242,6 @@ export function runPlsOptimization(
             break;
         }
     }
-    
     return results;
 }
 
@@ -294,79 +250,56 @@ export function runPlsAnalysis(
     preprocessingSteps: PreprocessingStep[],
     nComponents: number
 ): ModelResults {
-
-    // 1. Preparar datos
     const Y_raw = activeSamples.map(s => s.analyticalValue);
     const X_raw_array = activeSamples.map(s => applyPreprocessingLogic(s.values, preprocessingSteps));
     
     const N = activeSamples.length;
     const M = X_raw_array[0].length;
     
-    // Validar dimensiones
-    if (N < 2) throw new Error("Se necesitan al menos 2 muestras.");
-    if (nComponents > N - 1) throw new Error(`El número de componentes (${nComponents}) no puede ser mayor que N-1 (${N-1}).`);
+    // Protección de nComponents: no puede ser mayor que N-1
+    const safeNComponents = Math.min(nComponents, N - 1);
+    if (safeNComponents < 1) throw new Error("Se necesitan más muestras activas para generar el modelo.");
     
     const X_matrix = new Matrix(X_raw_array);
     const Y_matrix = new Matrix(Y_raw.map(v => [v]));
 
-    // 2. Modelo de Calibración (Todos los datos)
-    const calModel = trainPLS(X_matrix, Y_matrix, nComponents);
+    const calModel = trainPLS(X_matrix, Y_matrix, safeNComponents);
     const calPredictions = X_raw_array.map(spec => predictPLS(calModel, spec));
-    
-    // Estadísticas de Calibración (SEC)
     const statsCal = calculateStats(Y_raw, calPredictions);
 
-    // 3. Validación Cruzada (Leave-One-Out) para SECV
     const cvPredictions = new Array(N);
-    
     for (let i = 0; i < N; i++) {
-        // Crear matrices sin la muestra i
         const X_cv_indices = [];
         const Y_cv_data = [];
-        
         for (let j = 0; j < N; j++) {
             if (i !== j) {
                 X_cv_indices.push(j);
                 Y_cv_data.push([Y_raw[j]]);
             }
         }
-        
         const X_cv = X_matrix.selection(X_cv_indices, Array.from({length: M}, (_, k) => k));
         const Y_cv = new Matrix(Y_cv_data);
-        
-        // Entrenar modelo reducido
-        const cvModel = trainPLS(X_cv, Y_cv, nComponents);
-        
-        // Predecir muestra excluida
+        const cvModel = trainPLS(X_cv, Y_cv, safeNComponents);
         cvPredictions[i] = predictPLS(cvModel, X_raw_array[i]);
     }
     
-    // Estadísticas de Validación (SECV)
     const statsCV = calculateStats(Y_raw, cvPredictions);
-
-    // 4. Calcular Q² (Poder Predictivo)
     const yMean = Y_raw.reduce((a, b) => a + b, 0) / N;
     const press = Y_raw.reduce((sum, actual, i) => sum + Math.pow(actual - cvPredictions[i], 2), 0);
     const ssy = Y_raw.reduce((sum, actual) => sum + Math.pow(actual - yMean, 2), 0);
     const q2 = ssy > 1e-9 ? 1 - (press / ssy) : 0;
 
-    // 5. Detección de Outliers (Mahalanobis simulado sobre Scores)
     const residuals = Y_raw.map((y, i) => y - calPredictions[i]);
     const stdRes = statsCal.rmse;
-    
     const mahalanobisDistances = activeSamples.map((s, i) => {
         const zScore = Math.abs(residuals[i]) / (stdRes === 0 ? 1 : stdRes);
         const dist = zScore * (0.8 + Math.random() * 0.4); 
-        return {
-            id: s.id,
-            distance: dist,
-            isOutlier: dist > 3.0
-        };
+        return { id: s.id, distance: dist, isOutlier: dist > 3.0 };
     });
 
     return {
         modelType: 'PLS',
-        nComponents,
+        nComponents: safeNComponents,
         model: {
             r: statsCal.r,
             r2: statsCal.r2,
