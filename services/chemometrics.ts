@@ -125,7 +125,7 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
     for (let a = 0; a < A; a++) {
         let r = S.getColumnVector(0); 
         let t = X0.mmul(r);
-        let t_norm = t.norm();
+        let t_norm = t.norm('frobenius');
         if (t_norm < 1e-12) t_norm = 1;
         t.div(t_norm);
         r.div(t_norm); 
@@ -140,7 +140,7 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
             }
         }
         
-        let v_norm = v.norm();
+        let v_norm = v.norm('frobenius');
         if (v_norm < 1e-12) v_norm = 1;
         v.div(v_norm);
         
@@ -334,6 +334,166 @@ export function runPlsAnalysis(
         mahalanobis: {
             distances: mahalanobisDistances,
             outlierIds: mahalanobisDistances.filter(d => d.isOutlier).map(d => d.id)
+        }
+    };
+}
+
+// ===============================================
+// MÓDULO DE ANÁLISIS EXPLORATORIO (PCA)
+// ===============================================
+
+export interface PcaScore {
+    id: string | number;
+    pc1: number;
+    pc2: number;
+    color: string;
+    label: string;
+}
+
+export function runPcaAnalysis(
+    samples: { id: string | number; values: number[]; color?: string; label?: string }[]
+): PcaScore[] {
+    if (samples.length < 2) return [];
+
+    const X_raw = samples.map(s => s.values);
+    const X = new Matrix(X_raw);
+    const N = X.rows;
+    const M = X.columns;
+
+    // Centrar datos
+    const mean = X.mean('column');
+    const X_centered = X.clone();
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < M; j++) {
+            X_centered.set(i, j, X_centered.get(i, j) - mean[j]);
+        }
+    }
+
+    // SVD para obtener componentes principales
+    // Nota: ml-matrix no tiene SVD nativo de alto rendimiento para matrices grandes en JS puro de forma simple sin extensiones,
+    // pero podemos usar NIPALS simplificado para los primeros 2 componentes.
+    
+    const scores = new Array(N).fill(0).map((_, i) => ({
+        id: samples[i].id,
+        pc1: 0,
+        pc2: 0,
+        color: samples[i].color || '#6366f1',
+        label: samples[i].label || String(samples[i].id)
+    }));
+
+    let X_res = X_centered.clone();
+
+    // PC1
+    let t1 = X_res.getColumnVector(0);
+    for (let iter = 0; iter < 20; iter++) {
+        const p1 = X_res.transpose().mmul(t1).div(t1.transpose().mmul(t1).get(0, 0));
+        p1.div(p1.norm('frobenius'));
+        t1 = X_res.mmul(p1);
+    }
+    X_res = X_res.sub(t1.mmul(X_res.transpose().mmul(t1).div(t1.transpose().mmul(t1).get(0, 0)).transpose()));
+
+    // PC2
+    let t2 = X_res.getColumnVector(0);
+    for (let iter = 0; iter < 20; iter++) {
+        const p2 = X_res.transpose().mmul(t2).div(t2.transpose().mmul(t2).get(0, 0));
+        p2.div(p2.norm('frobenius'));
+        t2 = X_res.mmul(p2);
+    }
+
+    for (let i = 0; i < N; i++) {
+        scores[i].pc1 = t1.get(i, 0);
+        scores[i].pc2 = t2.get(i, 0);
+    }
+
+    return scores;
+}
+
+// ===============================================
+// MÓDULO DE CONTROL DE CALIDAD (IDENTIDAD)
+// ===============================================
+
+import { IngredientLibrary, ClassificationResult } from '../types';
+
+export function createIngredientLibrary(name: string, samples: { id: string | number; values: number[] }[]): IngredientLibrary {
+    if (samples.length === 0) throw new Error("Se necesitan muestras para crear una biblioteca.");
+    
+    const nPoints = samples[0].values.length;
+    const averageSpectrum = new Array(nPoints).fill(0);
+    const stdDevSpectrum = new Array(nPoints).fill(0);
+    
+    // Calcular promedio
+    samples.forEach(s => {
+        s.values.forEach((v, i) => {
+            averageSpectrum[i] += v;
+        });
+    });
+    averageSpectrum.forEach((v, i) => averageSpectrum[i] = v / samples.length);
+    
+    // Calcular desviación estándar y distancias internas para el umbral
+    const internalDistances: number[] = [];
+    samples.forEach(s => {
+        let dist = 0;
+        s.values.forEach((v, i) => {
+            const diff = v - averageSpectrum[i];
+            stdDevSpectrum[i] += diff * diff;
+            dist += diff * diff;
+        });
+        internalDistances.push(Math.sqrt(dist));
+    });
+    
+    stdDevSpectrum.forEach((v, i) => stdDevSpectrum[i] = Math.sqrt(v / samples.length));
+    
+    // El umbral se define como el promedio de distancias internas + 3 desviaciones estándar de esas distancias
+    const meanDist = internalDistances.reduce((a, b) => a + b, 0) / internalDistances.length;
+    const stdDist = Math.sqrt(internalDistances.map(d => Math.pow(d - meanDist, 2)).reduce((a, b) => a + b, 0) / internalDistances.length);
+    const threshold = meanDist + (3 * stdDist);
+
+    return {
+        id: `lib_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name,
+        samples,
+        averageSpectrum,
+        stdDevSpectrum,
+        threshold: threshold || 1.0 // Fallback
+    };
+}
+
+export function classifySpectrum(spectrum: number[], libraries: IngredientLibrary[]): ClassificationResult | null {
+    if (libraries.length === 0) return null;
+
+    let bestMatch: IngredientLibrary | null = null;
+    let minDistance = Infinity;
+
+    libraries.forEach(lib => {
+        let dist = 0;
+        spectrum.forEach((v, i) => {
+            const diff = v - lib.averageSpectrum[i];
+            dist += diff * diff;
+        });
+        const finalDist = Math.sqrt(dist);
+        
+        if (finalDist < minDistance) {
+            minDistance = finalDist;
+            bestMatch = lib;
+        }
+    });
+
+    if (!bestMatch) return null;
+
+    const match = bestMatch as IngredientLibrary;
+    // Confianza basada en la distancia relativa al umbral (simplificado)
+    const confidence = Math.max(0, Math.min(100, 100 * (1 - (minDistance / (match.threshold * 2)))));
+    const isConforming = minDistance <= match.threshold;
+
+    return {
+        ingredientId: match.id,
+        ingredientName: match.name,
+        confidence,
+        distance: minDistance,
+        isConforming,
+        details: {
+            meanDistance: minDistance,
+            threshold: match.threshold
         }
     };
 }

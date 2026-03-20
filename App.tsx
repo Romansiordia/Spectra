@@ -12,9 +12,10 @@ import ModelGenerator, { ModelParams } from './components/ModelGenerator';
 import ResultsViewer from './components/ResultsViewer';
 import ModelPredictor from './components/ModelPredictor';
 import ModelValidator from './components/ModelValidator';
+import QualityControl from './components/QualityControl';
 import Card from './components/Card';
 
-type AppView = 'calibration' | 'prediction' | 'validation';
+type AppView = 'calibration' | 'prediction' | 'validation' | 'quality';
 
 const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<AppView>('calibration');
@@ -144,6 +145,13 @@ const App: React.FC = () => {
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                             3. Validación del Modelo
                         </button>
+                        <button 
+                            onClick={() => setCurrentView('quality')}
+                            className={`py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${currentView === 'quality' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            4. Control de Calidad
+                        </button>
                     </div>
                 </div>
 
@@ -225,6 +233,13 @@ const App: React.FC = () => {
                         <div className="animate-fade-in">
                             <ModelValidator />
                         </div>
+                    )}
+
+                    {currentView === 'quality' && (
+                        <QualityControl 
+                            wavelengths={wavelengths}
+                            preprocessingSteps={preprocessingSteps}
+                        />
                     )}
 
                 </main>

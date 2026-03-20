@@ -59,3 +59,27 @@ export interface ModelResults {
         outlierIds: (string | number)[];
     };
 }
+
+export interface IngredientLibrary {
+    id: string;
+    name: string;
+    samples: {
+        id: string | number;
+        values: number[];
+    }[];
+    averageSpectrum: number[];
+    stdDevSpectrum: number[];
+    threshold: number; // Umbral de distancia para "Conformidad"
+}
+
+export interface ClassificationResult {
+    ingredientId: string;
+    ingredientName: string;
+    confidence: number;
+    distance: number;
+    isConforming: boolean;
+    details: {
+        meanDistance: number;
+        threshold: number;
+    };
+}
