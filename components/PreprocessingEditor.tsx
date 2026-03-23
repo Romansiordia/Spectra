@@ -13,16 +13,29 @@ interface PreprocessingEditorProps {
 
 const PREPROCESSING_METHODS = {
     'none': { name: 'Ninguno', params: [] },
-    'savgol': {
-        name: 'Savitzky-Golay',
+    'savgolsmooth': {
+        name: 'Suavizado (Savitzky-Golay)',
         params: [
-            { id: 'derivative', name: 'Orden Derivada', type: 'number', default: 1 },
-            { id: 'windowSize', name: 'Tamaño Ventana (impar)', type: 'number', default: 5 },
-            { id: 'polynomialOrder', name: 'Orden Polinomio', type: 'number', default: 2 },
+            { id: 'windowSize', name: 'Ventana (impar)', type: 'number', default: 11 },
+            { id: 'polynomialOrder', name: 'Polinomio', type: 'number', default: 2 },
         ],
     },
-    'snv': { name: 'Standard Normal Variate (SNV)', params: [] },
-    'msc': { name: 'Multiplicative Scatter Correction (MSC)', params: [] },
+    'savgol1': {
+        name: '1ª Derivada (Savitzky-Golay)',
+        params: [
+            { id: 'windowSize', name: 'Ventana (impar)', type: 'number', default: 11 },
+            { id: 'polynomialOrder', name: 'Polinomio', type: 'number', default: 2 },
+        ],
+    },
+    'savgol2': {
+        name: '2ª Derivada (Savitzky-Golay)',
+        params: [
+            { id: 'windowSize', name: 'Ventana (impar)', type: 'number', default: 11 },
+            { id: 'polynomialOrder', name: 'Polinomio', type: 'number', default: 2 },
+        ],
+    },
+    'snv': { name: 'SNV (Standard Normal Variate)', params: [] },
+    'msc': { name: 'MSC (Multiplicative Scatter Correction)', params: [] },
     'detrend': { name: 'Detrend', params: [] },
 };
 
@@ -40,8 +53,8 @@ const RemoveIcon: React.FC = () => (
 const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSteps, onVisualize, disabled }) => {
 
     const addStep = () => {
-        const newStep: PreprocessingStep = { method: 'savgol', params: {} };
-        PREPROCESSING_METHODS['savgol'].params.forEach(p => newStep.params[p.id] = p.default);
+        const newStep: PreprocessingStep = { method: 'savgol1', params: {} };
+        PREPROCESSING_METHODS['savgol1'].params.forEach(p => newStep.params[p.id] = p.default);
         setSteps([...steps, newStep]);
     };
 

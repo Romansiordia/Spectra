@@ -13,6 +13,7 @@ interface SavedModel {
     metrics: {
         plsIntercept: number;
         coefficients: number[];
+        referenceSpectrum?: number[];
     };
     preprocessing: PreprocessingStep[];
 }
@@ -134,7 +135,7 @@ const ModelPredictor: React.FC = () => {
                         }
 
                         // 1. Aplicar Pre-procesamiento específico de ESTE modelo
-                        const processed = applyPreprocessingLogic(spectralValues as number[], model.preprocessing);
+                        const processed = applyPreprocessingLogic(spectralValues as number[], model.preprocessing, model.metrics.referenceSpectrum);
 
                         // 2. Aplicar Ecuación de Regresión
                         let yPred = model.metrics.plsIntercept;

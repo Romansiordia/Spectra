@@ -58,9 +58,20 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
         setIsUploadingLibrary(true);
         parseCSV(file, (results) => {
             try {
+                if (results.samples.length === 0) return;
+
+                // Calcular media para MSC si es necesario
+                let ref: number[] | undefined = undefined;
+                if (preprocessingSteps.some(s => s.method === 'msc')) {
+                    const nPoints = results.samples[0].values.length;
+                    ref = new Array(nPoints).fill(0);
+                    results.samples.forEach(s => s.values.forEach((v, i) => ref![i] += v));
+                    ref = ref.map(v => v / results.samples.length);
+                }
+
                 const processedSamples = results.samples.map(s => ({
                     id: s.id,
-                    values: applyPreprocessingLogic(s.values, preprocessingSteps)
+                    values: applyPreprocessingLogic(s.values, preprocessingSteps, ref)
                 }));
                 
                 const newLib = createIngredientLibrary(newIngredientName, processedSamples);
@@ -85,7 +96,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                 const sample = results.samples[0];
                 if (!sample) throw new Error("No se encontraron muestras en el archivo.");
                 
-                const processedValues = applyPreprocessingLogic(sample.values, preprocessingSteps);
+                const processedValues = applyPreprocessingLogic(sample.values, preprocessingSteps, libraries.length > 0 ? libraries[0].averageSpectrum : undefined);
                 const result = classifySpectrum(processedValues, libraries);
                 
                 setInspectionResult(result);

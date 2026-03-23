@@ -7,7 +7,7 @@ export interface Sample {
 }
 
 export interface PreprocessingStep {
-    method: 'none' | 'savgol' | 'snv' | 'msc' | 'detrend';
+    method: 'none' | 'savgol' | 'savgol1' | 'savgol2' | 'savgolsmooth' | 'snv' | 'msc' | 'detrend';
     params: { [key: string]: any };
 }
 
@@ -49,6 +49,7 @@ export interface ModelResults {
         }[];
         coefficients: number[]; // Coeficientes de regresión (Beta)
         processedSpectra: number[][];
+        referenceSpectrum?: number[]; // Para MSC
     };
     mahalanobis: {
         distances: {

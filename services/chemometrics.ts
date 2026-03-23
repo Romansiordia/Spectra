@@ -7,8 +7,12 @@ import { Matrix, inverse, solve } from 'ml-matrix';
 // ===============================================
 
 function savitzkyGolay(data: number[], options: { windowSize: number; polynomial: number; derivative?: number }): number[] {
-    const { windowSize, polynomial, derivative = 0 } = options;
-    if (windowSize % 2 === 0 || windowSize < 3 || polynomial >= windowSize || derivative > polynomial) {
+    let { windowSize, polynomial, derivative = 0 } = options;
+    
+    // Asegurar que la ventana sea impar
+    if (windowSize % 2 === 0) windowSize += 1;
+    
+    if (windowSize < 3 || polynomial >= windowSize || derivative > polynomial) {
         return data;
     }
 
@@ -50,7 +54,7 @@ function savitzkyGolay(data: number[], options: { windowSize: number; polynomial
     }
 }
 
-export function applyPreprocessingLogic(inputSpectrum: number[], steps: PreprocessingStep[]): number[] {
+export function applyPreprocessingLogic(inputSpectrum: number[], steps: PreprocessingStep[], referenceSpectrum?: number[]): number[] {
     let processedSpectrum = [...inputSpectrum];
     
     steps.forEach(step => {
@@ -64,9 +68,44 @@ export function applyPreprocessingLogic(inputSpectrum: number[], steps: Preproce
                 if (stdDev > 0) processedSpectrum = processedSpectrum.map(x => (x - mean) / stdDev);
                 break;
             }
+            case 'msc': {
+                if (!referenceSpectrum || referenceSpectrum.length !== n) break;
+                
+                // Regresión lineal: processedSpectrum = a + b * referenceSpectrum
+                let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                for (let i = 0; i < n; i++) {
+                    sumX += referenceSpectrum[i];
+                    sumY += processedSpectrum[i];
+                    sumXY += referenceSpectrum[i] * processedSpectrum[i];
+                    sumX2 += referenceSpectrum[i] * referenceSpectrum[i];
+                }
+                
+                const b = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                const a = (sumY - b * sumX) / n;
+                
+                if (Math.abs(b) > 1e-10) {
+                    processedSpectrum = processedSpectrum.map(y => (y - a) / b);
+                }
+                break;
+            }
             case 'savgol': { 
                 const { derivative = 1, windowSize = 5, polynomialOrder = 2 } = step.params;
                 processedSpectrum = savitzkyGolay(processedSpectrum, { windowSize: parseInt(String(windowSize)), polynomial: parseInt(String(polynomialOrder)), derivative: parseInt(String(derivative)) });
+                break;
+            }
+            case 'savgol1': {
+                const { windowSize = 11, polynomialOrder = 2 } = step.params;
+                processedSpectrum = savitzkyGolay(processedSpectrum, { windowSize: parseInt(String(windowSize)), polynomial: parseInt(String(polynomialOrder)), derivative: 1 });
+                break;
+            }
+            case 'savgol2': {
+                const { windowSize = 11, polynomialOrder = 2 } = step.params;
+                processedSpectrum = savitzkyGolay(processedSpectrum, { windowSize: parseInt(String(windowSize)), polynomial: parseInt(String(polynomialOrder)), derivative: 2 });
+                break;
+            }
+            case 'savgolsmooth': {
+                const { windowSize = 11, polynomialOrder = 2 } = step.params;
+                processedSpectrum = savitzkyGolay(processedSpectrum, { windowSize: parseInt(String(windowSize)), polynomial: parseInt(String(polynomialOrder)), derivative: 0 });
                 break;
             }
             case 'detrend': {
@@ -246,10 +285,24 @@ export function runPlsAnalysis(
     preprocessingSteps: PreprocessingStep[],
     nComponents: number
 ): ModelResults {
-    const Y_raw = activeSamples.map(s => s.analyticalValue);
-    const X_raw_array = activeSamples.map(s => applyPreprocessingLogic(s.values, preprocessingSteps));
-    
     const N = activeSamples.length;
+    if (N === 0) throw new Error("No hay muestras activas.");
+
+    // Calcular espectro de referencia (media) para MSC si es necesario
+    let referenceSpectrum: number[] | undefined = undefined;
+    const hasMsc = preprocessingSteps.some(s => s.method === 'msc');
+    if (hasMsc) {
+        const nPoints = activeSamples[0].values.length;
+        referenceSpectrum = new Array(nPoints).fill(0);
+        activeSamples.forEach(s => {
+            s.values.forEach((v, i) => referenceSpectrum![i] += v);
+        });
+        referenceSpectrum = referenceSpectrum.map(v => v / N);
+    }
+
+    const Y_raw = activeSamples.map(s => s.analyticalValue);
+    const X_raw_array = activeSamples.map(s => applyPreprocessingLogic(s.values, preprocessingSteps, referenceSpectrum));
+    
     const M = X_raw_array[0].length;
     
     // safeNComponents para el modelo de calibración
@@ -329,7 +382,8 @@ export function runPlsAnalysis(
                 residual: residuals[i]
             })),
             coefficients: calModel.coefficients,
-            processedSpectra: X_raw_array
+            processedSpectra: X_raw_array,
+            referenceSpectrum: referenceSpectrum
         },
         mahalanobis: {
             distances: mahalanobisDistances,
