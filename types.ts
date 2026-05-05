@@ -46,10 +46,15 @@ export interface ModelResults {
             actual: number;
             predicted: number;
             residual: number;
+            gh: number;
         }[];
         coefficients: number[]; // Coeficientes de regresión (Beta)
         processedSpectra: number[][];
         referenceSpectrum?: number[]; // Para MSC
+        // Metadata para Mahalanobis (GH) en predicción
+        xMean?: number[];
+        W?: number[][];
+        T_inv_var?: number[];
     };
     mahalanobis: {
         distances: {

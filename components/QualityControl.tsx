@@ -5,11 +5,12 @@ import { createIngredientLibrary, classifySpectrum, applyPreprocessingLogic, run
 import Card from './Card';
 import Button from './Button';
 import { Search, ShieldCheck, ShieldAlert, Database, Plus, Trash2, Info, CheckCircle2, XCircle, AlertTriangle, BarChart3, Map as MapIcon, Activity } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart, ScatterChart, Scatter, ZAxis, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart, ScatterChart, Scatter, ZAxis, Cell, ComposedChart } from 'recharts';
 
 interface QualityControlProps {
     wavelengths: number[];
     preprocessingSteps: PreprocessingStep[];
+    onWavelengthsUpdate?: (wavelengths: number[]) => void;
 }
 
 const Gauge: React.FC<{ value: number; threshold: number; distance: number }> = ({ value, threshold, distance }) => {
@@ -42,7 +43,7 @@ const Gauge: React.FC<{ value: number; threshold: number; distance: number }> = 
     );
 };
 
-const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocessingSteps }) => {
+const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocessingSteps, onWavelengthsUpdate }) => {
     const [libraries, setLibraries] = useState<IngredientLibrary[]>([]);
     const [isUploadingLibrary, setIsUploadingLibrary] = useState(false);
     const [newIngredientName, setNewIngredientName] = useState('');
@@ -50,6 +51,16 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
     const [isInspecting, setIsInspecting] = useState(false);
     const [inspectedSpectrum, setInspectedSpectrum] = useState<number[] | null>(null);
     const [pcaScores, setPcaScores] = useState<PcaScore[]>([]);
+    
+    // Google Sheets Integration State
+    const [googleScriptUrl, setGoogleScriptUrl] = useState('');
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [showGoogleConfig, setShowGoogleConfig] = useState(false);
+
+    // Local wavelengths in case the global ones are empty
+    const [localWavelengths, setLocalWavelengths] = useState<number[]>([]);
+
+    const effectiveWavelengths = wavelengths.length > 0 ? wavelengths : localWavelengths;
 
     const handleLibraryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -59,6 +70,12 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
         parseCSV(file, (results) => {
             try {
                 if (results.samples.length === 0) return;
+
+                // Actualizar longitudes de onda si están vacías
+                if (effectiveWavelengths.length === 0 && results.wavelengths.length > 0) {
+                    setLocalWavelengths(results.wavelengths);
+                    onWavelengthsUpdate?.(results.wavelengths);
+                }
 
                 // Calcular media para MSC si es necesario
                 let ref: number[] | undefined = undefined;
@@ -86,6 +103,100 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
         });
     };
 
+    const syncWithGoogleSheets = async () => {
+        if (!googleScriptUrl) {
+            alert('Por favor, ingresa la URL de tu Google Apps Script.');
+            return;
+        }
+
+        setIsSyncing(true);
+        try {
+            // 1. Obtener lista de productos (hojas)
+            const productsResponse = await fetch(`${googleScriptUrl}?action=getProducts`);
+            if (!productsResponse.ok) throw new Error('No se pudo conectar con Google Sheets. Verifica la URL.');
+            const productNames = await productsResponse.json();
+
+            if (!Array.isArray(productNames)) throw new Error('Respuesta inválida de Google Sheets.');
+
+            const newLibraries: IngredientLibrary[] = [];
+
+            // 2. Para cada producto, obtener sus datos
+            for (const name of productNames) {
+                const dataResponse = await fetch(`${googleScriptUrl}?action=getData&sheet=${encodeURIComponent(name)}`);
+                const rawData = await dataResponse.json();
+
+                if (Array.isArray(rawData) && rawData.length > 1) {
+                    // 1. Extraer encabezados y determinar columnas reales
+                    const header = rawData[0].filter((cell: any) => cell !== null && cell !== "");
+                    const numCols = header.length;
+                    
+                    let currentWavelengths = effectiveWavelengths;
+                    if (currentWavelengths.length === 0 && numCols > 2) {
+                        const extracted = header.slice(1, numCols - 1).map(Number).filter(v => !isNaN(v));
+                        if (extracted.length > 0) {
+                            setLocalWavelengths(extracted);
+                            onWavelengthsUpdate?.(extracted);
+                            currentWavelengths = extracted;
+                        }
+                    }
+
+                    const expectedPoints = currentWavelengths.length;
+
+                    // 2. Procesar muestras (saltando la primera fila de encabezados)
+                    const samples = rawData.slice(1).map((row: any[]) => {
+                        if (row.length < 2) return null;
+                        
+                        const id = String(row[0]);
+                        // Tomamos exactamente la cantidad de puntos esperada empezando desde la col 1
+                        const values = row.slice(1, 1 + expectedPoints).map(v => {
+                            const num = Number(v);
+                            return isNaN(num) ? 0 : num;
+                        });
+
+                        return values.length === expectedPoints ? { id, values } : null;
+                    }).filter((s): s is { id: string; values: number[] } => s !== null);
+
+                    if (samples.length > 0) {
+                        // Calcular media para MSC si es necesario
+                        let ref: number[] | undefined = undefined;
+                        if (preprocessingSteps.some(s => s.method === 'msc')) {
+                            const nPoints = samples[0].values.length;
+                            ref = new Array(nPoints).fill(0);
+                            samples.forEach(s => s.values.forEach((v, i) => ref![i] += v));
+                            ref = ref.map(v => v / samples.length);
+                        }
+
+                        const processedSamples = samples.map(s => ({
+                            id: s.id,
+                            values: applyPreprocessingLogic(s.values, preprocessingSteps, ref)
+                        }));
+
+                        const lib = createIngredientLibrary(name, processedSamples);
+                        newLibraries.push(lib);
+                    }
+                }
+            }
+
+            if (newLibraries.length > 0) {
+                setLibraries(prev => {
+                    // Evitar duplicados por nombre
+                    const existingNames = new Set(prev.map(l => l.name));
+                    const filteredNew = newLibraries.filter(l => !existingNames.has(l.name));
+                    return [...prev, ...filteredNew];
+                });
+                alert(`Sincronización exitosa: ${newLibraries.length} productos cargados.`);
+            } else {
+                alert('No se encontraron datos válidos en las hojas de Google.');
+            }
+
+        } catch (error) {
+            console.error('Error syncing with Google Sheets:', error);
+            alert('Error de sincronización: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const handleInspectSample = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || libraries.length === 0) return;
@@ -95,6 +206,12 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
             try {
                 const sample = results.samples[0];
                 if (!sample) throw new Error("No se encontraron muestras en el archivo.");
+
+                // Actualizar longitudes de onda si están vacías
+                if (effectiveWavelengths.length === 0 && results.wavelengths.length > 0) {
+                    setLocalWavelengths(results.wavelengths);
+                    onWavelengthsUpdate?.(results.wavelengths);
+                }
                 
                 const processedValues = applyPreprocessingLogic(sample.values, preprocessingSteps, libraries.length > 0 ? libraries[0].averageSpectrum : undefined);
                 const result = classifySpectrum(processedValues, libraries);
@@ -140,19 +257,29 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
     };
 
     const chartData = useMemo(() => {
-        if (!inspectionResult || !inspectedSpectrum || !wavelengths.length) return [];
+        if (!inspectionResult || !inspectedSpectrum || !effectiveWavelengths.length) return [];
         
         const matchedLib = libraries.find(l => l.id === inspectionResult.ingredientId);
         if (!matchedLib) return [];
 
-        return wavelengths.map((w, i) => ({
-            wavelength: w,
-            sample: inspectedSpectrum[i],
-            reference: matchedLib.averageSpectrum[i],
-            upper: matchedLib.averageSpectrum[i] + (matchedLib.stdDevSpectrum[i] * 2),
-            lower: matchedLib.averageSpectrum[i] - (matchedLib.stdDevSpectrum[i] * 2),
-        }));
-    }, [inspectionResult, inspectedSpectrum, wavelengths, libraries]);
+        // Asegurarnos de no exceder los límites de los arrays
+        const dataPoints = Math.min(effectiveWavelengths.length, inspectedSpectrum.length, matchedLib.averageSpectrum.length);
+
+        const data = [];
+        for (let i = 0; i < dataPoints; i++) {
+            const diff = inspectedSpectrum[i] - matchedLib.averageSpectrum[i];
+            data.push({
+                wavelength: effectiveWavelengths[i],
+                sample: inspectedSpectrum[i],
+                reference: matchedLib.averageSpectrum[i],
+                upper: matchedLib.averageSpectrum[i] + (matchedLib.stdDevSpectrum[i] * 2),
+                lower: matchedLib.averageSpectrum[i] - (matchedLib.stdDevSpectrum[i] * 2),
+                diff: diff,
+                zero: 0
+            });
+        }
+        return data;
+    }, [inspectionResult, inspectedSpectrum, effectiveWavelengths, libraries]);
 
     return (
         <div className="flex flex-col gap-6 animate-fade-in">
@@ -164,6 +291,40 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                         <div className="flex items-center gap-2 mb-4">
                             <Database className="text-brand-600" size={20} />
                             <h2 className="text-lg font-bold text-slate-800">Biblioteca</h2>
+                        </div>
+
+                        {/* Google Sheets Sync Section */}
+                        <div className="mb-6 p-3 bg-brand-50/50 border border-brand-100 rounded-xl">
+                            <button 
+                                onClick={() => setShowGoogleConfig(!showGoogleConfig)}
+                                className="flex items-center justify-between w-full text-[10px] font-bold text-brand-700 uppercase tracking-wider"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <MapIcon size={12} />
+                                    Conexión Google Sheets
+                                </span>
+                                <span>{showGoogleConfig ? '−' : '+'}</span>
+                            </button>
+                            
+                            {showGoogleConfig && (
+                                <div className="mt-3 space-y-3 animate-fade-in">
+                                    <input 
+                                        type="text" 
+                                        value={googleScriptUrl}
+                                        onChange={(e) => setGoogleScriptUrl(e.target.value)}
+                                        placeholder="URL de Google Script..."
+                                        className="w-full px-2 py-1.5 bg-white border border-brand-200 rounded text-[10px] outline-none focus:ring-1 focus:ring-brand-500"
+                                    />
+                                    <Button 
+                                        onClick={syncWithGoogleSheets} 
+                                        disabled={isSyncing || !googleScriptUrl}
+                                        size="sm" 
+                                        className="w-full py-1.5 text-[10px]"
+                                    >
+                                        {isSyncing ? 'Sincronizando...' : 'Sincronizar Todo'}
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                         
                         <div className="space-y-4">
@@ -332,13 +493,15 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                         </div>
                                         <div className="h-64 w-full">
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={chartData}>
+                                                <ComposedChart data={chartData}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                                     <XAxis 
                                                         dataKey="wavelength" 
-                                                        hide 
+                                                        fontSize={10}
+                                                        tickFormatter={(val) => `${Math.round(val)}`}
+                                                        minTickGap={30}
                                                     />
-                                                    <YAxis hide domain={['auto', 'auto']} />
+                                                    <YAxis fontSize={10} domain={['auto', 'auto']} />
                                                     <Tooltip 
                                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                                                         labelFormatter={(val) => `${val} nm`}
@@ -363,7 +526,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                                         type="monotone" 
                                                         dataKey="reference" 
                                                         stroke="#94a3b8" 
-                                                        strokeWidth={2} 
+                                                        strokeWidth={1} 
                                                         dot={false} 
                                                         name="Promedio Ref."
                                                     />
@@ -371,11 +534,11 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                                         type="monotone" 
                                                         dataKey="sample" 
                                                         stroke="#6366f1" 
-                                                        strokeWidth={3} 
+                                                        strokeWidth={2} 
                                                         dot={false} 
                                                         name="Muestra Actual"
                                                     />
-                                                </AreaChart>
+                                                </ComposedChart>
                                             </ResponsiveContainer>
                                         </div>
                                         <div className="flex justify-center gap-6 mt-2">
@@ -390,6 +553,138 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                             <div className="flex items-center gap-2">
                                                 <div className="w-3 h-2 bg-slate-200 rounded-sm"></div>
                                                 <span className="text-[10px] text-slate-500 font-medium">Tolerancia</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Residuals Chart */}
+                                        <div className="mt-8 pt-6 border-t border-slate-100">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis de Residuales (Diferencia)</h3>
+                                                <div className="text-[10px] text-slate-400">Δ = Muestra - Ref</div>
+                                            </div>
+                                            <div className="h-32 w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <ComposedChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                        <XAxis 
+                                                            dataKey="wavelength" 
+                                                            fontSize={10}
+                                                            tickFormatter={(val) => `${Math.round(val)}`}
+                                                            minTickGap={30}
+                                                        />
+                                                        <YAxis fontSize={10} domain={['auto', 'auto']} />
+                                                        <Tooltip 
+                                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                            labelFormatter={(val) => `${val} nm`}
+                                                            formatter={(value: number) => [value.toFixed(4), 'Diferencia']}
+                                                        />
+                                                        <Line 
+                                                            type="monotone" 
+                                                            dataKey="zero" 
+                                                            stroke="#cbd5e1" 
+                                                            strokeWidth={1} 
+                                                            strokeDasharray="5 5"
+                                                            dot={false} 
+                                                            name="Línea Base"
+                                                        />
+                                                        <Area 
+                                                            type="monotone" 
+                                                            dataKey="diff" 
+                                                            stroke="#f43f5e" 
+                                                            fill="#f43f5e" 
+                                                            fillOpacity={0.1} 
+                                                            name="Diferencia"
+                                                        />
+                                                    </ComposedChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+
+                                        {/* Residuals Chart */}
+                                        <div className="mt-8 pt-6 border-t border-slate-100">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis de Residuales (Diferencia)</h3>
+                                                <div className="text-[10px] text-slate-400">Δ = Muestra - Ref</div>
+                                            </div>
+                                            <div className="h-32 w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <ComposedChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                        <XAxis 
+                                                            dataKey="wavelength" 
+                                                            fontSize={10}
+                                                            tickFormatter={(val) => `${Math.round(val)}`}
+                                                            minTickGap={30}
+                                                        />
+                                                        <YAxis fontSize={10} domain={['auto', 'auto']} />
+                                                        <Tooltip 
+                                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                            labelFormatter={(val) => `${val} nm`}
+                                                            formatter={(value: number) => [value.toFixed(4), 'Diferencia']}
+                                                        />
+                                                        <Line 
+                                                            type="monotone" 
+                                                            dataKey="zero" 
+                                                            stroke="#cbd5e1" 
+                                                            strokeWidth={1} 
+                                                            strokeDasharray="5 5"
+                                                            dot={false} 
+                                                            name="Línea Base"
+                                                        />
+                                                        <Area 
+                                                            type="monotone" 
+                                                            dataKey="diff" 
+                                                            stroke="#f43f5e" 
+                                                            fill="#f43f5e" 
+                                                            fillOpacity={0.1} 
+                                                            name="Diferencia"
+                                                        />
+                                                    </ComposedChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+
+                                        {/* Residuals Chart */}
+                                        <div className="mt-8 pt-6 border-t border-slate-100">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis de Residuales (Diferencia)</h3>
+                                                <div className="text-[10px] text-slate-400">Δ = Muestra - Ref</div>
+                                            </div>
+                                            <div className="h-32 w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <ComposedChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                        <XAxis 
+                                                            dataKey="wavelength" 
+                                                            fontSize={10}
+                                                            tickFormatter={(val) => `${Math.round(val)}`}
+                                                            minTickGap={30}
+                                                        />
+                                                        <YAxis fontSize={10} domain={['auto', 'auto']} />
+                                                        <Tooltip 
+                                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                                            labelFormatter={(val) => `${val} nm`}
+                                                            formatter={(value: number) => [value.toFixed(4), 'Diferencia']}
+                                                        />
+                                                        <Line 
+                                                            type="monotone" 
+                                                            dataKey="zero" 
+                                                            stroke="#cbd5e1" 
+                                                            strokeWidth={1} 
+                                                            strokeDasharray="5 5"
+                                                            dot={false} 
+                                                            name="Línea Base"
+                                                        />
+                                                        <Area 
+                                                            type="monotone" 
+                                                            dataKey="diff" 
+                                                            stroke="#f43f5e" 
+                                                            fill="#f43f5e" 
+                                                            fillOpacity={0.1} 
+                                                            name="Diferencia"
+                                                        />
+                                                    </ComposedChart>
+                                                </ResponsiveContainer>
                                             </div>
                                         </div>
                                     </Card>

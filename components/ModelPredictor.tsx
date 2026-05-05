@@ -3,24 +3,28 @@ import React, { useState, useRef } from 'react';
 import Card from './Card';
 import Button from './Button';
 import { PreprocessingStep } from '../types';
-import { applyPreprocessingLogic } from '../services/chemometrics';
+import { applyPreprocessingLogic, predictPLS } from '../services/chemometrics';
 
 declare var Papa: any;
 
 interface SavedModel {
-    fileName: string; // Para mostrar en la lista
+    fileName: string; 
     analyticalProperty: string;
     metrics: {
         plsIntercept: number;
         coefficients: number[];
         referenceSpectrum?: number[];
+        xMean?: number[];
+        W?: number[][];
+        T_inv_var?: number[];
     };
     preprocessing: PreprocessingStep[];
 }
 
 interface PredictionResult {
     id: string;
-    values: { [key: string]: number }; // Mapa: "Proteina": 12.5, "Humedad": 10.1
+    values: { [key: string]: number }; 
+    ghs: { [key: string]: number }; // Mapa de Distancias GH
 }
 
 const PredictIcon: React.FC = () => (
@@ -100,61 +104,79 @@ const ModelPredictor: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file || models.length === 0) return;
 
-        Papa.parse(file, {
-            header: false,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: (results: { data: any[][] }) => {
-                const data = results.data;
-                if (data.length < 2) return;
+                Papa.parse(file, {
+                    header: false,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: (results: { data: any[][] }) => {
+                        try {
+                            const data = results.data;
+                            if (data.length < 2) {
+                                alert("El archivo CSV debe tener al menos una fila de encabezados y una de datos.");
+                                return;
+                            }
 
-                const newPredictions: PredictionResult[] = [];
-                
-                // Iterar sobre las filas del CSV (muestras)
-                for (let i = 1; i < data.length; i++) {
-                    const row = data[i];
-                    const id = String(row[0]); // Columna 0 es ID
-                    const resultRow: PredictionResult = { id, values: {} };
-                    let isValidRow = true;
+                            const newPredictions: PredictionResult[] = [];
+                            let skippedCount = 0;
+                            
+                            // Iterar sobre las filas del CSV (muestras)
+                            for (let i = 1; i < data.length; i++) {
+                                const row = data[i];
+                                if (!row || row.length < 2) {
+                                    skippedCount++;
+                                    continue;
+                                }
 
-                    // Iterar sobre cada modelo cargado para esta muestra
-                    for (const model of models) {
-                        // Extraer espectro crudo. Asumimos que el CSV tiene suficientes columnas.
-                        // Usamos la longitud de coeficientes del modelo para saber cuántas columnas tomar.
-                        const spectralValues = row.slice(1, 1 + model.metrics.coefficients.length);
-                        
-                        if (spectralValues.length !== model.metrics.coefficients.length) {
-                            console.warn(`Muestra ${id}: Longitud espectral no coincide para el modelo ${model.analyticalProperty}.`);
-                            isValidRow = false;
-                            break; 
+                                const id = String(row[0]);
+                                const resultRow: PredictionResult = { id, values: {}, ghs: {} };
+                                let isValidRow = true;
+
+                                for (const model of models) {
+                                    const expectedLen = model.metrics.coefficients.length;
+                                    const spectralValues = row.slice(1, 1 + expectedLen);
+                                    
+                                    if (spectralValues.length !== expectedLen) {
+                                        console.warn(`Muestra ${id}: Columnas insuficientes (${spectralValues.length}/${expectedLen}) para ${model.analyticalProperty}`);
+                                        isValidRow = false;
+                                        break; 
+                                    }
+                                    
+                                    const numericValues = spectralValues.map(v => Number(v));
+                                    if (numericValues.some(v => isNaN(v))) {
+                                        console.warn(`Muestra ${id}: Valores no numéricos encontrados para ${model.analyticalProperty}`);
+                                        isValidRow = false;
+                                        break;
+                                    }
+
+                                    const processed = applyPreprocessingLogic(numericValues, model.preprocessing, model.metrics.referenceSpectrum);
+                                    const res = predictPLS(model.metrics as any, processed);
+
+                                    resultRow.values[model.analyticalProperty] = res.prediction;
+                                    resultRow.ghs[model.analyticalProperty] = res.gh;
+                                }
+
+                                if (isValidRow) {
+                                    newPredictions.push(resultRow);
+                                } else {
+                                    skippedCount++;
+                                }
+                            }
+
+                            if (newPredictions.length === 0 && data.length > 1) {
+                                alert("No se pudo procesar ninguna muestra. Verifique que el CSV tenga el mismo número de columnas que el espectro con el que se entrenó el modelo.");
+                            } else if (skippedCount > 0) {
+                                console.info(`Se omitieron ${skippedCount} muestras no válidas.`);
+                            }
+
+                            setPredictions(newPredictions);
+                        } catch (error) {
+                            console.error("Error crítico procesando CSV:", error);
+                            alert("Ocurrió un error inesperado al procesar el archivo.");
+                        } finally {
+                            if (csvInputRef.current) csvInputRef.current.value = '';
                         }
-                        
-                        if (spectralValues.some((v: any) => typeof v !== 'number')) {
-                            isValidRow = false;
-                            break;
-                        }
-
-                        // 1. Aplicar Pre-procesamiento específico de ESTE modelo
-                        const processed = applyPreprocessingLogic(spectralValues as number[], model.preprocessing, model.metrics.referenceSpectrum);
-
-                        // 2. Aplicar Ecuación de Regresión
-                        let yPred = model.metrics.plsIntercept;
-                        for(let k=0; k<processed.length; k++) {
-                            yPred += processed[k] * model.metrics.coefficients[k];
-                        }
-
-                        // Guardar resultado mapeado por nombre de propiedad
-                        resultRow.values[model.analyticalProperty] = yPred;
                     }
-
-                    if (isValidRow) {
-                        newPredictions.push(resultRow);
-                    }
-                }
-                setPredictions(newPredictions);
-                if (csvInputRef.current) csvInputRef.current.value = '';
-            }
-        });
+                });
     };
 
     const downloadResults = () => {
@@ -264,13 +286,26 @@ const ModelPredictor: React.FC = () => {
                                     {predictions.map((p, idx) => (
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-3 font-medium text-slate-700 border-r border-slate-100">{p.id}</td>
-                                            {models.map((m, mIdx) => (
-                                                <td key={mIdx} className="px-6 py-3 text-right font-mono text-slate-600">
-                                                    {p.values[m.analyticalProperty] !== undefined 
-                                                        ? p.values[m.analyticalProperty].toFixed(4) 
-                                                        : '-'}
-                                                </td>
-                                            ))}
+                                            {models.map((m, mIdx) => {
+                                                const val = p.values[m.analyticalProperty];
+                                                const gh = p.ghs[m.analyticalProperty];
+                                                const isOutlier = gh > 3.0;
+                                                
+                                                return (
+                                                    <td key={mIdx} className={`px-6 py-3 text-right font-mono ${isOutlier ? 'bg-red-50' : ''}`}>
+                                                        <div className="flex flex-col items-end">
+                                                            <span className={`text-sm ${isOutlier ? 'text-red-700 font-bold' : 'text-slate-700'}`}>
+                                                                {val !== undefined ? val.toFixed(4) : '-'}
+                                                            </span>
+                                                            {gh !== undefined && (
+                                                                <span className={`text-[9px] ${isOutlier ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                                                                    GH: {gh.toFixed(2)} {isOutlier ? '⚠️' : ''}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                );
+                                            })}
                                         </tr>
                                     ))}
                                 </tbody>

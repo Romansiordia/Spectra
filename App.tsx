@@ -252,6 +252,7 @@ const App: React.FC = () => {
                         <QualityControl 
                             wavelengths={wavelengths}
                             preprocessingSteps={preprocessingSteps}
+                            onWavelengthsUpdate={setWavelengths}
                         />
                     )}
 

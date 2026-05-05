@@ -134,6 +134,9 @@ interface PlsModel {
     intercept: number;
     xMean: number[];
     yMean: number;
+    // Para detección de outliers en predicción (H-Distance / GH)
+    W: number[][]; // Pesos de carga (M x A)
+    T_inv_var: number[]; // 1 / (T_a^T * T_a) para cada componente
 }
 
 function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
@@ -195,7 +198,15 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
 
     const T_final = X0.mmul(W);
     const TT = T_final.transpose().mmul(T_final);
-    // Ridge Regularization para evitar singularidad
+    
+    // Almacenar inversas de varianzas de scores para Mahalanobis (H-distance)
+    const T_inv_var = new Array(A);
+    for(let i=0; i<A; i++) {
+        const val = TT.get(i,i);
+        T_inv_var[i] = val > 1e-12 ? 1.0 / val : 0;
+    }
+
+    // Ridge Regularization para evitar singularidad en el cálculo de B
     for(let i=0; i<A; i++) TT.set(i,i, TT.get(i,i) + 1e-8);
     
     const TY = T_final.transpose().mmul(y0);
@@ -207,15 +218,57 @@ function trainPLS(X: Matrix, Y: Matrix, nComponents: number): PlsModel {
     for(let i=0; i<M; i++) xMeanDotB += xMeanVec[i] * coefficients[i];
     const intercept = yMeanVal - xMeanDotB;
 
-    return { coefficients, intercept, xMean: xMeanVec, yMean: yMeanVal };
+    return { 
+        coefficients, 
+        intercept, 
+        xMean: xMeanVec, 
+        yMean: yMeanVal,
+        W: W.to2DArray(),
+        T_inv_var: T_inv_var
+    };
 }
 
-function predictPLS(model: PlsModel, spectrum: number[]): number {
-    let prediction = model.intercept;
-    for (let i = 0; i < spectrum.length; i++) {
-        prediction += spectrum[i] * model.coefficients[i];
+export function predictPLS(model: any, spectrum: number[]): { prediction: number; gh: number } {
+    // 1. Predicción cuantitativa (Siempre disponible)
+    let prediction = model.plsIntercept || model.intercept || 0;
+    const coeffs = model.coefficients || [];
+    for (let i = 0; i < Math.min(spectrum.length, coeffs.length); i++) {
+        prediction += spectrum[i] * coeffs[i];
     }
-    return isFinite(prediction) ? prediction : 0;
+
+    // 2. Cálculo de GH (Solo si el modelo tiene la metadata necesaria)
+    let gh = 0;
+    if (model.xMean && model.W && model.T_inv_var) {
+        try {
+            const M = model.xMean.length;
+            const xc = new Array(M);
+            for(let i=0; i<M; i++) {
+                xc[i] = (spectrum[i] || 0) - model.xMean[i];
+            }
+
+            let hDist = 0;
+            const numComponents = model.T_inv_var.length;
+            
+            for (let a = 0; a < numComponents; a++) {
+                let ta = 0;
+                for (let i = 0; i < M; i++) {
+                    ta += xc[i] * model.W[i][a];
+                }
+                hDist += (ta * ta) * model.T_inv_var[a];
+            }
+
+            // Normalización GH
+            gh = Math.sqrt(hDist * (numComponents || 1) * 10); 
+        } catch (e) {
+            console.warn("Error calculando GH:", e);
+            gh = 0;
+        }
+    }
+
+    return { 
+        prediction: isFinite(prediction) ? prediction : 0, 
+        gh: isFinite(gh) ? gh : 0 
+    };
 }
 
 function calculateStats(actual: number[], predicted: number[]) {
@@ -313,7 +366,8 @@ export function runPlsAnalysis(
     const Y_matrix = new Matrix(Y_raw.map(v => [v]));
 
     const calModel = trainPLS(X_matrix, Y_matrix, safeNComponents);
-    const calPredictions = X_raw_array.map(spec => predictPLS(calModel, spec));
+    const calPredictionsData = X_raw_array.map(spec => predictPLS(calModel, spec));
+    const calPredictions = calPredictionsData.map(p => p.prediction);
     const statsCal = calculateStats(Y_raw, calPredictions);
 
     // Para validación cruzada, usamos un componente menos si es crítico
@@ -338,7 +392,8 @@ export function runPlsAnalysis(
             const X_cv = X_matrix.selection(X_cv_indices, Array.from({length: M}, (_, k) => k));
             const Y_cv = new Matrix(Y_cv_data);
             const cvModel = trainPLS(X_cv, Y_cv, finalCvComponents);
-            cvPredictions[i] = predictPLS(cvModel, X_raw_array[i]);
+            const cvRes = predictPLS(cvModel, X_raw_array[i]);
+            cvPredictions[i] = cvRes.prediction;
         } catch (e) {
             cvPredictions[i] = calPredictions[i]; // Fallback
         }
@@ -353,8 +408,8 @@ export function runPlsAnalysis(
     const residuals = Y_raw.map((y, i) => y - calPredictions[i]);
     const stdRes = statsCal.rmse || 1;
     const mahalanobisDistances = activeSamples.map((s, i) => {
-        const zScore = Math.abs(residuals[i]) / stdRes;
-        const dist = zScore * (0.8 + Math.random() * 0.4); 
+        // Usar el GH calculado por el modelo
+        const dist = calPredictionsData[i].gh; 
         return { id: s.id, distance: isFinite(dist) ? dist : 0, isOutlier: dist > 3.5 };
     });
 
@@ -379,11 +434,16 @@ export function runPlsAnalysis(
                 id: s.id,
                 actual: Y_raw[i],
                 predicted: calPredictions[i],
-                residual: residuals[i]
+                residual: residuals[i],
+                gh: calPredictionsData[i].gh
             })),
             coefficients: calModel.coefficients,
             processedSpectra: X_raw_array,
-            referenceSpectrum: referenceSpectrum
+            referenceSpectrum: referenceSpectrum,
+            // Exportar metadata de Mahalanobis para predicción futura
+            xMean: calModel.xMean,
+            W: calModel.W,
+            T_inv_var: calModel.T_inv_var
         },
         mahalanobis: {
             distances: mahalanobisDistances,
@@ -512,37 +572,85 @@ export function createIngredientLibrary(name: string, samples: { id: string | nu
     };
 }
 
+function calculateCorrelation(a: number[], b: number[]): number {
+    const n = a.length;
+    let sumA = 0, sumB = 0, sumAA = 0, sumBB = 0, sumAB = 0;
+    for (let i = 0; i < n; i++) {
+        sumA += a[i];
+        sumB += b[i];
+        sumAA += a[i] * a[i];
+        sumBB += b[i] * b[i];
+        sumAB += a[i] * b[i];
+    }
+    const num = n * sumAB - sumA * sumB;
+    const den = Math.sqrt((n * sumAA - sumA * sumA) * (n * sumBB - sumB * sumB));
+    return den === 0 ? 0 : num / den;
+}
+
 export function classifySpectrum(spectrum: number[], libraries: IngredientLibrary[]): ClassificationResult | null {
     if (libraries.length === 0) return null;
 
     let bestMatch: IngredientLibrary | null = null;
     let minDistance = Infinity;
+    let maxCorrelation = -1;
 
-    libraries.forEach(lib => {
+    const results = libraries.map(lib => {
+        // Asegurar que comparamos la misma cantidad de puntos
+        const n = Math.min(spectrum.length, lib.averageSpectrum.length);
+        const specA = spectrum.slice(0, n);
+        const specB = lib.averageSpectrum.slice(0, n);
+
         let dist = 0;
-        spectrum.forEach((v, i) => {
-            const diff = v - lib.averageSpectrum[i];
+        for (let i = 0; i < n; i++) {
+            const diff = specA[i] - specB[i];
             dist += diff * diff;
-        });
-        const finalDist = Math.sqrt(dist);
-        
-        if (finalDist < minDistance) {
-            minDistance = finalDist;
-            bestMatch = lib;
         }
+        
+        const finalDist = Math.sqrt(dist);
+        const correlation = calculateCorrelation(specA, specB);
+        
+        return { lib, dist: finalDist, correlation };
     });
+
+    // Criterio de selección riguroso: 
+    // 1. Debe tener una correlación alta (> 0.95) para ser considerado el mismo ingrediente
+    // 2. Entre los que tienen correlación alta, elegimos el de menor distancia
+    const validMatches = results.filter(r => r.correlation > 0.90);
+    
+    if (validMatches.length === 0) {
+        // Si ninguno correlaciona bien, buscamos el "menos malo" pero con confianza baja
+        const absoluteBest = results.sort((a, b) => b.correlation - a.correlation)[0];
+        bestMatch = absoluteBest.lib;
+        minDistance = absoluteBest.dist;
+        maxCorrelation = absoluteBest.correlation;
+    } else {
+        const best = validMatches.sort((a, b) => a.dist - b.dist)[0];
+        bestMatch = best.lib;
+        minDistance = best.dist;
+        maxCorrelation = best.correlation;
+    }
 
     if (!bestMatch) return null;
 
     const match = bestMatch as IngredientLibrary;
-    // Confianza basada en la distancia relativa al umbral (simplificado)
-    const confidence = Math.max(0, Math.min(100, 100 * (1 - (minDistance / (match.threshold * 2)))));
-    const isConforming = minDistance <= match.threshold;
+    
+    // Confianza Rigurosa: Combinación de Distancia y Correlación
+    // Si la correlación es baja, la confianza cae exponencialmente
+    const distScore = Math.max(0, 1 - (minDistance / (match.threshold * 1.5)));
+    const corrScore = maxCorrelation > 0.98 ? 1 : (maxCorrelation > 0.90 ? 0.5 : 0);
+    
+    let confidence = (distScore * 0.4 + maxCorrelation * 0.6) * 100;
+    
+    // Penalización crítica: Si la forma no coincide, no es el producto
+    if (maxCorrelation < 0.95) confidence *= 0.5;
+    if (maxCorrelation < 0.85) confidence = 0;
+
+    const isConforming = minDistance <= match.threshold && maxCorrelation > 0.97;
 
     return {
         ingredientId: match.id,
         ingredientName: match.name,
-        confidence,
+        confidence: Math.min(100, Math.max(0, confidence)),
         distance: minDistance,
         isConforming,
         details: {
