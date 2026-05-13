@@ -74,16 +74,16 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
     return (
         <Card className="h-full">
             <div className="flex flex-col h-full">
-                <div className="flex items-center gap-3 mb-4 border-b border-slate-200 pb-3">
-                    <div className="h-7 w-7 bg-brand-50 text-brand-600 border border-brand-100 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">3</div>
-                    <h3 className="text-lg font-bold text-slate-800">Generación de Modelo (PLS)</h3>
+                <div className="flex items-center gap-3 mb-4 border-b border-ui-border pb-3">
+                    <div className="h-7 w-7 bg-ui-darkest text-ui-accent border border-ui-accent rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">3</div>
+                    <h3 className="text-lg font-bold text-slate-100">Generación de Modelo (PLS)</h3>
                 </div>
                 
                 {/* Scrollable Content Area */}
                 <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2 pb-2 min-h-0">
                     <div className="grid grid-cols-2 gap-4 items-end">
                         <div>
-                             <label htmlFor="lv-input" className="block text-xs font-bold text-slate-500 mb-1">Variables Latentes (LV)</label>
+                             <label htmlFor="lv-input" className="block text-xs font-bold text-slate-400 mb-1">Variables Latentes (LV)</label>
                             <input
                                 type="number"
                                 id="lv-input"
@@ -91,7 +91,7 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                                 onChange={(e) => setNComponents(e.target.value)}
                                 min="1"
                                 max="20"
-                                className="w-full bg-white border border-slate-300 text-slate-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
+                                className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
                             />
                         </div>
                         <Button variant="secondary" onClick={handleOptimize} disabled={disabled || isOptimizing} className="h-[38px] text-xs">
@@ -116,7 +116,7 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                 </div>
 
                 {/* Static Footer with Final Button */}
-                <div className="pt-4 border-t border-slate-200">
+                <div className="pt-4 border-t border-ui-border">
                     <Button onClick={handleRun} disabled={disabled} className="w-full">
                         <RunIcon />
                         Generar Modelo PLS Final

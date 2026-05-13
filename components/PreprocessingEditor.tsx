@@ -81,10 +81,10 @@ const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSte
     return (
         <Card className="h-full">
             <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between gap-3 mb-4 border-b border-slate-200 pb-3">
+                <div className="flex items-center justify-between gap-3 mb-4 border-b border-ui-border pb-3">
                     <div className="flex items-center gap-3">
-                        <div className="h-7 w-7 bg-brand-50 text-brand-600 border border-brand-100 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">2</div>
-                        <h3 className="text-lg font-bold text-slate-800">Pre-procesamiento</h3>
+                        <div className="h-7 w-7 bg-ui-darkest text-ui-accent border border-ui-accent rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">2</div>
+                        <h3 className="text-lg font-bold text-slate-100">Pre-procesamiento</h3>
                     </div>
                     <Button onClick={onVisualize} disabled={disabled} size="sm" variant="primary">
                         <VisualizeIcon />
@@ -96,12 +96,12 @@ const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSte
                     {steps.map((step, index) => {
                         const methodInfo = PREPROCESSING_METHODS[step.method];
                         return (
-                            <div key={index} className="p-3 border border-slate-200 rounded-lg bg-slate-50 shadow-sm">
+                            <div key={index} className="p-3 border border-ui-border rounded-lg bg-ui-dark shadow-sm">
                                 <div className="flex items-center justify-between">
                                     <select
                                         value={step.method}
                                         onChange={(e) => handleMethodChange(index, e.target.value as PreprocessingStep['method'])}
-                                        className="w-full bg-white border border-slate-300 text-slate-700 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 shadow-sm"
+                                        className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
                                     >
                                         {Object.entries(PREPROCESSING_METHODS).map(([key, value]) => (
                                             <option key={key} value={key}>{value.name}</option>
@@ -115,13 +115,13 @@ const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSte
                                     <div className="grid grid-cols-3 gap-3 mt-3">
                                         {(methodInfo.params as any[]).map(param => (
                                             <div key={param.id} className="text-xs">
-                                                <label htmlFor={`${param.id}-${index}`} className="text-slate-500 font-medium mb-1 block">{param.name}</label>
+                                                <label htmlFor={`${param.id}-${index}`} className="text-slate-400 font-medium mb-1 block">{param.name}</label>
                                                 <input
                                                     type={param.type}
                                                     id={`${param.id}-${index}`}
                                                     value={step.params[param.id] || ''}
                                                     onChange={(e) => handleParamChange(index, param.id, e.target.value)}
-                                                    className="w-full bg-white border border-slate-300 text-slate-700 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                                    className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
                                                 />
                                             </div>
                                         ))}

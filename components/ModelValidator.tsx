@@ -136,13 +136,13 @@ const ModelValidator: React.FC = () => {
 
   const getRpdColor = (rpd: number | undefined) => {
     if (!rpd) return "bg-slate-400";
-    if (rpd >= 3.0) return "bg-emerald-500";
+    if (rpd >= 3.0) return "bg-ui-success";
     if (rpd >= 2.0) return "bg-amber-500";
     return "bg-rose-500";
   };
 
   const StatCard = ({ title, value, unit, icon: Icon, description, color }: { title: string; value: any; unit?: string; icon: any; description: string; color: string }) => (
-    <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-full hover:shadow-md transition-shadow">
+    <div className="bg-ui-card p-5 rounded-xl shadow-sm border border-ui-border flex flex-col justify-between h-full hover:shadow-md transition-shadow">
       <div>
         <div className="flex items-center justify-between mb-2">
           <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{title}</span>
@@ -151,7 +151,7 @@ const ModelValidator: React.FC = () => {
           </div>
         </div>
         <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold text-slate-800">{typeof value === 'number' ? value.toFixed(2) : (value || '0.00')}</span>
+          <span className="text-2xl font-bold text-slate-100">{typeof value === 'number' ? value.toFixed(2) : (value || '0.00')}</span>
           <span className="text-slate-400 text-xs font-medium">{unit}</span>
         </div>
       </div>
@@ -160,19 +160,19 @@ const ModelValidator: React.FC = () => {
   );
 
   return (
-    <div className="p-0 font-sans text-slate-900 bg-transparent pb-12">
+    <div className="p-0 font-sans text-slate-100 bg-transparent pb-12">
       <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-800">Validación NIR Externa</h1>
-          <p className="text-slate-500 text-sm mt-1">Análisis de rendimiento y precisión del modelo con regresión lineal vs laboratorio.</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-100">Validación NIR Externa</h1>
+          <p className="text-slate-400 text-sm mt-1">Análisis de rendimiento y precisión del modelo con regresión lineal vs laboratorio.</p>
         </div>
         
         <div className="flex gap-3">
-          <label className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg transition-colors font-bold text-xs shadow-sm cursor-pointer uppercase tracking-wide">
+          <label className="flex items-center gap-2 bg-ui-accent text-[#0a1d4a] hover:bg-[#38bdf8] shadow-[0_0_15px_rgba(14,165,233,0.3)] px-5 py-2.5 rounded-lg transition-all font-bold text-xs cursor-pointer uppercase tracking-wide">
             <Upload size={14} /> Cargar Datos (.csv)
             <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
           </label>
-          <button onClick={() => {setData(generateMockData()); setIsCustomData(false);}} className="text-slate-500 bg-white hover:bg-slate-50 p-2.5 rounded-lg transition-colors border border-slate-200 shadow-sm" title="Datos de ejemplo">
+          <button onClick={() => {setData(generateMockData()); setIsCustomData(false);}} className="text-slate-500 bg-ui-card hover:bg-ui-darkest p-2.5 rounded-lg transition-colors border border-ui-border shadow-sm" title="Datos de ejemplo">
             <Activity size={18} />
           </button>
         </div>
@@ -181,15 +181,15 @@ const ModelValidator: React.FC = () => {
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard title="RPD" value={stats?.rpd} icon={Gauge} color={getRpdColor(stats?.rpd)} description="Capacidad predictiva del modelo." />
-          <StatCard title="Pendiente" value={stats?.slope} icon={TrendingUp} color="bg-brand-500" description="Inclinación de la recta (ideal 1.0)." />
+          <StatCard title="Pendiente" value={stats?.slope} icon={TrendingUp} color="bg-ui-accent" description="Inclinación de la recta (ideal 1.0)." />
           <StatCard title="SEP" value={stats?.sep} unit="%" icon={AlertCircle} color="bg-slate-700" description="Error total de predicción." />
           <StatCard title="Bias" value={stats?.bias} unit="%" icon={BarChart3} color="bg-blue-500" description="Desviación sistemática promedio." />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-card border border-slate-100">
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-800">
-              <TrendingUp size={20} className="text-brand-600" />
+          <div className="lg:col-span-2 bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-100">
+              <TrendingUp size={20} className="text-ui-accent" />
               Dispersión y Línea de Tendencia
             </h2>
             <div className="h-[400px] w-full">
@@ -214,13 +214,13 @@ const ModelValidator: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-card border border-slate-100">
-              <h2 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-800">
-                <ClipboardList size={20} className="text-brand-600" />
+            <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-100">
+                <ClipboardList size={20} className="text-ui-accent" />
                 Estadísticos de Regresión
               </h2>
               <div className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="p-4 bg-ui-darkest rounded-xl border border-ui-border">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold text-slate-500 uppercase">Estado RPD</span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${getRpdColor(stats?.rpd)}`}>
@@ -233,9 +233,9 @@ const ModelValidator: React.FC = () => {
                   <p className="mt-2 text-[10px] text-slate-400">RPD {stats?.rpd.toFixed(2)}: Precisión relativa a la desviación estándar.</p>
                 </div>
 
-                <div className="overflow-hidden border border-slate-100 rounded-lg text-xs">
+                <div className="overflow-hidden border border-ui-border rounded-lg text-xs">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-slate-400 uppercase text-[9px] font-bold">
+                    <thead className="bg-ui-darkest text-slate-400 uppercase text-[9px] font-bold">
                       <tr>
                         <th className="px-3 py-2">Parámetro</th>
                         <th className="px-3 py-2">Valor</th>
@@ -245,27 +245,27 @@ const ModelValidator: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                       <tr>
                         <td className="px-3 py-2 font-medium">Pendiente (Slope)</td>
-                        <td className="px-3 py-2 font-bold text-brand-600">{stats?.slope.toFixed(4)}</td>
+                        <td className="px-3 py-2 font-bold text-ui-accent">{stats?.slope.toFixed(4)}</td>
                         <td className="px-3 py-2 text-right text-slate-400">1.000</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">Intercepto</td>
-                        <td className="px-3 py-2 font-bold text-slate-700">{stats?.intercept.toFixed(3)}</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.intercept.toFixed(3)}</td>
                         <td className="px-3 py-2 text-right text-slate-400">0.000</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">R²</td>
-                        <td className="px-3 py-2 font-bold text-slate-700">{stats?.r2.toFixed(3)}</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.r2.toFixed(3)}</td>
                         <td className="px-3 py-2 text-right text-slate-400">{"> 0.90"}</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">SEP</td>
-                        <td className="px-3 py-2 font-bold text-slate-700">{stats?.sep.toFixed(3)}%</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.sep.toFixed(3)}%</td>
                         <td className="px-3 py-2 text-right text-slate-400">Mínimo</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">Bias</td>
-                        <td className="px-3 py-2 font-bold text-slate-700">{stats?.bias.toFixed(3)}%</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.bias.toFixed(3)}%</td>
                         <td className="px-3 py-2 text-right text-slate-400">{"± 0.05"}</td>
                       </tr>
                     </tbody>
@@ -274,16 +274,16 @@ const ModelValidator: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-slate-900 p-6 rounded-xl text-white shadow-lg">
+            <div className="bg-ui-dark p-6 rounded-xl text-white shadow-lg">
               <h3 className="font-bold mb-3 flex items-center gap-2 text-[13px]">
-                <Target size={18} className="text-brand-400" />
+                <Target size={18} className="text-ui-accent" />
                 Análisis de Pendiente
               </h3>
               <div className="space-y-3">
                 <p className="text-[11px] leading-relaxed text-slate-400">
                   La pendiente (slope) mide la sensibilidad del modelo. Un valor de <strong>{stats?.slope.toFixed(2)}</strong> indica que el modelo {stats && stats.slope < 1 ? "infraestima" : "sobreestima"} los cambios en la concentración real. 
                 </p>
-                <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
+                <div className="p-3 bg-ui-darkest rounded-lg border border-ui-border">
                   <p className="text-brand-300 text-[10px] font-bold uppercase mb-1">Ecuación de Regresión:</p>
                   <p className="text-[12px] font-mono text-white tracking-tight">
                     NIR = {stats?.slope.toFixed(2)}x {stats && stats.intercept >= 0 ? '+' : '-'} {stats ? Math.abs(stats.intercept).toFixed(2) : '0.00'}
@@ -295,30 +295,30 @@ const ModelValidator: React.FC = () => {
         </div>
 
         {/* --- NUEVA TABLA DE DATOS DE VALIDACIÓN --- */}
-        <div className="bg-white p-6 rounded-xl shadow-card border border-slate-100 animate-fade-in">
-          <h2 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-800">
-            <TableIcon size={20} className="text-brand-600" />
+        <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border animate-fade-in">
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-100">
+            <TableIcon size={20} className="text-ui-accent" />
             Tabla de Datos y Diferencias de Validación
           </h2>
-          <div className="overflow-x-auto rounded-lg border border-slate-100">
+          <div className="overflow-x-auto rounded-lg border border-ui-border">
             <table className="w-full text-sm text-left border-collapse">
-              <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold sticky top-0">
+              <thead className="bg-ui-darkest text-slate-500 uppercase text-[10px] font-bold sticky top-0">
                 <tr>
-                  <th className="px-6 py-4 border-b border-slate-100">ID Muestra</th>
-                  <th className="px-6 py-4 border-b border-slate-100 text-right">Químico (Ref) %</th>
-                  <th className="px-6 py-4 border-b border-slate-100 text-right">NIR (Pred) %</th>
-                  <th className="px-6 py-4 border-b border-slate-100 text-right">Diferencia %</th>
+                  <th className="px-6 py-4 border-b border-ui-border">ID Muestra</th>
+                  <th className="px-6 py-4 border-b border-ui-border text-right">Químico (Ref) %</th>
+                  <th className="px-6 py-4 border-b border-ui-border text-right">NIR (Pred) %</th>
+                  <th className="px-6 py-4 border-b border-ui-border text-right">Diferencia %</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.map((row) => {
                   const diff = row.nir - row.quimico;
                   return (
-                    <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 font-medium text-slate-700">{row.id}</td>
-                      <td className="px-6 py-3 text-right font-mono text-slate-600">{row.quimico.toFixed(3)}</td>
-                      <td className="px-6 py-3 text-right font-mono text-slate-600">{row.nir.toFixed(3)}</td>
-                      <td className={`px-6 py-3 text-right font-mono font-bold ${Math.abs(diff) > (stats?.sep || 1) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    <tr key={row.id} className="hover:bg-ui-darkest transition-colors">
+                      <td className="px-6 py-3 font-medium text-slate-200">{row.id}</td>
+                      <td className="px-6 py-3 text-right font-mono text-slate-300">{row.quimico.toFixed(3)}</td>
+                      <td className="px-6 py-3 text-right font-mono text-slate-300">{row.nir.toFixed(3)}</td>
+                      <td className={`px-6 py-3 text-right font-mono font-bold ${Math.abs(diff) > (stats?.sep || 1) ? 'text-red-500' : 'text-ui-success'}`}>
                         {diff >= 0 ? '+' : ''}{diff.toFixed(3)}
                       </td>
                     </tr>
@@ -332,12 +332,12 @@ const ModelValidator: React.FC = () => {
                   </tr>
                 )}
               </tbody>
-              <tfoot className="bg-slate-50 font-bold">
+              <tfoot className="bg-ui-darkest font-bold">
                 <tr>
                   <td className="px-6 py-3 text-slate-500 uppercase text-[10px]">Promedios</td>
                   <td className="px-6 py-3 text-right font-mono">{stats?.meanX.toFixed(3)}</td>
                   <td className="px-6 py-3 text-right font-mono">{stats?.meanY.toFixed(3)}</td>
-                  <td className="px-6 py-3 text-right font-mono text-slate-800">{stats?.bias.toFixed(3)}</td>
+                  <td className="px-6 py-3 text-right font-mono text-slate-100">{stats?.bias.toFixed(3)}</td>
                 </tr>
               </tfoot>
             </table>

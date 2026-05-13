@@ -132,43 +132,44 @@ const App: React.FC = () => {
     return (
         <>
             {loadingMessage && <Loader message={loadingMessage} />}
-            <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
-                <Header />
-                
-                <div className="bg-white border-b border-slate-200 sticky top-16 z-20">
-                    <div className="max-w-[1920px] mx-auto px-4 lg:px-6 flex gap-8">
-                        <button 
-                            onClick={() => setCurrentView('calibration')}
-                            className={`py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${currentView === 'calibration' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h5"/><path d="M17 12h5"/><path d="M7 12a5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5Z"/></svg>
-                            1. Entrenamiento & Calibración
-                        </button>
-                        <button 
-                            onClick={() => setCurrentView('prediction')}
-                            className={`py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${currentView === 'prediction' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                            2. Predicción de Nuevas Muestras
-                        </button>
-                        <button 
-                            onClick={() => setCurrentView('validation')}
-                            className={`py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${currentView === 'validation' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                            3. Validación del Modelo
-                        </button>
-                        <button 
-                            onClick={() => setCurrentView('quality')}
-                            className={`py-4 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${currentView === 'quality' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            4. Control de Calidad
-                        </button>
-                    </div>
-                </div>
+            <div className="min-h-screen flex text-slate-100 font-sans bg-transparent">
+                {/* Sidebar */}
+                <aside className="w-20 bg-ui-darkest border-r border-ui-border flex flex-col items-center py-6 gap-6 z-40 sticky top-0 h-screen">
+                    {/* Placeholder for icons like in the image */}
+                    <button 
+                        onClick={() => setCurrentView('calibration')}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'calibration' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
+                        title="Entrenamiento & Calibración"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h5"/><path d="M17 12h5"/><path d="M7 12a5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5Z"/></svg>
+                    </button>
+                    <button 
+                        onClick={() => setCurrentView('prediction')}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'prediction' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
+                        title="Predicción"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </button>
+                    <button 
+                        onClick={() => setCurrentView('validation')}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'validation' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
+                        title="Validación"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    </button>
+                    <button 
+                        onClick={() => setCurrentView('quality')}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'quality' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
+                        title="Predicción Espectral"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </button>
+                </aside>
 
-                <main className="flex-grow p-4 lg:p-6">
+                <div className="flex-grow flex flex-col min-w-0">
+                    <Header />
+
+                    <main className="flex-grow p-4 lg:p-6 overflow-x-hidden">
                     
                     {currentView === 'calibration' && (
                         <div className="flex flex-col gap-6 animate-fade-in">
@@ -203,8 +204,8 @@ const App: React.FC = () => {
                                     />
                                     <div>
                                         <div className="flex items-center gap-3 mb-4">
-                                             <div className="h-7 w-7 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">4</div>
-                                             <h2 className="text-lg font-bold text-slate-800">Análisis de Resultados del Modelo</h2>
+                                             <div className="h-7 w-7 bg-ui-darkest text-ui-accent border border-ui-accent rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">4</div>
+                                             <h2 className="text-lg font-bold text-slate-100">Análisis de Resultados del Modelo</h2>
                                         </div>
                                         {modelResults ? (
                                             <ResultsViewer 
@@ -217,12 +218,12 @@ const App: React.FC = () => {
                                             />
                                         ) : (
                                             <Card>
-                                                <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-slate-50/50 rounded-lg border-2 border-dashed border-slate-300">
+                                                <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-ui-dark rounded-lg border-2 border-dashed border-ui-border">
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                     </svg>
-                                                    <p className="font-semibold text-slate-600 text-lg">Resultados del Modelo</p>
-                                                    <p className="text-sm text-slate-500 mt-1">Genere un modelo en el paso 3 para ver el análisis estadístico aquí.</p>
+                                                    <p className="font-semibold text-slate-200 text-lg">Resultados del Modelo</p>
+                                                    <p className="text-sm text-slate-400 mt-1">Genere un modelo en el paso 3 para ver el análisis estadístico aquí.</p>
                                                 </div>
                                             </Card>
                                         )}
@@ -234,9 +235,9 @@ const App: React.FC = () => {
 
                     {currentView === 'prediction' && (
                         <div className="max-w-5xl mx-auto animate-fade-in">
-                            <div className="mb-6 text-center">
-                                <h2 className="text-2xl font-bold text-slate-800">Módulo de Predicción Independiente</h2>
-                                <p className="text-slate-500 mt-2">Cargue un modelo previamente entrenado (.json) y un nuevo archivo de espectros (.csv) para calcular propiedades.</p>
+                            <div className="mb-6 mt-4">
+                                <h1 className="text-3xl font-black text-slate-100 uppercase tracking-wide">Gestión de Modelos</h1>
+                                <p className="text-ui-accent font-semibold mt-2 text-sm tracking-wide">Sincronice y administre su librería de modelos predictivos.</p>
                             </div>
                             <ModelPredictor />
                         </div>
@@ -257,6 +258,7 @@ const App: React.FC = () => {
                     )}
 
                 </main>
+                </div>
             </div>
         </>
     );

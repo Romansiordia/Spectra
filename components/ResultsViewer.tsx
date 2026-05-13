@@ -18,10 +18,10 @@ interface ResultsViewerProps {
 }
 
 const StatCard = ({ label, value, subtext, colorClass }: { label: string, value: string | number, subtext?: string, colorClass: string }) => (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-soft flex flex-col items-center justify-center hover:translate-y-[-2px] transition-transform duration-200">
+    <div className="bg-ui-dark p-5 rounded-xl border border-ui-border shadow-sm flex flex-col items-center justify-center hover:translate-y-[-2px] transition-transform duration-200">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{label}</span>
         <span className={`text-3xl font-bold font-mono ${colorClass}`}>{value}</span>
-        {subtext && <span className="text-xs text-slate-500 mt-2 bg-slate-50 px-2 py-0.5 rounded-full">{subtext}</span>}
+        {subtext && <span className="text-xs text-slate-400 mt-2 bg-ui-darkest px-2 py-0.5 rounded-full">{subtext}</span>}
     </div>
 );
 
@@ -76,10 +76,10 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                 labels: { usePointStyle: true, padding: 20, font: { family: 'Inter', size: 12 }, color: '#94a3b8' }
                             },
                             tooltip: {
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                                titleColor: '#0f172a',
-                                bodyColor: '#334155',
-                                borderColor: '#e2e8f0',
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                titleColor: '#f8fafc',
+                                bodyColor: '#f1f5f9',
+                                borderColor: '#1e293b',
                                 borderWidth: 1,
                                 padding: 10,
                                 callbacks: {
@@ -308,14 +308,14 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
     };
 
     const TabButton = ({ tabId, label, icon }: { tabId: string; label: string; icon?: React.ReactNode }) => (
-        <button className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all relative ${activeTab === tabId ? 'text-brand-600 bg-brand-50 border-b-2 border-brand-600' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`} onClick={() => setActiveTab(tabId)}>
+        <button className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all relative ${activeTab === tabId ? 'text-ui-accent bg-ui-darkest border-b-2 border-ui-accent' : 'text-slate-400 hover:text-slate-100 hover:bg-ui-dark'}`} onClick={() => setActiveTab(tabId)}>
             {icon}{label}
         </button>
     );
 
     return (
         <Card noPadding className="overflow-hidden">
-            <div className="bg-white border-b border-slate-200">
+            <div className="bg-ui-card border-b border-ui-border">
                 <div className="flex overflow-x-auto no-scrollbar">
                     <TabButton tabId="correlation" label="Gráfico" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18"></path></svg>} />
                     <TabButton tabId="stats" label="Métricas" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5v6h2"></path></svg>} />
@@ -324,24 +324,24 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                 </div>
             </div>
 
-            <div className="p-6 bg-slate-50 min-h-[400px]">
+            <div className="p-6 bg-ui-darkest min-h-[400px]">
                 <div className={activeTab === 'correlation' ? 'block' : 'hidden'}>
                     <div className="flex flex-col gap-6 animate-fade-in">
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <StatCard label="R²" value={isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'} colorClass="text-sky-600" />
-                            <StatCard label="Q²" value={isFinite(results.model.q2) ? results.model.q2.toFixed(4) : '0.0000'} colorClass="text-purple-600" />
-                            <StatCard label="SEC" value={isFinite(results.model.sec) ? results.model.sec.toFixed(4) : '0.0000'} colorClass="text-brand-600" />
-                            <StatCard label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-emerald-600" />
+                            <StatCard label="R²" value={isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'} colorClass="text-sky-400" />
+                            <StatCard label="Q²" value={isFinite(results.model.q2) ? results.model.q2.toFixed(4) : '0.0000'} colorClass="text-purple-400" />
+                            <StatCard label="SEC" value={isFinite(results.model.sec) ? results.model.sec.toFixed(4) : '0.0000'} colorClass="text-ui-accent" />
+                            <StatCard label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-ui-success" />
                         </div>
 
-                        <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-inner-dark h-[450px] relative">
+                        <div className="bg-ui-darkest p-4 rounded-xl border border-ui-border shadow-inner-dark h-[450px] relative">
                             <canvas ref={chartRef}></canvas>
                         </div>
 
-                        <div className="bg-white rounded-xl border border-slate-200 p-6 flex justify-between items-center">
+                        <div className="bg-ui-card rounded-xl border border-ui-border p-6 flex justify-between items-center">
                             <div>
-                                <h4 className="font-bold text-slate-700">Gestión de Outliers</h4>
-                                <p className="text-sm text-slate-500">Seleccionados: {manualSelection.size}</p>
+                                <h4 className="font-bold text-slate-100">Gestión de Outliers</h4>
+                                <p className="text-sm text-slate-400">Seleccionados: {manualSelection.size}</p>
                             </div>
                             <Button onClick={handleDeactivateManualClick} disabled={manualSelection.size === 0} variant="danger">
                                 Desactivar y Recalcular
@@ -352,15 +352,15 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
 
                 <div className={activeTab === 'stats' ? 'block' : 'hidden'}>
                     <div className="max-w-2xl mx-auto space-y-4 animate-fade-in">
-                        <StatCard label="Pendiente" value={results.model.slope.toFixed(4)} colorClass="text-slate-800" />
-                        <StatCard label="Offset" value={results.model.offset.toFixed(4)} colorClass="text-slate-800" />
+                        <StatCard label="Pendiente" value={results.model.slope.toFixed(4)} colorClass="text-slate-100" />
+                        <StatCard label="Offset" value={results.model.offset.toFixed(4)} colorClass="text-slate-100" />
                     </div>
                 </div>
                 
                 <div className={activeTab === 'residuals' ? 'block' : 'hidden'}>
-                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden animate-fade-in">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                     <div className="bg-ui-card rounded-xl border border-ui-border overflow-hidden animate-fade-in">
+                        <table className="w-full text-sm text-left text-slate-100">
+                            <thead className="bg-ui-dark text-slate-400 uppercase text-xs">
                                 <tr>
                                     <th className="px-6 py-3">ID</th>
                                     <th className="px-6 py-3 text-right">Real</th>
@@ -368,13 +368,13 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                                     <th className="px-6 py-3 text-right">Error</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-ui-darkest">
                                 {residuals.map(r => (
                                     <tr key={r.id}>
                                         <td className="px-6 py-3">{r.id}</td>
                                         <td className="px-6 py-3 text-right font-mono">{r.actual.toFixed(4)}</td>
                                         <td className="px-6 py-3 text-right font-mono">{r.predicted.toFixed(4)}</td>
-                                        <td className={`px-6 py-3 text-right font-mono ${Math.abs(r.residual) > results.model.sec * 2 ? 'text-red-600 font-bold' : ''}`}>{r.residual.toFixed(4)}</td>
+                                        <td className={`px-6 py-3 text-right font-mono ${Math.abs(r.residual) > results.model.sec * 2 ? 'text-red-400 font-bold' : ''}`}>{r.residual.toFixed(4)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -383,7 +383,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                 </div>
 
                 <div className={activeTab === 'full-data' ? 'block' : 'hidden'}>
-                    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200 animate-fade-in gap-4">
+                    <div className="flex flex-col items-center justify-center py-20 bg-ui-card rounded-xl border-2 border-dashed border-ui-border animate-fade-in gap-4">
                          <div className="flex gap-4">
                             <Button onClick={handleExportConfig} size="lg">Descargar Modelo JSON</Button>
                             <Button onClick={handleDownloadPDF} size="lg" variant="secondary">Descargar Reporte PDF</Button>

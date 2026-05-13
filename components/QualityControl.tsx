@@ -20,7 +20,7 @@ const Gauge: React.FC<{ value: number; threshold: number; distance: number }> = 
     return (
         <div className="relative flex flex-col items-center">
             <div className="relative w-48 h-24 overflow-hidden">
-                <div className="absolute top-0 left-0 w-48 h-48 border-[16px] border-slate-100 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-48 h-48 border-[16px] border-ui-border rounded-full"></div>
                 <div 
                     className={`absolute top-0 left-0 w-48 h-48 border-[16px] rounded-full transition-all duration-1000 ease-out`}
                     style={{ 
@@ -30,7 +30,7 @@ const Gauge: React.FC<{ value: number; threshold: number; distance: number }> = 
                     }}
                 ></div>
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-                    <span className={`text-2xl font-black ${isConforming ? 'text-emerald-600' : 'text-red-600'}`}>
+                    <span className={`text-2xl font-black ${isConforming ? 'text-ui-success' : 'text-red-600'}`}>
                         {isConforming ? 'OK' : 'FAIL'}
                     </span>
                 </div>
@@ -289,15 +289,15 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <Card id="library-management">
                         <div className="flex items-center gap-2 mb-4">
-                            <Database className="text-brand-600" size={20} />
-                            <h2 className="text-lg font-bold text-slate-800">Biblioteca</h2>
+                            <Database className="text-ui-accent" size={20} />
+                            <h2 className="text-lg font-bold text-slate-100">Biblioteca</h2>
                         </div>
 
                         {/* Google Sheets Sync Section */}
-                        <div className="mb-6 p-3 bg-brand-50/50 border border-brand-100 rounded-xl">
+                        <div className="mb-6 p-3 bg-ui-accent/10/50 border border-ui-accent/30 rounded-xl">
                             <button 
                                 onClick={() => setShowGoogleConfig(!showGoogleConfig)}
-                                className="flex items-center justify-between w-full text-[10px] font-bold text-brand-700 uppercase tracking-wider"
+                                className="flex items-center justify-between w-full text-[10px] font-bold text-ui-accent uppercase tracking-wider"
                             >
                                 <span className="flex items-center gap-2">
                                     <MapIcon size={12} />
@@ -313,7 +313,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                         value={googleScriptUrl}
                                         onChange={(e) => setGoogleScriptUrl(e.target.value)}
                                         placeholder="URL de Google Script..."
-                                        className="w-full px-2 py-1.5 bg-white border border-brand-200 rounded text-[10px] outline-none focus:ring-1 focus:ring-brand-500"
+                                        className="w-full px-2 py-1.5 bg-ui-card border border-ui-border rounded text-[10px] outline-none focus:ring-1 focus:ring-ui-accent"
                                     />
                                     <Button 
                                         onClick={syncWithGoogleSheets} 
@@ -335,7 +335,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                     value={newIngredientName}
                                     onChange={(e) => setNewIngredientName(e.target.value)}
                                     placeholder="Nombre del producto..."
-                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 outline-none transition-all"
+                                    className="w-full px-3 py-2 bg-ui-dark border border-ui-border rounded-lg text-sm text-slate-100 focus:ring-2 focus:ring-brand-500 outline-none transition-all"
                                 />
                             </div>
                             
@@ -350,10 +350,10 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                 />
                                 <label 
                                     htmlFor="lib-upload"
-                                    className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${!newIngredientName ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-brand-50 border-brand-200 text-brand-700 hover:bg-brand-100'}`}
+                                    className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${!newIngredientName ? 'bg-ui-dark border-ui-border text-slate-400 cursor-not-allowed' : 'bg-ui-accent/10 border-ui-accent/50 text-ui-accent hover:bg-ui-accent/20'}`}
                                 >
                                     {isUploadingLibrary ? (
-                                        <div className="h-4 w-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></div>
+                                        <div className="h-4 w-4 border-2 border-[#0a1d4a] border-t-transparent rounded-full animate-spin"></div>
                                     ) : (
                                         <Plus size={16} />
                                     )}
@@ -365,18 +365,18 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                         <div className="mt-6">
                             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Registrados ({libraries.length})</h3>
                             {libraries.length === 0 ? (
-                                <div className="py-6 text-center bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="py-6 text-center bg-ui-dark rounded-lg border border-ui-border">
                                     <p className="text-[10px] text-slate-400 italic">Sin datos</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                                     {libraries.map(lib => (
-                                        <div key={lib.id} className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg group hover:border-brand-300 transition-colors">
+                                        <div key={lib.id} className="flex items-center justify-between p-2 bg-ui-dark border border-ui-border rounded-lg group hover:border-ui-accent transition-colors">
                                             <div className="flex items-center gap-2 overflow-hidden">
-                                                <div className="h-6 w-6 bg-brand-50 text-brand-600 rounded flex items-center justify-center font-bold text-[10px] shrink-0">
+                                                <div className="h-6 w-6 bg-ui-accent/10 text-ui-accent rounded flex items-center justify-center font-bold text-[10px] shrink-0">
                                                     {lib.name.substring(0, 2).toUpperCase()}
                                                 </div>
-                                                <p className="text-xs font-semibold text-slate-700 truncate">{lib.name}</p>
+                                                <p className="text-xs font-semibold text-slate-300 truncate">{lib.name}</p>
                                             </div>
                                             <button 
                                                 onClick={() => removeLibrary(lib.id)}
@@ -391,9 +391,9 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                         </div>
                     </Card>
 
-                    <Card id="quality-info" className="bg-slate-900 text-white border-none">
+                    <Card id="quality-info" className="bg-ui-dark text-white border-none">
                         <div className="flex items-start gap-3">
-                            <Info size={18} className="text-brand-400 shrink-0 mt-0.5" />
+                            <Info size={18} className="text-ui-accent shrink-0 mt-0.5" />
                             <div>
                                 <h4 className="font-bold text-sm mb-1">Metodología</h4>
                                 <p className="text-[10px] text-slate-400 leading-relaxed">
@@ -409,8 +409,8 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                     <Card id="inspection-terminal">
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-2">
-                                <Search className="text-brand-600" size={20} />
-                                <h2 className="text-lg font-bold text-slate-800">Terminal de Inspección</h2>
+                                <Search className="text-ui-accent" size={20} />
+                                <h2 className="text-lg font-bold text-slate-100">Terminal de Inspección</h2>
                             </div>
                             
                             <div className="flex gap-2">
@@ -424,10 +424,10 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                 />
                                 <label 
                                     htmlFor="sample-inspect"
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-sm ${libraries.length === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white'}`}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-sm ${libraries.length === 0 ? 'bg-ui-darkest text-slate-400 cursor-not-allowed' : 'bg-ui-accent text-[#0a1d4a] hover:bg-[#38bdf8] shadow-[0_0_15px_rgba(14,165,233,0.3)]'}`}
                                 >
                                     {isInspecting ? (
-                                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <div className="h-4 w-4 border-2 border-[#0a1d4a] border-t-transparent rounded-full animate-spin"></div>
                                     ) : (
                                         <Activity size={16} />
                                     )}
@@ -440,40 +440,40 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                             <div className="space-y-6">
                                 {/* Fila Superior: Identidad y Gauge */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className={`md:col-span-2 p-6 rounded-2xl border-2 flex flex-col justify-center ${inspectionResult.isConforming ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
+                                    <div className={`md:col-span-2 p-6 rounded-2xl border-2 flex flex-col justify-center ${inspectionResult.isConforming ? 'bg-ui-success/10 border-ui-success/30' : 'bg-red-500/10 border-red-500/30'}`}>
                                         <div className="flex items-center justify-between mb-4">
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Identificación Detectada</span>
                                             <div className="flex items-center gap-2">
-                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black ${inspectionResult.isConforming ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black ${inspectionResult.isConforming ? 'bg-ui-success text-white' : 'bg-red-500 text-white'}`}>
                                                     {inspectionResult.isConforming ? 'CONFORME' : 'NO CONFORME'}
                                                 </span>
                                             </div>
                                         </div>
                                         
-                                        <h4 className="text-4xl font-black text-slate-800 mb-2">{inspectionResult.ingredientName}</h4>
+                                        <h4 className="text-4xl font-black text-slate-100 mb-2">{inspectionResult.ingredientName}</h4>
                                         <div className="flex items-center gap-3 mb-4">
                                             <div className="h-2 flex-grow bg-slate-200 rounded-full overflow-hidden">
                                                 <div 
-                                                    className="h-full bg-brand-500 transition-all duration-1000" 
+                                                    className="h-full bg-ui-accent transition-all duration-1000" 
                                                     style={{ width: `${inspectionResult.confidence}%` }}
                                                 ></div>
                                             </div>
-                                            <span className="text-xs font-bold text-brand-600">{Math.round(inspectionResult.confidence)}% Confianza</span>
+                                            <span className="text-xs font-bold text-ui-accent">{Math.round(inspectionResult.confidence)}% Confianza</span>
                                         </div>
                                         
                                         <div className="grid grid-cols-2 gap-4 mt-2">
-                                            <div className="bg-white/50 p-3 rounded-xl border border-white">
+                                            <div className="bg-ui-card/50 p-3 rounded-xl border border-ui-border">
                                                 <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Distancia</p>
-                                                <p className="text-xl font-mono font-bold text-slate-700">{inspectionResult.distance.toFixed(4)}</p>
+                                                <p className="text-xl font-mono font-bold text-slate-200">{inspectionResult.distance.toFixed(4)}</p>
                                             </div>
-                                            <div className="bg-white/50 p-3 rounded-xl border border-white">
+                                            <div className="bg-ui-card/50 p-3 rounded-xl border border-ui-border">
                                                 <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">Umbral Máx.</p>
-                                                <p className="text-xl font-mono font-bold text-slate-700">{inspectionResult.details.threshold.toFixed(4)}</p>
+                                                <p className="text-xl font-mono font-bold text-slate-200">{inspectionResult.details.threshold.toFixed(4)}</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 flex flex-col items-center justify-center">
+                                    <div className="bg-ui-darkest rounded-2xl border border-ui-border p-6 flex flex-col items-center justify-center">
                                         <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 text-center w-full">Indicador de Conformidad</span>
                                         <Gauge 
                                             value={inspectionResult.confidence} 
@@ -488,8 +488,8 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                     {/* Gráfico de Superposición (Opción 1) */}
                                     <Card className="p-4">
                                         <div className="flex items-center gap-2 mb-4">
-                                            <BarChart3 size={16} className="text-brand-600" />
-                                            <h3 className="text-xs font-bold text-slate-700 uppercase">Comparación Espectral (Overlay)</h3>
+                                            <BarChart3 size={16} className="text-ui-accent" />
+                                            <h3 className="text-xs font-bold text-slate-200 uppercase">Comparación Espectral (Overlay)</h3>
                                         </div>
                                         <div className="h-64 w-full">
                                             <ResponsiveContainer width="100%" height="100%">
@@ -547,7 +547,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                                 <span className="text-[10px] text-slate-500 font-medium">Referencia</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <div className="w-3 h-0.5 bg-brand-500"></div>
+                                                <div className="w-3 h-0.5 bg-ui-accent"></div>
                                                 <span className="text-[10px] text-slate-500 font-medium">Muestra</span>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -557,95 +557,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                         </div>
 
                                         {/* Residuals Chart */}
-                                        <div className="mt-8 pt-6 border-t border-slate-100">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis de Residuales (Diferencia)</h3>
-                                                <div className="text-[10px] text-slate-400">Δ = Muestra - Ref</div>
-                                            </div>
-                                            <div className="h-32 w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <ComposedChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis 
-                                                            dataKey="wavelength" 
-                                                            fontSize={10}
-                                                            tickFormatter={(val) => `${Math.round(val)}`}
-                                                            minTickGap={30}
-                                                        />
-                                                        <YAxis fontSize={10} domain={['auto', 'auto']} />
-                                                        <Tooltip 
-                                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                                            labelFormatter={(val) => `${val} nm`}
-                                                            formatter={(value: number) => [value.toFixed(4), 'Diferencia']}
-                                                        />
-                                                        <Line 
-                                                            type="monotone" 
-                                                            dataKey="zero" 
-                                                            stroke="#cbd5e1" 
-                                                            strokeWidth={1} 
-                                                            strokeDasharray="5 5"
-                                                            dot={false} 
-                                                            name="Línea Base"
-                                                        />
-                                                        <Area 
-                                                            type="monotone" 
-                                                            dataKey="diff" 
-                                                            stroke="#f43f5e" 
-                                                            fill="#f43f5e" 
-                                                            fillOpacity={0.1} 
-                                                            name="Diferencia"
-                                                        />
-                                                    </ComposedChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-
-                                        {/* Residuals Chart */}
-                                        <div className="mt-8 pt-6 border-t border-slate-100">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis de Residuales (Diferencia)</h3>
-                                                <div className="text-[10px] text-slate-400">Δ = Muestra - Ref</div>
-                                            </div>
-                                            <div className="h-32 w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <ComposedChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                                        <XAxis 
-                                                            dataKey="wavelength" 
-                                                            fontSize={10}
-                                                            tickFormatter={(val) => `${Math.round(val)}`}
-                                                            minTickGap={30}
-                                                        />
-                                                        <YAxis fontSize={10} domain={['auto', 'auto']} />
-                                                        <Tooltip 
-                                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                                            labelFormatter={(val) => `${val} nm`}
-                                                            formatter={(value: number) => [value.toFixed(4), 'Diferencia']}
-                                                        />
-                                                        <Line 
-                                                            type="monotone" 
-                                                            dataKey="zero" 
-                                                            stroke="#cbd5e1" 
-                                                            strokeWidth={1} 
-                                                            strokeDasharray="5 5"
-                                                            dot={false} 
-                                                            name="Línea Base"
-                                                        />
-                                                        <Area 
-                                                            type="monotone" 
-                                                            dataKey="diff" 
-                                                            stroke="#f43f5e" 
-                                                            fill="#f43f5e" 
-                                                            fillOpacity={0.1} 
-                                                            name="Diferencia"
-                                                        />
-                                                    </ComposedChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        </div>
-
-                                        {/* Residuals Chart */}
-                                        <div className="mt-8 pt-6 border-t border-slate-100">
+                                        <div className="mt-8 pt-6 border-t border-ui-border">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Análisis de Residuales (Diferencia)</h3>
                                                 <div className="text-[10px] text-slate-400">Δ = Muestra - Ref</div>
@@ -692,8 +604,8 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                     {/* Mapa PCA (Opción 5) */}
                                     <Card className="p-4">
                                         <div className="flex items-center gap-2 mb-4">
-                                            <MapIcon size={16} className="text-brand-600" />
-                                            <h3 className="text-xs font-bold text-slate-700 uppercase">Mapa de Identidad (PCA)</h3>
+                                            <MapIcon size={16} className="text-ui-accent" />
+                                            <h3 className="text-xs font-bold text-slate-200 uppercase">Mapa de Identidad (PCA)</h3>
                                         </div>
                                         <div className="h-64 w-full">
                                             <ResponsiveContainer width="100%" height="100%">
@@ -728,10 +640,10 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-24 text-center px-10">
-                                <div className="h-20 w-20 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mb-6 border-2 border-dashed border-slate-200">
+                                <div className="h-20 w-20 bg-ui-dark text-slate-400 rounded-full flex items-center justify-center mb-6 border-2 border-dashed border-ui-border">
                                     <Activity size={40} />
                                 </div>
-                                <h3 className="text-slate-600 font-bold text-lg mb-2">Listo para Inspección</h3>
+                                <h3 className="text-slate-200 font-bold text-lg mb-2">Listo para Inspección</h3>
                                 <p className="text-sm text-slate-400 max-w-xs">
                                     Selecciona un archivo CSV con la muestra que deseas verificar contra tu biblioteca de referencia.
                                 </p>

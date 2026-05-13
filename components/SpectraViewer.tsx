@@ -15,11 +15,11 @@ interface SpectraViewerProps {
 
 // --- TABLA DE REFERENCIA DE BANDAS NIR ---
 const NIR_BANDS = [
-    { id: 'humedad', name: 'Humedad (O-H)', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', ranges: [[1430, 1470], [1920, 1960]] },
-    { id: 'proteina', name: 'Proteína (N-H)', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.12)', ranges: [[1500, 1525], [2040, 2080], [2160, 2200]] },
-    { id: 'grasas', name: 'Grasas (C-H)', color: '#eab308', bg: 'rgba(234, 179, 8, 0.12)', ranges: [[1710, 1780], [2290, 2320], [2340, 2360]] },
-    { id: 'almidon', name: 'Almidón', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', ranges: [[2090, 2120], [2270, 2290]] },
-    { id: 'celulosa', name: 'Celulosa/Fibra', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', ranges: [[2260, 2275], [2330, 2345]] },
+    { id: 'humedad', name: 'Humedad (O-H)', description: 'Crucial para calidad y estabilidad post-cosecha.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', ranges: [[1430, 1470], [1920, 1960]] },
+    { id: 'proteina', name: 'Proteína (N-H)', description: 'Indicador de valor nutricional y calidad de granos.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.12)', ranges: [[1500, 1525], [2040, 2080], [2160, 2200]] },
+    { id: 'grasas', name: 'Grasas (C-H)', description: 'Componente clave para el perfil energético y de lípidos.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.12)', ranges: [[1710, 1780], [2290, 2320], [2340, 2360]] },
+    { id: 'almidon', name: 'Almidón', description: 'Carbohidrato principal, fuente de energía.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', ranges: [[2090, 2120], [2270, 2290]] },
+    { id: 'celulosa', name: 'Celulosa/Fibra', description: 'Componente estructural y de fibra dietética.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', ranges: [[2260, 2275], [2330, 2345]] },
 ];
 
 const findBandAssignment = (wavelength: number) => {
@@ -29,7 +29,7 @@ const findBandAssignment = (wavelength: number) => {
 };
 
 const ChartIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-600">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ui-accent">
         <path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path>
     </svg>
 );
@@ -142,7 +142,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                                             return [
                                                 '',
                                                 '── ASIGNACIÓN QUÍMICA ──',
-                                                ...assignments.map(a => `● ${a.name}`)
+                                                ...assignments.map(a => `● ${a.name}: ${a.description}`)
                                             ];
                                         }
                                         return null;
@@ -259,12 +259,12 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-brand-50 rounded-lg flex items-center justify-center">
+                        <div className="h-9 w-9 bg-ui-darkest text-ui-accent rounded-lg flex items-center justify-center">
                             <ChartIcon />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800">Diagnóstico Químico NIR</h2>
-                            <p className="text-sm text-slate-500">Seleccione los parámetros para resaltar sus regiones de absorción.</p>
+                            <h2 className="text-lg font-bold text-slate-100">Diagnóstico Químico NIR</h2>
+                            <p className="text-sm text-slate-400">Seleccione los parámetros para resaltar sus regiones de absorción.</p>
                         </div>
                     </div>
                 </div>
@@ -276,7 +276,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
             </div>
 
             {/* --- PANEL DE DIAGNÓSTICO (CHIPS) --- */}
-            <div className={`flex flex-wrap gap-2 mb-4 p-3 bg-slate-100/50 rounded-xl border border-slate-200 transition-opacity ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className={`flex flex-wrap gap-2 mb-4 p-3 bg-ui-darkest rounded-xl border border-ui-border transition-opacity ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest w-full mb-1">Filtros de Diagnóstico:</span>
                 {NIR_BANDS.map(band => (
                     <button
@@ -284,8 +284,8 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                         onClick={() => toggleBand(band.id)}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                             activeBands.has(band.id) 
-                                ? 'bg-white shadow-sm ring-2 ring-offset-1' 
-                                : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300'
+                                ? 'bg-ui-card shadow-sm ring-2 ring-offset-1' 
+                                : 'bg-ui-dark text-slate-400 border-ui-border hover:border-slate-500'
                         }`}
                         style={{ 
                             borderColor: activeBands.has(band.id) ? band.color : undefined,
@@ -299,21 +299,21 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                 ))}
             </div>
 
-            <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-end mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200 transition-opacity ${!hasData ? 'opacity-50' : ''}`}>
+            <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-end mb-4 bg-ui-dark p-3 rounded-lg border border-ui-border transition-opacity ${!hasData ? 'opacity-50' : ''}`}>
                 <div className="md:col-span-5">
-                    <label htmlFor="startWavelength" className="block text-xs font-semibold text-slate-500 mb-1">Longitud de onda inicial (nm)</label>
-                    <input type="number" id="startWavelength" value={startWl} onChange={e => setStartWl(e.target.value)} disabled={!hasData} className="w-full bg-white border border-slate-300 text-slate-800 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow shadow-sm disabled:bg-slate-100" />
+                    <label htmlFor="startWavelength" className="block text-xs font-semibold text-slate-400 mb-1">Longitud de onda inicial (nm)</label>
+                    <input type="number" id="startWavelength" value={startWl} onChange={e => setStartWl(e.target.value)} disabled={!hasData} className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-shadow shadow-sm disabled:bg-ui-darkest" />
                 </div>
                 <div className="md:col-span-5">
-                    <label htmlFor="endWavelength" className="block text-xs font-semibold text-slate-500 mb-1">Longitud de onda final (nm)</label>
-                    <input type="number" id="endWavelength" value={endWl} onChange={e => setEndWl(e.target.value)} disabled={!hasData} className="w-full bg-white border border-slate-300 text-slate-800 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow shadow-sm disabled:bg-slate-100" />
+                    <label htmlFor="endWavelength" className="block text-xs font-semibold text-slate-400 mb-1">Longitud de onda final (nm)</label>
+                    <input type="number" id="endWavelength" value={endWl} onChange={e => setEndWl(e.target.value)} disabled={!hasData} className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-shadow shadow-sm disabled:bg-ui-darkest" />
                 </div>
                 <div className="md:col-span-2">
                     <Button onClick={handleApplyRange} className="w-full text-sm py-1.5" disabled={!hasData}>Aplicar</Button>
                 </div>
             </div>
             
-            <div className="relative h-[450px] rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-inner-dark group">
+            <div className="relative h-[450px] rounded-xl overflow-hidden border border-ui-border bg-ui-dark shadow-inner-dark group">
                 <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-900 to-[#0f172a]"></div>
                 
                 {hasData ? (
@@ -322,14 +322,14 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                             <canvas ref={chartRef}></canvas>
                         </div>
 
-                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-slate-400 bg-black/60 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
+                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-slate-400 bg-black/60 px-3 py-1.5 rounded-lg border border-ui-border backdrop-blur-sm">
                             Scroll: Zoom • Arrastrar: Pan • Click: Info
                         </div>
                     </>
                 ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-                        <div className="h-20 w-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 border border-slate-700 shadow-xl">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                        <div className="h-20 w-20 bg-ui-darkest rounded-full flex items-center justify-center mb-6 border border-ui-border shadow-xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5v6h2" />
                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6" />
                                <path strokeLinecap="round" strokeLinejoin="round" d="M1 18l3.5-3.5a2 2 0 012.828 0L9 16m7 2l-3-3m0 0l-3-3m3 3l3-3m-3 3l-3 3" />
