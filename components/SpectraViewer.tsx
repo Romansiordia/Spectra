@@ -124,16 +124,15 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                                 titleFont: { family: 'Inter', size: 14, weight: 'bold' },
                                 bodyFont: { family: 'Inter', size: 12 },
                                 cornerRadius: 8,
-                                displayColors: true,
+                                displayColors: false,
+                                filter: (e: any, index: number) => index === 0,
                                 callbacks: { 
                                     title: (context: any) => {
                                         const wl = context[0].parsed.x;
                                         return `${wl.toFixed(1)} nm`;
                                     },
-                                    label: (context: any) => {
-                                        const sampleId = context.dataset.label;
-                                        const val = context.parsed.y;
-                                        return `${sampleId}: ${val.toFixed(5)}`;
+                                    label: () => {
+                                        return '';
                                     },
                                     afterBody: (context: any) => {
                                         const wl = context[0].parsed.x;
