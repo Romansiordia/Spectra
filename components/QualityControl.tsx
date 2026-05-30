@@ -64,9 +64,48 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
 
     const handleLibraryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !newIngredientName) return;
+        if (!file) return;
+
+        const isJson = file.name.toLowerCase().endsWith('.json');
+        if (!isJson && !newIngredientName) return;
 
         setIsUploadingLibrary(true);
+
+        if (isJson) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const config = JSON.parse(event.target?.result as string);
+                    if (config.referenceData && config.referenceData.meanSpectrum) {
+                        const newLib: IngredientLibrary = {
+                            id: `lib_${Date.now()}`,
+                            name: newIngredientName || config.analyticalProperty || 'Modelo Referencia',
+                            averageSpectrum: config.referenceData.meanSpectrum,
+                            stdDevSpectrum: config.referenceData.stdSpectrum,
+                            samples: [],
+                            threshold: config.referenceData.threshold || 2.0
+                        };
+                        setLibraries(prev => [...prev, newLib]);
+                        
+                        if (effectiveWavelengths.length === 0 && config.referenceData.wavelengths) {
+                            setLocalWavelengths(config.referenceData.wavelengths);
+                            onWavelengthsUpdate?.(config.referenceData.wavelengths);
+                        }
+                        setNewIngredientName('');
+                    } else {
+                        alert("El archivo JSON no contiene datos de referencia válidos (se requiere generar un modelo con la versión actualizada).");
+                    }
+                } catch (error) {
+                    alert('Error al leer el archivo JSON.');
+                } finally {
+                    setIsUploadingLibrary(false);
+                    if (e.target) e.target.value = '';
+                }
+            };
+            reader.readAsText(file);
+            return;
+        }
+
         parseCSV(file, (results) => {
             try {
                 if (results.samples.length === 0) return;
@@ -329,12 +368,12 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                         
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nuevo Ingrediente</label>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nombre (Opcional si usa JSON)</label>
                                 <input 
                                     type="text" 
                                     value={newIngredientName}
                                     onChange={(e) => setNewIngredientName(e.target.value)}
-                                    placeholder="Nombre del producto..."
+                                    placeholder="Nombre del producto o modelo..."
                                     className="w-full px-3 py-2 bg-ui-dark border border-ui-border rounded-lg text-sm text-slate-100 focus:ring-2 focus:ring-brand-500 outline-none transition-all"
                                 />
                             </div>
@@ -342,15 +381,15 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                             <div className="relative">
                                 <input 
                                     type="file" 
-                                    accept=".csv"
+                                    accept=".csv,.json"
                                     onChange={handleLibraryUpload}
-                                    disabled={!newIngredientName || isUploadingLibrary}
+                                    disabled={isUploadingLibrary}
                                     className="hidden" 
                                     id="lib-upload"
                                 />
                                 <label 
                                     htmlFor="lib-upload"
-                                    className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${!newIngredientName ? 'bg-ui-dark border-ui-border text-slate-400 cursor-not-allowed' : 'bg-ui-accent/10 border-ui-accent/50 text-ui-accent hover:bg-ui-accent/20'}`}
+                                    className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl border-2 border-dashed transition-all cursor-pointer ${isUploadingLibrary ? 'bg-ui-dark border-ui-border text-slate-400 cursor-wait' : 'bg-ui-accent/10 border-ui-accent/50 text-ui-accent hover:bg-ui-accent/20'}`}
                                 >
                                     {isUploadingLibrary ? (
                                         <div className="h-4 w-4 border-2 border-[#0a1d4a] border-t-transparent rounded-full animate-spin"></div>
@@ -509,7 +548,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                                     />
                                                     <Area 
                                                         type="monotone" 
-                                                        dataKey="upper" 
+                                                        dataKey="upperTolerance" 
                                                         stroke="none" 
                                                         fill="#94a3b8" 
                                                         fillOpacity={0.1} 
@@ -517,7 +556,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                                     />
                                                     <Area 
                                                         type="monotone" 
-                                                        dataKey="lower" 
+                                                        dataKey="lowerTolerance" 
                                                         stroke="none" 
                                                         fill="#94a3b8" 
                                                         fillOpacity={0.1} 

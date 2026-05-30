@@ -469,7 +469,11 @@ export function runPcaAnalysis(
 ): PcaScore[] {
     if (samples.length < 2) return [];
 
-    const X_raw = samples.map(s => s.values);
+    // Ensure all arrays have the same length to prevent ml-matrix from crashing
+    const minLength = Math.min(...samples.map(s => s.values.length));
+    if (minLength === 0) return [];
+    
+    const X_raw = samples.map(s => s.values.slice(0, minLength));
     const X = new Matrix(X_raw);
     const N = X.rows;
     const M = X.columns;

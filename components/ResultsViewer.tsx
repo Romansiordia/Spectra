@@ -13,6 +13,7 @@ interface ResultsViewerProps {
     propertyName: string;
     preprocessingSteps: PreprocessingStep[];
     activeSamples: (string | number)[];
+    activeSamplesData: Sample[];
     onDeactivateOutliers: (outlierIds: (string | number)[]) => void;
     wavelengths: number[];
     onExportCleanDataset: () => void;
@@ -26,7 +27,7 @@ const StatCard = ({ label, value, subtext, colorClass }: { label: string, value:
     </div>
 );
 
-const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, preprocessingSteps, activeSamples, onDeactivateOutliers, wavelengths, onExportCleanDataset }) => {
+const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, preprocessingSteps, activeSamples, activeSamplesData, onDeactivateOutliers, wavelengths, onExportCleanDataset }) => {
     const [activeTab, setActiveTab] = useState('correlation');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
@@ -140,7 +141,58 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
     }, [results, manualSelection, activeTab, propertyName]);
 
     const handleExportConfig = () => {
-        const config = { date: new Date().toISOString(), modelType: results.modelType, nComponents: results.nComponents, analyticalProperty: propertyName, preprocessing: preprocessingSteps, metrics: results.model };
+        // Calcular espectro de referencia y desviación estándar para muestras limpias
+        const spectra = activeSamplesData.map(s => s.values);
+        const meanSpectrum: number[] = [];
+        const stdSpectrum: number[] = [];
+        const numPoints = spectra[0]?.length || 0;
+        const numSamples = spectra.length;
+
+        for (let i = 0; i < numPoints; i++) {
+            let sum = 0;
+            for (let j = 0; j < numSamples; j++) {
+                sum += spectra[j][i];
+            }
+            const mean = sum / numSamples;
+            meanSpectrum.push(mean);
+
+            let varianceSum = 0;
+            for (let j = 0; j < numSamples; j++) {
+                varianceSum += Math.pow(spectra[j][i] - mean, 2);
+            }
+            const std = Math.sqrt(varianceSum / (numSamples > 1 ? numSamples - 1 : 1));
+            stdSpectrum.push(std);
+        }
+
+        const internalDistances: number[] = [];
+        for (let j = 0; j < numSamples; j++) {
+            let dist = 0;
+            for (let i = 0; i < numPoints; i++) {
+                const diff = spectra[j][i] - meanSpectrum[i];
+                dist += diff * diff;
+            }
+            internalDistances.push(Math.sqrt(dist));
+        }
+        
+        const meanDist = internalDistances.reduce((a, b) => a + b, 0) / (numSamples || 1);
+        const stdDist = Math.sqrt(internalDistances.reduce((a, b) => a + Math.pow(b - meanDist, 2), 0) / (numSamples || 1));
+        const resultThreshold = meanDist + (3 * stdDist) || 1.0;
+
+        const config = { 
+            date: new Date().toISOString(), 
+            modelType: results.modelType, 
+            nComponents: results.nComponents, 
+            analyticalProperty: propertyName, 
+            preprocessing: preprocessingSteps, 
+            metrics: results.model,
+            referenceData: {
+                meanSpectrum,
+                stdSpectrum,
+                numberOfSamples: numSamples,
+                wavelengths: wavelengths,
+                threshold: resultThreshold
+            }
+        };
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
         const anchor = document.createElement('a'); anchor.href = dataStr; anchor.download = `modelo_${propertyName}.json`; anchor.click();
     };

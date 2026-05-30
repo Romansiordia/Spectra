@@ -235,6 +235,7 @@ const App: React.FC = () => {
                                                 propertyName={analyticalProperty}
                                                 preprocessingSteps={preprocessingSteps}
                                                 activeSamples={activeSamples.map(s => s.id)}
+                                                activeSamplesData={activeSamples}
                                                 onDeactivateOutliers={handleDeactivateOutliers}
                                                 wavelengths={wavelengths}
                                                 onExportCleanDataset={handleExportCleanDataset}
