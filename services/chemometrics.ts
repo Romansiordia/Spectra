@@ -500,17 +500,29 @@ export function runPcaAnalysis(
     // PC1
     let t1 = X_res.getColumnVector(0);
     for (let iter = 0; iter < 20; iter++) {
-        const p1 = X_res.transpose().mmul(t1).div(t1.transpose().mmul(t1).get(0, 0));
-        p1.div(p1.norm('frobenius'));
+        const t1_sq = t1.transpose().mmul(t1).get(0, 0);
+        if (t1_sq < 1e-10) break;
+        const p1 = X_res.transpose().mmul(t1).div(t1_sq);
+        const p1_norm = p1.norm('frobenius');
+        if (p1_norm < 1e-10) break;
+        p1.div(p1_norm);
         t1 = X_res.mmul(p1);
     }
-    X_res = X_res.sub(t1.mmul(X_res.transpose().mmul(t1).div(t1.transpose().mmul(t1).get(0, 0)).transpose()));
+    
+    let t1_sq_final = t1.transpose().mmul(t1).get(0, 0);
+    if (t1_sq_final > 1e-10) {
+        X_res = X_res.sub(t1.mmul(X_res.transpose().mmul(t1).div(t1_sq_final).transpose()));
+    }
 
     // PC2
     let t2 = X_res.getColumnVector(0);
     for (let iter = 0; iter < 20; iter++) {
-        const p2 = X_res.transpose().mmul(t2).div(t2.transpose().mmul(t2).get(0, 0));
-        p2.div(p2.norm('frobenius'));
+        const t2_sq = t2.transpose().mmul(t2).get(0, 0);
+        if (t2_sq < 1e-10) break;
+        const p2 = X_res.transpose().mmul(t2).div(t2_sq);
+        const p2_norm = p2.norm('frobenius');
+        if (p2_norm < 1e-10) break;
+        p2.div(p2_norm);
         t2 = X_res.mmul(p2);
     }
 

@@ -13,9 +13,9 @@ interface QualityControlProps {
     onWavelengthsUpdate?: (wavelengths: number[]) => void;
 }
 
-const Gauge: React.FC<{ value: number; threshold: number; distance: number }> = ({ value, threshold, distance }) => {
-    const percentage = Math.min(100, (distance / (threshold * 1.5)) * 100);
-    const isConforming = distance <= threshold;
+const Gauge: React.FC<{ value: number; threshold: number; distance: number; isConforming: boolean }> = ({ value, threshold, distance, isConforming }) => {
+    // Utilizamos la confianza global (value) para la aguja
+    const percentage = 100 - value;
     
     return (
         <div className="relative flex flex-col items-center">
@@ -479,6 +479,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                             value={inspectionResult.confidence} 
                                             threshold={inspectionResult.details.threshold} 
                                             distance={inspectionResult.distance} 
+                                            isConforming={inspectionResult.isConforming}
                                         />
                                     </div>
                                 </div>
@@ -611,8 +612,8 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                                    <XAxis type="number" dataKey="pc1" name="PC1" hide />
-                                                    <YAxis type="number" dataKey="pc2" name="PC2" hide />
+                                                    <XAxis type="number" dataKey="pc1" name="PC1" domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                                    <YAxis type="number" dataKey="pc2" name="PC2" domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: 10 }} />
                                                     <ZAxis type="number" range={[100, 400]} />
                                                     <Tooltip 
                                                         cursor={{ strokeDasharray: '3 3' }}
