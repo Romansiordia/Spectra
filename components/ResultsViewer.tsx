@@ -15,6 +15,7 @@ interface ResultsViewerProps {
     activeSamples: (string | number)[];
     onDeactivateOutliers: (outlierIds: (string | number)[]) => void;
     wavelengths: number[];
+    onExportCleanDataset: () => void;
 }
 
 const StatCard = ({ label, value, subtext, colorClass }: { label: string, value: string | number, subtext?: string, colorClass: string }) => (
@@ -25,7 +26,7 @@ const StatCard = ({ label, value, subtext, colorClass }: { label: string, value:
     </div>
 );
 
-const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, preprocessingSteps, activeSamples, onDeactivateOutliers, wavelengths }) => {
+const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, preprocessingSteps, activeSamples, onDeactivateOutliers, wavelengths, onExportCleanDataset }) => {
     const [activeTab, setActiveTab] = useState('correlation');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
@@ -318,7 +319,6 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
             <div className="bg-ui-card border-b border-ui-border">
                 <div className="flex overflow-x-auto no-scrollbar">
                     <TabButton tabId="correlation" label="Gráfico" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18"></path></svg>} />
-                    <TabButton tabId="stats" label="Métricas" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5v6h2"></path></svg>} />
                     <TabButton tabId="residuals" label="Residuos" />
                     <TabButton tabId="full-data" label="Exportar" />
                 </div>
@@ -327,11 +327,12 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
             <div className="p-6 bg-ui-darkest min-h-[400px]">
                 <div className={activeTab === 'correlation' ? 'block' : 'hidden'}>
                     <div className="flex flex-col gap-6 animate-fade-in">
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                             <StatCard label="R²" value={isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'} colorClass="text-sky-400" />
                             <StatCard label="Q²" value={isFinite(results.model.q2) ? results.model.q2.toFixed(4) : '0.0000'} colorClass="text-purple-400" />
                             <StatCard label="SEC" value={isFinite(results.model.sec) ? results.model.sec.toFixed(4) : '0.0000'} colorClass="text-ui-accent" />
                             <StatCard label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-ui-success" />
+                            <StatCard label="Offset" value={results.model.offset != null && isFinite(results.model.offset) ? results.model.offset.toFixed(4) : '0.0000'} colorClass="text-amber-400" />
                         </div>
 
                         <div className="bg-ui-darkest p-4 rounded-xl border border-ui-border shadow-inner-dark h-[450px] relative">
@@ -350,13 +351,6 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                     </div>
                 </div>
 
-                <div className={activeTab === 'stats' ? 'block' : 'hidden'}>
-                    <div className="max-w-2xl mx-auto space-y-4 animate-fade-in">
-                        <StatCard label="Pendiente" value={results.model.slope.toFixed(4)} colorClass="text-slate-100" />
-                        <StatCard label="Offset" value={results.model.offset.toFixed(4)} colorClass="text-slate-100" />
-                    </div>
-                </div>
-                
                 <div className={activeTab === 'residuals' ? 'block' : 'hidden'}>
                      <div className="bg-ui-card rounded-xl border border-ui-border overflow-hidden animate-fade-in">
                         <table className="w-full text-sm text-left text-slate-100">
@@ -386,9 +380,10 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                     <div className="flex flex-col items-center justify-center py-20 bg-ui-card rounded-xl border-2 border-dashed border-ui-border animate-fade-in gap-4">
                          <div className="flex gap-4">
                             <Button onClick={handleExportConfig} size="lg">Descargar Modelo JSON</Button>
+                            <Button onClick={onExportCleanDataset} size="lg" className="bg-ui-accent hover:bg-ui-accent/80 text-white">Descargar Dataset Limpio (CSV)</Button>
                             <Button onClick={handleDownloadPDF} size="lg" variant="secondary">Descargar Reporte PDF</Button>
                          </div>
-                         <p className="mt-4 text-slate-400 text-sm">El archivo JSON es para el módulo de predicción. El PDF es un reporte técnico.</p>
+                         <p className="mt-4 text-slate-400 text-sm">El archivo JSON es para el módulo de predicción. El CSV contiene las lecturas y valores de las muestras activas. El PDF es un reporte técnico.</p>
                     </div>
                 </div>
             </div>

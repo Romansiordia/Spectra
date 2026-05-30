@@ -2,21 +2,11 @@ import React from 'react';
 
 const Header: React.FC = () => {
     return (
-        <header className="bg-ui-card border-b border-ui-border sticky top-0 z-30 shadow-sm">
-            <div className="mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
+        <header className="bg-ui-card border-b border-ui-border sticky top-0 z-30 shadow-sm w-full">
+            <div className="w-full px-4 lg:px-6 h-20 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg border border-ui-accent/30 flex items-center justify-center text-ui-accent">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-white tracking-tight leading-none">
-                            Spectra<span className="text-ui-accent">Pro</span>
-                        </h1>
-                        <p className="text-[10px] font-semibold text-ui-accent uppercase tracking-widest leading-none mt-1">
-                            RSS
-                        </p>
+                    <div className="h-14 w-auto flex items-center justify-center">
+                        <img src="/logo.png" alt="SpectraModel" className="h-full w-auto object-contain" />
                     </div>
                 </div>
                 

@@ -121,7 +121,29 @@ const App: React.FC = () => {
              const params: ModelParams = { type: 'pls', nComponents: modelResults.nComponents };
              handleRunModel(params, updatedSamples);
          }
-    }
+    };
+
+    const handleExportCleanDataset = () => {
+        const activeSamples = samples.filter(s => s.active);
+        if (activeSamples.length === 0) return;
+
+        let csvContent = "Sample_ID," + wavelengths.join(",") + "," + analyticalProperty + "\n";
+        
+        activeSamples.forEach(sample => {
+            const row = [sample.id, ...sample.values, sample.analyticalValue];
+            csvContent += row.join(",") + "\n";
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `dataset_limpio_${analyticalProperty}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
     
     const activeSamples = samples.filter(s => s.active);
     const spectraToDisplay = processedSpectra ? processedSpectra.map(p => {
@@ -132,9 +154,11 @@ const App: React.FC = () => {
     return (
         <>
             {loadingMessage && <Loader message={loadingMessage} />}
-            <div className="min-h-screen flex text-slate-100 font-sans bg-transparent">
-                {/* Sidebar */}
-                <aside className="w-20 bg-ui-darkest border-r border-ui-border flex flex-col items-center py-6 gap-6 z-40 sticky top-0 h-screen">
+            <div className="h-screen flex flex-col text-slate-100 font-sans bg-transparent overflow-hidden">
+                <Header />
+                <div className="flex-grow flex overflow-hidden">
+                    {/* Sidebar */}
+                    <aside className="w-20 bg-ui-darkest border-r border-ui-border flex flex-col items-center pt-16 pb-6 gap-6 z-40 shrink-0">
                     {/* Placeholder for icons like in the image */}
                     <button 
                         onClick={() => setCurrentView('calibration')}
@@ -166,10 +190,8 @@ const App: React.FC = () => {
                     </button>
                 </aside>
 
-                <div className="flex-grow flex flex-col min-w-0">
-                    <Header />
-
-                    <main className="flex-grow p-4 lg:p-6 overflow-x-hidden">
+                    <main className="flex-grow flex flex-col min-w-0 overflow-y-auto relative">
+                        <div className="flex-grow p-4 lg:p-6 pb-20">
                     
                     {currentView === 'calibration' && (
                         <div className="flex flex-col gap-6 animate-fade-in">
@@ -215,6 +237,7 @@ const App: React.FC = () => {
                                                 activeSamples={activeSamples.map(s => s.id)}
                                                 onDeactivateOutliers={handleDeactivateOutliers}
                                                 wavelengths={wavelengths}
+                                                onExportCleanDataset={handleExportCleanDataset}
                                             />
                                         ) : (
                                             <Card>
@@ -257,7 +280,8 @@ const App: React.FC = () => {
                         />
                     )}
 
-                </main>
+                        </div>
+                    </main>
                 </div>
             </div>
         </>
