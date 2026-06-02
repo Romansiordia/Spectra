@@ -75,6 +75,7 @@ export interface IngredientLibrary {
     }[];
     averageSpectrum: number[];
     stdDevSpectrum: number[];
+    rawAverageSpectrum?: number[];
     threshold: number; // Umbral de distancia para "Conformidad"
 }
 

@@ -82,6 +82,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                             name: newIngredientName || config.analyticalProperty || 'Modelo Referencia',
                             averageSpectrum: config.referenceData.meanSpectrum,
                             stdDevSpectrum: config.referenceData.stdSpectrum,
+                            rawAverageSpectrum: config.referenceData.rawMeanSpectrum,
                             samples: [],
                             threshold: config.referenceData.threshold || 2.0
                         };
@@ -139,7 +140,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                 setIsUploadingLibrary(false);
                 if (e.target) e.target.value = '';
             }
-        });
+        }, false);
     };
 
     const syncWithGoogleSheets = async () => {
@@ -252,7 +253,8 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                     onWavelengthsUpdate?.(results.wavelengths);
                 }
                 
-                const processedValues = applyPreprocessingLogic(sample.values, preprocessingSteps, libraries.length > 0 ? libraries[0].averageSpectrum : undefined);
+                const refSpec = libraries.length > 0 ? (libraries[0].rawAverageSpectrum || libraries[0].averageSpectrum) : undefined;
+                const processedValues = applyPreprocessingLogic(sample.values, preprocessingSteps, refSpec);
                 const result = classifySpectrum(processedValues, libraries);
                 
                 setInspectionResult(result);
@@ -283,7 +285,7 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                 setIsInspecting(false);
                 if (e.target) e.target.value = '';
             }
-        });
+        }, false);
     };
 
     const removeLibrary = (id: string) => {
@@ -311,8 +313,8 @@ const QualityControl: React.FC<QualityControlProps> = ({ wavelengths, preprocess
                 wavelength: effectiveWavelengths[i],
                 sample: inspectedSpectrum[i],
                 reference: matchedLib.averageSpectrum[i],
-                upper: matchedLib.averageSpectrum[i] + (matchedLib.stdDevSpectrum[i] * 2),
-                lower: matchedLib.averageSpectrum[i] - (matchedLib.stdDevSpectrum[i] * 2),
+                upperTolerance: matchedLib.averageSpectrum[i] + (matchedLib.stdDevSpectrum[i] * 2),
+                lowerTolerance: matchedLib.averageSpectrum[i] - (matchedLib.stdDevSpectrum[i] * 2),
                 diff: diff,
                 zero: 0
             });

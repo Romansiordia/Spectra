@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Card from './Card';
 import Button from './Button';
-import { ModelResults, PreprocessingStep } from '../types';
+import { ModelResults, PreprocessingStep, Sample } from '../types';
+import { applyPreprocessingLogic } from '../services/chemometrics';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -142,11 +143,18 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
 
     const handleExportConfig = () => {
         // Calcular espectro de referencia y desviación estándar para muestras limpias
-        const spectra = activeSamplesData.map(s => s.values);
+        const rawSpectra = activeSamplesData.map(s => s.values);
+        const numSamples = rawSpectra.length;
+        
+        const rawMeanSpectrum = rawSpectra[0]?.map((_, i) => 
+            rawSpectra.reduce((sum, s) => sum + s[i], 0) / (numSamples || 1)
+        ) || [];
+        
+        const spectra = rawSpectra.map(s => applyPreprocessingLogic(s, preprocessingSteps, rawMeanSpectrum));
+        
         const meanSpectrum: number[] = [];
         const stdSpectrum: number[] = [];
         const numPoints = spectra[0]?.length || 0;
-        const numSamples = spectra.length;
 
         for (let i = 0; i < numPoints; i++) {
             let sum = 0;
@@ -188,6 +196,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
             referenceData: {
                 meanSpectrum,
                 stdSpectrum,
+                rawMeanSpectrum,
                 numberOfSamples: numSamples,
                 wavelengths: wavelengths,
                 threshold: resultThreshold
