@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Scatter, ReferenceLine, Label,
-  ComposedChart
+  ComposedChart, BarChart, Bar
 } from 'recharts';
 import { 
   BarChart3, 
@@ -13,8 +13,12 @@ import {
   ClipboardList,
   Target,
   Gauge,
-  Table as TableIcon
+  Table as TableIcon,
+  Download
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 // --- Funciones Estadísticas ---
 
@@ -93,12 +97,228 @@ const generateMockData = () => {
 const ModelValidator: React.FC = () => {
   const [data, setData] = useState<{ id: number; quimico: number; nir: number }[]>([]);
   const [isCustomData, setIsCustomData] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   useEffect(() => {
     setData(generateMockData());
   }, []);
 
   const stats = useMemo(() => calculateStatistics(data), [data]);
+
+  const histogramData = useMemo(() => {
+    if (data.length === 0) return [];
+    const diffs = data.map(d => d.nir - d.quimico);
+    const min = Math.min(...diffs);
+    const max = Math.max(...diffs);
+    const range = max - min || 0.1;
+
+    const numBins = Math.max(5, Math.min(10, Math.round(Math.sqrt(data.length))));
+    const binWidth = range / numBins;
+
+    const bins = Array.from({ length: numBins }, (_, i) => {
+      const start = min + i * binWidth;
+      const end = start + binWidth;
+      return {
+        start,
+        end,
+        name: `${start.toFixed(2)} a ${end.toFixed(2)}`,
+        count: 0
+      };
+    });
+
+    diffs.forEach(diff => {
+      let placed = false;
+      for (let i = 0; i < bins.length; i++) {
+        const isLastBin = (i === bins.length - 1);
+        if (diff >= bins[i].start && (isLastBin ? diff <= bins[i].end : diff < bins[i].end)) {
+          bins[i].count++;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed && bins.length > 0) {
+        if (diff < min) bins[0].count++;
+        else if (diff > max) bins[bins.length - 1].count++;
+      }
+    });
+
+    return bins;
+  }, [data]);
+
+  const diffStats = useMemo(() => {
+    if (data.length === 0) return { max: 0, min: 0, meanAbs: 0, std: 0 };
+    const diffs = data.map(d => d.nir - d.quimico);
+    const max = Math.max(...diffs);
+    const min = Math.min(...diffs);
+    const sum = diffs.reduce((a, b) => a + b, 0);
+    const mean = sum / data.length;
+    const std = Math.sqrt(diffs.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / Math.max(1, data.length - 1));
+    const meanAbs = diffs.reduce((a, b) => a + Math.abs(b), 0) / data.length;
+    return { max, min, meanAbs, std };
+  }, [data]);
+
+  const handleDownloadPDF = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const doc = new jsPDF();
+      const today = new Date().toLocaleDateString('es-ES');
+      const time = new Date().toLocaleTimeString('es-ES');
+      
+      // --- PÁGINA 1: RESUMEN Y METRICAS ---
+      // Header
+      doc.setFontSize(22);
+      doc.setTextColor(14, 165, 233); // Brand color: sky-500
+      doc.text('Reporte de Validacion Externa NIR', 14, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139); // Slate 500
+      doc.text(`Fecha de Emisión: ${today} a las ${time}`, 14, 30);
+      doc.text(`Origen de Datos: ${isCustomData ? 'Archivo CSV cargado por usuario' : 'Muestras de simulacion por defecto'}`, 14, 35);
+      
+      // Line divider
+      doc.setDrawColor(226, 232, 240); // Slate 200
+      doc.line(14, 40, 196, 40);
+      
+      // Section 1: Key stats
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42); // Slate 900
+      doc.text('1. Resumen Estadistico de Regresion', 14, 49);
+      
+      const statsRows = [
+        ['Muestras Analizadas (n)', `${stats?.n || 0}`, '-'],
+        ['Pendiente (Slope)', `${stats?.slope.toFixed(4) || '0.0000'}`, '1.000'],
+        ['Intercepto', `${stats?.intercept.toFixed(4) || '0.0000'}`, '0.000'],
+        ['R2 (Coeficiente Determinacion)', `${stats?.r2.toFixed(4) || '0.0000'}`, '> 0.90'],
+        ['SEP (Error Estandar de Prediccion)', `${stats?.sep.toFixed(4) || '0.0000'}%`, 'Minimo'],
+        ['Bias (Sesgo)', `${stats?.bias.toFixed(4) || '0.0000'}%`, '± 0.05'],
+        ['RPD (Desviacion Predictiva Relativa)', `${stats?.rpd.toFixed(2) || '0.00'}`, 'Excelente (>=3.0)'],
+      ];
+      
+      autoTable(doc, {
+        startY: 54,
+        head: [['Estadistico', 'Valor Obtenido', 'Valor Ideal / Objetivo']],
+        body: statsRows,
+        theme: 'striped',
+        headStyles: { fillColor: [14, 165, 233] },
+        margin: { left: 14, right: 14 }
+      });
+      
+      // Section 2: Detailed Error Analysis
+      let currentY = (doc as any).lastAutoTable.finalY + 12;
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('2. Analisis de Diferencias y Dispersion de Errores', 14, currentY);
+      
+      const errorRows = [
+        ['Diferencia Maxima (Error Max Positivo)', `+${diffStats.max.toFixed(4)}%`],
+        ['Diferencia Minima (Error Max Negativo)', `${diffStats.min.toFixed(4)}%`],
+        ['Error Absoluto Medio (MAE)', `${diffStats.meanAbs.toFixed(4)}%`],
+        ['Media de Diferencias (Bias)', `${(stats?.bias || 0).toFixed(4)}%`],
+        ['Desviacion Estandar de Diferencias (Std Dev Errores)', `${diffStats.std.toFixed(4)}%`],
+      ];
+      
+      autoTable(doc, {
+        startY: currentY + 5,
+        head: [['Metrica de Error / Diferencia', 'Valor']],
+        body: errorRows,
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105] },
+        margin: { left: 14, right: 14 }
+      });
+
+      // --- PÁGINA 2: GRÁFICOS ---
+      // Capturar Gráficos
+      const dispContainer = document.getElementById('chart-dispersion-container');
+      const histContainer = document.getElementById('chart-histogram-container');
+
+      if (dispContainer || histContainer) {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.setTextColor(14, 165, 233);
+        doc.text('3. Graficos de Validación NIR Externa', 14, 20);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, 24, 196, 24);
+
+        let graphY = 32;
+
+        if (dispContainer) {
+          try {
+            const dispCanvas = await html2canvas(dispContainer, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: '#0a1d4a',
+            });
+            const dispImg = dispCanvas.toDataURL('image/png');
+            doc.setFontSize(11);
+            doc.setTextColor(71, 85, 105);
+            doc.text('A. Recta de Regresión / Dispersión (Predicción vs Laboratorio)', 14, graphY);
+            doc.addImage(dispImg, 'PNG', 14, graphY + 4, 180, 100);
+            graphY += 112;
+          } catch (err) {
+            console.error("Error al renderizar el gráfico de dispersión en PDF:", err);
+            doc.setFontSize(10);
+            doc.setTextColor(220, 38, 38);
+            doc.text("[Error al capturar el gráfico de dispersión]", 14, graphY + 10);
+            graphY += 20;
+          }
+        }
+
+        if (histContainer) {
+          try {
+            const histCanvas = await html2canvas(histContainer, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: '#0a1d4a',
+            });
+            const histImg = histCanvas.toDataURL('image/png');
+            doc.setFontSize(11);
+            doc.setTextColor(71, 85, 105);
+            doc.text('B. Histograma de Errores (Frecuencia de Diferencias Residuales)', 14, graphY);
+            doc.addImage(histImg, 'PNG', 14, graphY + 4, 180, 95);
+          } catch (err) {
+            console.error("Error al renderizar el histograma en PDF:", err);
+            doc.setFontSize(10);
+            doc.setTextColor(220, 38, 38);
+            doc.text("[Error al capturar el histograma de errores]", 14, graphY + 10);
+          }
+        }
+      }
+      
+      // --- PÁGINA 3: TABLA DETALLADA ---
+      doc.addPage();
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42);
+      doc.text('4. Tabla Completa de Diferencias y Valores por Muestra', 14, 20);
+      
+      const dataRows = data.map((row) => {
+        const di = row.nir - row.quimico;
+        const diffStr = di >= 0 ? `+${di.toFixed(3)}%` : `${di.toFixed(3)}%`;
+        return [
+          `${row.id}`,
+          `${row.quimico.toFixed(3)}%`,
+          `${row.nir.toFixed(3)}%`,
+          diffStr
+        ];
+      });
+      
+      autoTable(doc, {
+        startY: 25,
+        head: [['ID de Muestra', 'Quimico (Laboratorio Ref) %', 'NIR (Predicho) %', 'Diferencia (Residual)']],
+        body: dataRows,
+        theme: 'striped',
+        headStyles: { fillColor: [30, 41, 59] },
+        margin: { left: 14, right: 14 }
+      });
+      
+      doc.save(`Reporte_Validacion_NIR_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (e: any) {
+      console.error("Error al generar PDF:", e);
+      alert(`Error al generar el documento PDF: ${e.message}`);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -167,7 +387,15 @@ const ModelValidator: React.FC = () => {
           <p className="text-slate-400 text-sm mt-1">Análisis de rendimiento y precisión del modelo con regresión lineal vs laboratorio.</p>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+          <button 
+            onClick={handleDownloadPDF} 
+            disabled={isGeneratingPdf}
+            className={`flex items-center gap-2 bg-slate-800 text-slate-100 hover:bg-slate-700 px-5 py-2.5 rounded-lg transition-all font-bold text-xs border border-slate-700 uppercase tracking-wide shadow-sm ${isGeneratingPdf ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title="Descargar Reporte Completo en PDF"
+          >
+            <Download size={14} className={isGeneratingPdf ? 'animate-spin' : 'text-ui-accent'} /> {isGeneratingPdf ? 'Generando PDF...' : 'Exportar PDF'}
+          </button>
           <label className="flex items-center gap-2 bg-ui-accent text-[#0a1d4a] hover:bg-[#38bdf8] shadow-[0_0_15px_rgba(14,165,233,0.3)] px-5 py-2.5 rounded-lg transition-all font-bold text-xs cursor-pointer uppercase tracking-wide">
             <Upload size={14} /> Cargar Datos (.csv)
             <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
@@ -179,7 +407,8 @@ const ModelValidator: React.FC = () => {
       </header>
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <StatCard title="Muestras" value={stats?.n || data.length} icon={ClipboardList} color="bg-indigo-600" description="Total de muestras analizadas." />
           <StatCard title="RPD" value={stats?.rpd} icon={Gauge} color={getRpdColor(stats?.rpd)} description="Capacidad predictiva del modelo." />
           <StatCard title="Pendiente" value={stats?.slope} icon={TrendingUp} color="bg-ui-accent" description="Inclinación de la recta (ideal 1.0)." />
           <StatCard title="SEP" value={stats?.sep} unit="%" icon={AlertCircle} color="bg-slate-700" description="Error total de predicción." />
@@ -187,7 +416,7 @@ const ModelValidator: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
+          <div id="chart-dispersion-container" className="lg:col-span-2 bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
             <h2 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-100">
               <TrendingUp size={20} className="text-ui-accent" />
               Dispersión y Línea de Tendencia
@@ -244,6 +473,11 @@ const ModelValidator: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       <tr>
+                        <td className="px-3 py-2 font-medium">Muestras Analizadas (n)</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.n || data.length}</td>
+                        <td className="px-3 py-2 text-right text-slate-400">-</td>
+                      </tr>
+                      <tr>
                         <td className="px-3 py-2 font-medium">Pendiente (Slope)</td>
                         <td className="px-3 py-2 font-bold text-ui-accent">{stats?.slope.toFixed(4)}</td>
                         <td className="px-3 py-2 text-right text-slate-400">1.000</td>
@@ -290,6 +524,71 @@ const ModelValidator: React.FC = () => {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* --- DYNAMIC RESIDUALS HISTOGRAM --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div id="chart-histogram-container" className="lg:col-span-2 bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-2 text-slate-100">
+              <BarChart3 size={20} className="text-ui-accent" />
+              Distribución de Diferencias (Histograma de Errores)
+            </h2>
+            <p className="text-slate-400 text-xs mb-6">Frecuencia de las diferencias (NIR - Referencia Quimiométrica) agrupadas en rangos equidistantes.</p>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={histogramData} margin={{ top: 20, right: 25, bottom: 20, left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={9} angle={-15} textAnchor="end" height={50} />
+                  <YAxis stroke="#94a3b8" fontSize={11} allowDecimals={false} label={{ value: 'Frecuencia (Muestras)', angle: -90, position: 'insideLeft', offset: 0, fill: '#64748b' }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
+                    labelClassName="text-xs font-bold text-slate-300"
+                    itemStyle={{ fontSize: '11px', color: '#0ea5e9' }}
+                    formatter={(value) => [`${value} muestras`, 'Cantidad']}
+                  />
+                  <Bar dataKey="count" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border flex flex-col justify-between">
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-100">
+                <Activity size={20} className="text-indigo-400" />
+                Estadísticas de Errores
+              </h2>
+              <div className="p-4 bg-ui-darkest rounded-xl border border-ui-border space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Error Máximo Positivo</span>
+                  <span className="font-mono font-bold text-rose-500">+{diffStats.max.toFixed(3)}%</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Error Máximo Negativo</span>
+                  <span className="font-mono font-bold text-amber-500">{diffStats.min.toFixed(3)}%</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Media del Error (Bias)</span>
+                  <span className={`font-mono font-bold ${Math.abs(stats?.bias || 0) > 0.05 ? 'text-amber-500' : 'text-ui-success'}`}>
+                    {(stats?.bias || 0).toFixed(3)}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">MAE (Error Absoluto Medio)</span>
+                  <span className="font-mono font-bold text-slate-100">{diffStats.meanAbs.toFixed(3)}%</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Desv Est de Diferencias (n-1)</span>
+                  <span className="font-mono font-bold text-slate-100">{diffStats.std.toFixed(3)}%</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-slate-900/40 rounded-lg text-[11px] text-slate-400">
+              <p className="leading-relaxed">
+                El histograma muestra cuán balanceados están los errores. Una distribución simétrica y centrada en <strong>0.00</strong> nos dice que no hay sesgo o subdosage constante.
+              </p>
             </div>
           </div>
         </div>
