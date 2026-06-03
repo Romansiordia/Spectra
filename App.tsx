@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Sample, PreprocessingStep, ModelResults } from './types';
 import { parseCSV } from './services/csvParser';
+import { parseDX } from './services/dxParser';
 import { applyPreprocessingLogic, runPlsAnalysis } from './services/chemometrics';
 import Header from './components/Header';
 import Loader from './components/Loader';
@@ -38,10 +39,20 @@ const App: React.FC = () => {
 
     const handleFileSelected = (file: File) => {
         setLoadingMessage('Cargando datos...');
-        parseCSV(file, (results) => {
-            handleDataLoaded(results);
-            setLoadingMessage(null);
-        });
+        const ext = file.name.toLowerCase().split('.').pop();
+        if (ext === 'dx' || ext === 'jdx') {
+            parseDX(file, (results) => {
+                if (results) {
+                    handleDataLoaded(results);
+                }
+                setLoadingMessage(null);
+            });
+        } else {
+            parseCSV(file, (results) => {
+                handleDataLoaded(results);
+                setLoadingMessage(null);
+            });
+        }
     };
 
     const handleToggleSample = (index: number) => {

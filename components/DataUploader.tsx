@@ -35,10 +35,13 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
         e.preventDefault();
         setIsDragging(false);
         const file = e.dataTransfer.files?.[0];
-        if (file && file.name.endsWith('.csv')) {
-            processFile(file);
-        } else if (file) {
-            alert("Por favor suba un archivo .csv");
+        if (file) {
+            const fileName = file.name.toLowerCase();
+            if (fileName.endsWith('.csv') || fileName.endsWith('.dx') || fileName.endsWith('.jdx')) {
+                processFile(file);
+            } else {
+                alert("Por favor suba un archivo .csv o jcamp-dx (.dx, .jdx)");
+            }
         }
     };
 
@@ -61,7 +64,7 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
                         <input
                             type="file"
                             ref={fileInputRef}
-                            accept=".csv"
+                            accept=".csv,.dx,.jdx"
                             onChange={handleFileChange}
                             className="hidden"
                         />
@@ -72,7 +75,7 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
                                 <line x1="12" y1="3" x2="12" y2="15"></line>
                             </svg>
                         </div>
-                        <p className="text-sm font-semibold text-slate-200">Click o arrastre un CSV</p>
+                        <p className="text-sm font-semibold text-slate-200">Click o arrastre un CSV o JCAMP-DX</p>
                         <p className="text-xs text-slate-400 mt-1">para iniciar el análisis</p>
                     </div>
 
@@ -84,7 +87,9 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
                             </div>
                         )}
                         <div className="text-[10px] text-slate-400 leading-relaxed bg-ui-dark p-2 rounded-lg border border-ui-border">
-                            <strong className="text-slate-200">Formato:</strong> 1ª fila: Headers. Última col: Propiedad (Y).
+                            <strong className="text-slate-200">Formatos soportados:</strong><br/>
+                            - <strong>CSV:</strong> 1ª fila headers. Última col Propiedad (Y). <br/>
+                            - <strong>JCAMP-DX:</strong> Archivos .dx o .jdx de equipos FOSS/Brukker.
                         </div>
                     </div>
                 </div>
