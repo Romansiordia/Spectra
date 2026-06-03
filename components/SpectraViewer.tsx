@@ -40,8 +40,23 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
     const [startWl, setStartWl] = useState('');
     const [endWl, setEndWl] = useState('');
     const [activeBands, setActiveBands] = useState<Set<string>>(new Set());
+    const [samplingLimit, setSamplingLimit] = useState<number>(50);
     
     const hasData = samples.length > 0;
+
+    const displayedSamples = useMemo(() => {
+        if (samplingLimit === 0 || samples.length <= samplingLimit) {
+            return samples;
+        }
+        // Systematic sampling: select 'samplingLimit' elements evenly distributed
+        const step = samples.length / samplingLimit;
+        const filtered: typeof samples = [];
+        for (let i = 0; i < samplingLimit; i++) {
+            const idx = Math.min(Math.floor(i * step), samples.length - 1);
+            filtered.push(samples[idx]);
+        }
+        return filtered;
+    }, [samples, samplingLimit]);
 
     useEffect(() => {
         if (hasData) {
@@ -190,7 +205,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
         const chart = chartInstanceRef.current;
         if (chart && hasData) {
             chart.data.labels = wavelengths;
-            chart.data.datasets = samples.map(sample => ({
+            chart.data.datasets = displayedSamples.map(sample => ({
                 label: sample.id,
                 data: sample.values,
                 borderColor: sample.color,
@@ -200,7 +215,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
             }));
             
             if (isProcessed) {
-                const allValues = samples.flatMap(s => s.values).filter(v => typeof v === 'number' && isFinite(v));
+                const allValues = displayedSamples.flatMap(s => s.values).filter(v => typeof v === 'number' && isFinite(v));
                 if (allValues.length > 0) {
                     const min = Math.min(...allValues);
                     const max = Math.max(...allValues);
@@ -215,7 +230,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
 
             chart.update('none'); 
         }
-    }, [wavelengths, samples, isProcessed, hasData]);
+    }, [wavelengths, displayedSamples, isProcessed, hasData]);
     
     // Update chart when active bands change
     useEffect(() => {
@@ -311,6 +326,31 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                     <Button onClick={handleApplyRange} className="w-full text-sm py-1.5" disabled={!hasData}>Aplicar</Button>
                 </div>
             </div>
+
+            {/* --- CONTROLLER DE MUESTREO EN CASO DE MUCHOS DATOS --- */}
+            {hasData && samples.length > 50 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 mb-4 text-xs bg-brand-500/10 border border-brand-500/20 text-brand-400 rounded-xl">
+                    <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-ui-accent shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        <span>
+                            <strong>Muestreo Inteligente:</strong> Se visualizan <strong className="text-slate-200">{displayedSamples.length}</strong> de <strong className="text-slate-200">{samples.length}</strong> espectros para optimizar el rendimiento. <span className="opacity-80">El 100% de los datos participa en el fondo matemático para entrenamientos y calibraciones.</span>
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        <label className="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">Mostrar:</label>
+                        <select 
+                            value={samplingLimit} 
+                            onChange={e => setSamplingLimit(Number(e.target.value))}
+                            className="bg-ui-dark border border-ui-border rounded-lg px-2.5 py-1 text-xs text-slate-200 outline-none cursor-pointer focus:border-ui-accent min-w-[120px] font-semibold"
+                        >
+                            <option value={50}>50 espectros</option>
+                            <option value={100}>100 espectros (Fina)</option>
+                            <option value={200}>200 espectros (Denso)</option>
+                            <option value={0}>Todos (Saturar)</option>
+                        </select>
+                    </div>
+                </div>
+            )}
             
             <div className="relative h-[450px] rounded-xl overflow-hidden border border-ui-border bg-ui-dark shadow-inner-dark group">
                 <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-slate-900 to-[#0f172a]"></div>
