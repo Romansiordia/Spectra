@@ -207,7 +207,7 @@ const ModelPredictor: React.FC = () => {
                 if (results) {
                     try {
                         const samplesData = results.samples.map(s => ({
-                            id: s.id,
+                            id: String(s.id),
                             values: s.values
                         }));
                         processSpectra(samplesData, results.wavelengths);

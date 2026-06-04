@@ -19,10 +19,24 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import * as XLSX from 'xlsx';
+
+// --- Interfaces para Multianalito ---
+
+interface SampleData {
+  id: string | number;
+  quimico: number;
+  nir: number;
+}
+
+interface ParameterData {
+  name: string;
+  samples: SampleData[];
+}
 
 // --- Funciones Estadísticas ---
 
-const calculateStatistics = (data: { id: number; quimico: number; nir: number }[]) => {
+const calculateStatistics = (data: SampleData[]) => {
   const n = data.length;
   if (n < 2) return null;
 
@@ -84,24 +98,86 @@ function normalCDF(x: number) {
   return x > 0 ? 1 - prob : prob;
 }
 
-const generateMockData = () => {
-  return Array.from({ length: 40 }, (_, i) => {
-    const quimico = 10 + Math.random() * 15;
-    const ruido = (Math.random() - 0.5) * 0.7;
-    // Forzamos una ligera pendiente distinta de 1 para visibilidad
-    const nir = (quimico * 0.98) + ruido + 0.45; 
-    return { id: i, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+// --- Generador de Datos por Defecto (Simulados para cada Analito) ---
+
+const generateDefaultParameters = (): ParameterData[] => {
+  const numSamples = 30;
+  
+  // PROTEÍNA (Ref: 7.5 - 10.5)
+  const proteinaSamples = Array.from({ length: numSamples }, (_, i) => {
+    const quimico = 7.5 + Math.random() * 3.0;
+    const noise = (Math.random() - 0.5) * 0.25;
+    const nir = (quimico * 0.98) + noise + 0.15;
+    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
   });
+
+  // GRASA (Ref: 1.5 - 3.8)
+  const grasaSamples = Array.from({ length: numSamples }, (_, i) => {
+    const quimico = 1.5 + Math.random() * 2.3;
+    const noise = (Math.random() - 0.5) * 0.35;
+    const nir = (quimico * 0.95) + noise + 0.25;
+    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+  });
+
+  // HUMEDAD (Ref: 10.0 - 13.8)
+  const humedadSamples = Array.from({ length: numSamples }, (_, i) => {
+    const quimico = 11.5 + Math.random() * 2.3;
+    const noise = (Math.random() - 0.5) * 0.20;
+    const nir = (quimico * 0.99) + noise + 0.08;
+    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+  });
+
+  // CENIZA (Ref: 0.1 - 2.5)
+  const cenizaSamples = Array.from({ length: numSamples }, (_, i) => {
+    const quimico = 0.5 + Math.random() * 2.0;
+    const noise = (Math.random() - 0.5) * 0.18;
+    const nir = (quimico * 0.97) + noise + 0.09;
+    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+  });
+
+  // FIBRA (Ref: 1.8 - 4.2)
+  const fibraSamples = Array.from({ length: numSamples }, (_, i) => {
+    const quimico = 1.8 + Math.random() * 2.4;
+    const noise = (Math.random() - 0.5) * 0.22;
+    const nir = (quimico * 0.96) + noise + 0.12;
+    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+  });
+
+  // ALMIDÓN (Ref: 63.0 - 69.5)
+  const almidonSamples = Array.from({ length: numSamples }, (_, i) => {
+    const quimico = 63.0 + Math.random() * 5.5;
+    const noise = (Math.random() - 0.5) * 0.85;
+    const nir = (quimico * 0.99) + noise + 0.40;
+    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+  });
+
+  return [
+    { name: 'PROTEÍNA', samples: proteinaSamples },
+    { name: 'GRASA', samples: grasaSamples },
+    { name: 'HUMEDAD', samples: humedadSamples },
+    { name: 'CENIZA', samples: cenizaSamples },
+    { name: 'FIBRA', samples: fibraSamples },
+    { name: 'ALMIDÓN', samples: almidonSamples }
+  ];
 };
 
 const ModelValidator: React.FC = () => {
-  const [data, setData] = useState<{ id: number; quimico: number; nir: number }[]>([]);
+  const [parameters, setParameters] = useState<ParameterData[]>([]);
+  const [selectedParamIndex, setSelectedParamIndex] = useState<number>(0);
   const [isCustomData, setIsCustomData] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   useEffect(() => {
-    setData(generateMockData());
+    setParameters(generateDefaultParameters());
   }, []);
+
+  const activeParameter = useMemo(() => {
+    return parameters[selectedParamIndex] || null;
+  }, [parameters, selectedParamIndex]);
+
+  const data = useMemo(() => {
+    return activeParameter ? activeParameter.samples : [];
+  }, [activeParameter]);
 
   const stats = useMemo(() => calculateStatistics(data), [data]);
 
@@ -161,160 +237,246 @@ const ModelValidator: React.FC = () => {
     if (isGeneratingPdf) return;
     setIsGeneratingPdf(true);
     try {
-      const doc = new jsPDF();
+      const doc = new jsPDF('p', 'mm', 'a4');
       const today = new Date().toLocaleDateString('es-ES');
       const time = new Date().toLocaleTimeString('es-ES');
+      const originalIndex = selectedParamIndex;
+
+      // ==========================================
+      // PÁGINA 1: RESUMEN CONFIGURADO MULTI-ANALITO
+      // ==========================================
       
-      // --- PÁGINA 1: RESUMEN Y METRICAS ---
-      // Header
+      // Decoraciones y bordes
+      doc.setDrawColor(14, 165, 233); // Brand sky-500
+      doc.setLineWidth(1);
+      doc.rect(8, 8, 194, 281);
+      
+      // Cabecera Principal
       doc.setFontSize(22);
-      doc.setTextColor(14, 165, 233); // Brand color: sky-500
-      doc.text('Reporte de Validacion Externa NIR', 14, 22);
+      doc.setTextColor(14, 165, 233);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Reporte de Validación Externa NIR', 14, 24);
       
       doc.setFontSize(10);
-      doc.setTextColor(100, 116, 139); // Slate 500
-      doc.text(`Fecha de Emisión: ${today} a las ${time}`, 14, 30);
-      doc.text(`Origen de Datos: ${isCustomData ? 'Archivo CSV cargado por usuario' : 'Muestras de simulacion por defecto'}`, 14, 35);
-      
-      // Line divider
+      doc.setTextColor(71, 85, 105);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Módulo de Comparación Estadística de Modelos vs Vía Húmeda (Laboratorio)', 14, 30);
+
+      // Bloque de Metadatos
+      doc.setFillColor(248, 250, 252); // Slate 50
+      doc.rect(14, 37, 182, 30, 'F');
       doc.setDrawColor(226, 232, 240); // Slate 200
-      doc.line(14, 40, 196, 40);
+      doc.setLineWidth(0.5);
+      doc.rect(14, 37, 182, 30, 'D');
       
-      // Section 1: Key stats
-      doc.setFontSize(14);
+      doc.setFontSize(9);
       doc.setTextColor(15, 23, 42); // Slate 900
-      doc.text('1. Resumen Estadistico de Regresion', 14, 49);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INFORMACIÓN DE VALIDACIÓN:', 18, 43);
       
-      const statsRows = [
-        ['Muestras Analizadas (n)', `${stats?.n || 0}`, '-'],
-        ['Pendiente (Slope)', `${stats?.slope.toFixed(4) || '0.0000'}`, '1.000'],
-        ['Intercepto', `${stats?.intercept.toFixed(4) || '0.0000'}`, '0.000'],
-        ['R2 (Coeficiente Determinacion)', `${stats?.r2.toFixed(4) || '0.0000'}`, '> 0.90'],
-        ['SEP (Error Estandar de Prediccion)', `${stats?.sep.toFixed(4) || '0.0000'}%`, 'Minimo'],
-        ['Bias (Sesgo)', `${stats?.bias.toFixed(4) || '0.0000'}%`, '± 0.05'],
-        ['RPD (Desviacion Predictiva Relativa)', `${stats?.rpd.toFixed(2) || '0.00'}`, 'Excelente (>=3.0)'],
-      ];
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Fecha del Reporte: ${today} a las ${time}`, 18, 49);
+      doc.text(`Origen de Datos: ${isCustomData ? 'Archivo Excel/CSV Cargado por Usuario' : 'Simulación de Calibración Espectral'}`, 18, 54);
+      doc.text(`Total Métodos de Enlace / Parámetros: ${parameters.length}`, 18, 59);
       
-      autoTable(doc, {
-        startY: 54,
-        head: [['Estadistico', 'Valor Obtenido', 'Valor Ideal / Objetivo']],
-        body: statsRows,
-        theme: 'striped',
-        headStyles: { fillColor: [14, 165, 233] },
-        margin: { left: 14, right: 14 }
-      });
-      
-      // Section 2: Detailed Error Analysis
-      let currentY = (doc as any).lastAutoTable.finalY + 12;
+      doc.text(`Supervisor QC: romansiordias@gmail.com`, 110, 49);
+      doc.text(`Instrumentación: FOSS NIR Predictor Engine`, 110, 54);
+      doc.text(`Estado del Sistema: Validación Activa`, 110, 59);
+
+      // Section 1: Executive Comparison Table
       doc.setFontSize(14);
       doc.setTextColor(15, 23, 42);
-      doc.text('2. Analisis de Diferencias y Dispersion de Errores', 14, currentY);
+      doc.setFont('helvetica', 'bold');
+      doc.text('1. Consolidado de Parámetros Analizados (Ref vs Espectro)', 14, 78);
       
-      const errorRows = [
-        ['Diferencia Maxima (Error Max Positivo)', `+${diffStats.max.toFixed(4)}%`],
-        ['Diferencia Minima (Error Max Negativo)', `${diffStats.min.toFixed(4)}%`],
-        ['Error Absoluto Medio (MAE)', `${diffStats.meanAbs.toFixed(4)}%`],
-        ['Media de Diferencias (Bias)', `${(stats?.bias || 0).toFixed(4)}%`],
-        ['Desviacion Estandar de Diferencias (Std Dev Errores)', `${diffStats.std.toFixed(4)}%`],
-      ];
-      
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Indicadores quimiométricos de ajuste para cada uno de los analitos configurados.', 14, 83);
+
+      // Generar filas para todos los parámetros cargados
+      const overviewRows = parameters.map((param) => {
+        const paramStats = calculateStatistics(param.samples);
+        const rpd = paramStats?.rpd || 0;
+        
+        let desemp = "Insuficiente (<2.0)";
+        if (rpd >= 3.0) desemp = "Excelente (C. Calidad)";
+        else if (rpd >= 2.0) desemp = "Aceptable (Monitoreo)";
+        
+        return [
+          param.name,
+          `${param.samples.length}`,
+          `${paramStats?.r2.toFixed(3) || '0.000'}`,
+          `${paramStats?.sep.toFixed(3) || '0.000'}%`,
+          `${paramStats?.bias.toFixed(3) || '0.000'}%`,
+          `${rpd.toFixed(2)}`,
+          `${paramStats?.slope.toFixed(3) || '0.000'}`,
+          desemp
+        ];
+      });
+
       autoTable(doc, {
-        startY: currentY + 5,
-        head: [['Metrica de Error / Diferencia', 'Valor']],
-        body: errorRows,
-        theme: 'grid',
-        headStyles: { fillColor: [71, 85, 105] },
+        startY: 87,
+        head: [['Analito / Componente', 'Muestras', 'R²', 'SEP', 'Bias (Sesgo)', 'RPD', 'Pendiente', 'Diagnóstico NIR']],
+        body: overviewRows,
+        theme: 'striped',
+        headStyles: { fillColor: [14, 165, 233] },
+        bodyStyles: { fontSize: 8.5 },
+        columnStyles: {
+          0: { fontStyle: 'bold' },
+          7: { fontStyle: 'bold' }
+        },
         margin: { left: 14, right: 14 }
       });
 
-      // --- PÁGINA 2: GRÁFICOS ---
-      // Capturar Gráficos
-      const dispContainer = document.getElementById('chart-dispersion-container');
-      const histContainer = document.getElementById('chart-histogram-container');
+      // Section 2: Interpretación
+      let yAfterTable = (doc as any).lastAutoTable.finalY + 12;
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont('helvetica', 'bold');
+      doc.text('2. Criterios de Evaluación y Tolerancia Técnica', 14, yAfterTable);
 
-      if (dispContainer || histContainer) {
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont('helvetica', 'normal');
+      const introText = [
+        "• Coeficiente de Determinación (R²): Medida del ajuste funcional de la recta. El valor ideal es 1.000; valores por encima de 0.90",
+        "  demuestran que el modelo predice con alta precisión los cambios en las concentraciones de laboratorio.",
+        "• SEP (Standard Error of Prediction): Mide la desviación promedio en las mismas unidades de concentración. Representa la",
+        "  precisión real de las predicciones en comparación con la química convencional.",
+        "• RPD (Ratio of Prediction to Deviation): Determina la robustez. Mayor a 3.0 es excelente para reemplazo directo de laboratorio.",
+        "• Bias (Sesgo): Evalúa sesgo sistemático direccional. Se espera que promedie en ±0.05 para asegurar que no hay sobredosis constante."
+      ];
+      
+      let textLineY = yAfterTable + 5;
+      introText.forEach(line => {
+        doc.text(line, 14, textLineY);
+        textLineY += 4.5;
+      });
+
+      // Footer cover
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184); // Slate 400
+      doc.text(`Página 1 de ${parameters.length + 1} - Reporte Consolidado de Validación NIR`, 14, 282);
+
+      // ==========================================
+      // PÁGINAS 2+: REPORTES INDIVIDUALES CON GRÁFICOS CAPTURADOS
+      // ==========================================
+      
+      for (let i = 0; i < parameters.length; i++) {
+        const param = parameters[i];
+        const paramStats = calculateStatistics(param.samples);
+        const diffs = param.samples.map(d => d.nir - d.quimico);
+        const maxDiff = diffs.length > 0 ? Math.max(...diffs) : 0;
+        const minDiff = diffs.length > 0 ? Math.min(...diffs) : 0;
+        const sumDiffs = diffs.reduce((a, b) => a + b, 0);
+        const meanDiff = diffs.length > 0 ? sumDiffs / diffs.length : 0;
+        const mae = diffs.length > 0 ? diffs.reduce((a, b) => a + Math.abs(b), 0) / diffs.length : 0;
+
+        // Switch visual active tab so charts render active data properly!
+        setSelectedParamIndex(i);
+        // Wait briefly for Recharts redraw and animations to finish
+        await new Promise(resolve => setTimeout(resolve, 250));
+
         doc.addPage();
+        
+        // Header de Analito
         doc.setFontSize(16);
         doc.setTextColor(14, 165, 233);
-        doc.text('3. Graficos de Validación NIR Externa', 14, 20);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Resultados Detallados: ${param.name}`, 14, 16);
+        
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Evaluación e histograma residual de predicciones de laboratorio vs espectral`, 14, 21);
+        
         doc.setDrawColor(226, 232, 240);
-        doc.line(14, 24, 196, 24);
+        doc.setLineWidth(0.5);
+        doc.line(14, 23, 196, 23);
 
-        let graphY = 32;
+        // Tabla detallada para este analito
+        const paramRows = [
+          ['Muestras Registradas (n)', `${param.samples.length}`, 'Coeficiente R²', `${paramStats?.r2.toFixed(4) || '0.0000'}`],
+          ['Pendiente (Slope)', `${paramStats?.slope.toFixed(4) || '0.0000'}`, 'Intercepto', `${paramStats?.intercept.toFixed(4) || '0.0000'}`],
+          ['Error de Predicción SEP', `${paramStats?.sep.toFixed(4) || '0.0000'}%`, 'Media del Error (Bias)', `${paramStats?.bias.toFixed(4) || '0.0000'}%`],
+          ['RPD (Desviación Relativa)', `${paramStats?.rpd.toFixed(2) || '0.00'}`, 'Residuo Máx Positivo', `+${maxDiff.toFixed(3)}%`],
+          ['Residuo Máx Negativo', `${minDiff.toFixed(3)}%`, 'Error Absoluto MAE', `${mae.toFixed(3)}%`]
+        ];
 
+        autoTable(doc, {
+          startY: 26,
+          head: [['Métrica de Rendimiento', 'Valor', 'Parámetro de Ajuste', 'Valor']],
+          body: paramRows,
+          theme: 'grid',
+          headStyles: { fillColor: [71, 85, 105] },
+          bodyStyles: { fontSize: 8 },
+          margin: { left: 14, right: 14 }
+        });
+
+        // Add both charts side-by-side or stacked
+        const dispContainer = document.getElementById('chart-dispersion-container');
+        const histContainer = document.getElementById('chart-histogram-container');
+        
+        let chartsY = (doc as any).lastAutoTable.finalY + 8;
+        
         if (dispContainer) {
           try {
-            const dispCanvas = await html2canvas(dispContainer, {
+            const canvas = await html2canvas(dispContainer, {
               scale: 2,
               useCORS: true,
               backgroundColor: '#0a1d4a',
             });
-            const dispImg = dispCanvas.toDataURL('image/png');
-            doc.setFontSize(11);
-            doc.setTextColor(71, 85, 105);
-            doc.text('A. Recta de Regresión / Dispersión (Predicción vs Laboratorio)', 14, graphY);
-            doc.addImage(dispImg, 'PNG', 14, graphY + 4, 180, 100);
-            graphY += 112;
+            const imgData = canvas.toDataURL('image/png');
+            doc.setFontSize(10);
+            doc.setTextColor(15, 23, 42);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`A. Gráfico de Dispersión y Ajuste (Recta de Tendencia)`, 14, chartsY);
+            doc.addImage(imgData, 'PNG', 14, chartsY + 3, 182, 85);
+            chartsY += 93;
           } catch (err) {
-            console.error("Error al renderizar el gráfico de dispersión en PDF:", err);
+            console.error("Error al capturar dispersión:", err);
             doc.setFontSize(10);
             doc.setTextColor(220, 38, 38);
-            doc.text("[Error al capturar el gráfico de dispersión]", 14, graphY + 10);
-            graphY += 20;
+            doc.text("[Gráfico de dispersión no disponible para exportación]", 14, chartsY + 10);
+            chartsY += 15;
           }
         }
 
         if (histContainer) {
           try {
-            const histCanvas = await html2canvas(histContainer, {
+            const canvas = await html2canvas(histContainer, {
               scale: 2,
               useCORS: true,
               backgroundColor: '#0a1d4a',
             });
-            const histImg = histCanvas.toDataURL('image/png');
-            doc.setFontSize(11);
-            doc.setTextColor(71, 85, 105);
-            doc.text('B. Histograma de Errores (Frecuencia de Diferencias Residuales)', 14, graphY);
-            doc.addImage(histImg, 'PNG', 14, graphY + 4, 180, 95);
+            const imgData = canvas.toDataURL('image/png');
+            doc.setFontSize(10);
+            doc.setTextColor(15, 23, 42);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`B. Histograma de Frecuencias de Errores Residuales`, 14, chartsY);
+            doc.addImage(imgData, 'PNG', 14, chartsY + 3, 182, 80);
           } catch (err) {
-            console.error("Error al renderizar el histograma en PDF:", err);
+            console.error("Error al capturar histograma:", err);
             doc.setFontSize(10);
             doc.setTextColor(220, 38, 38);
-            doc.text("[Error al capturar el histograma de errores]", 14, graphY + 10);
+            doc.text("[Histograma de errores no disponible para exportación]", 14, chartsY + 10);
           }
         }
+
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Página ${i + 2} de ${parameters.length + 1} - Reporte Consolidado por Parámetro`, 14, 285);
       }
-      
-      // --- PÁGINA 3: TABLA DETALLADA ---
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.setTextColor(15, 23, 42);
-      doc.text('4. Tabla Completa de Diferencias y Valores por Muestra', 14, 20);
-      
-      const dataRows = data.map((row) => {
-        const di = row.nir - row.quimico;
-        const diffStr = di >= 0 ? `+${di.toFixed(3)}%` : `${di.toFixed(3)}%`;
-        return [
-          `${row.id}`,
-          `${row.quimico.toFixed(3)}%`,
-          `${row.nir.toFixed(3)}%`,
-          diffStr
-        ];
-      });
-      
-      autoTable(doc, {
-        startY: 25,
-        head: [['ID de Muestra', 'Quimico (Laboratorio Ref) %', 'NIR (Predicho) %', 'Diferencia (Residual)']],
-        body: dataRows,
-        theme: 'striped',
-        headStyles: { fillColor: [30, 41, 59] },
-        margin: { left: 14, right: 14 }
-      });
-      
-      doc.save(`Reporte_Validacion_NIR_${new Date().toISOString().split('T')[0]}.pdf`);
+
+      // Restore original index visual state
+      setSelectedParamIndex(originalIndex);
+
+      // Save PDF
+      doc.save(`Reporte_Consolidado_NIR_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (e: any) {
-      console.error("Error al generar PDF:", e);
-      alert(`Error al generar el documento PDF: ${e.message}`);
+      console.error("Error completo de PDF:", e);
+      alert(`Error al generar reporte PDF consolidado: ${e.message || e}`);
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -325,33 +487,344 @@ const ModelValidator: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
-      if (rows.length < 2) return;
-      const firstRow = rows[0];
-      const delimiter = firstRow.includes(';') ? ';' : ',';
-      const headers = firstRow.split(delimiter).map(h => h.trim().toLowerCase());
-      
-      const idxQuimico = headers.findIndex(h => h.includes('quimico') || h.includes('ref') || h.includes('lab'));
-      const idxNir = headers.findIndex(h => h.includes('nir') || h.includes('pred'));
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
 
-      if (idxQuimico === -1 || idxNir === -1) {
-        alert("Error: No se encontraron columnas 'Quimico' y 'NIR' (o similares como 'Ref'/'Pred').");
-        return;
+    if (isExcel) {
+      reader.onload = (event) => {
+        try {
+          const buffer = event.target?.result as ArrayBuffer;
+          const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[firstSheetName];
+          
+          // Read raw rows (2D array)
+          const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+          parseMultiParameterRows(rows);
+        } catch (error: any) {
+          console.error("Error al procesar el archivo Excel:", error);
+          alert(`Error al procesar el archivo Excel: ${error.message || error}`);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // It's a CSV
+      reader.onload = (event) => {
+        try {
+          const text = event.target?.result as string;
+          const rawRows = text.split(/\r?\n/).filter(r => r.trim() !== '');
+          if (rawRows.length === 0) return;
+          
+          // Detect delimiter
+          const firstRow = rawRows[0];
+          const delimiter = firstRow.includes(';') ? ';' : (firstRow.includes('\t') ? '\t' : ',');
+          
+          const rows = rawRows.map(row => {
+            return row.split(delimiter).map(cell => {
+              return cell.trim().replace(/^["']|["']$/g, '');
+            });
+          });
+          
+          parseMultiParameterRows(rows);
+        } catch (error: any) {
+          console.error("Error al cargar el archivo CSV:", error);
+          alert(`Error al procesar el archivo CSV: ${error.message || error}`);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const parseMultiParameterRows = (rows: any[][]) => {
+    if (rows.length < 2) {
+      alert("El archivo no tiene suficientes filas para ser analizado.");
+      return;
+    }
+
+    const cleanedRows = rows.filter(row => row && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== ''));
+    if (cleanedRows.length < 2) return;
+
+    // Helper para normalizar nombres y eliminar acentos
+    const normalizeName = (name: string) => {
+      return String(name || '')
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    let subHeaderIdx = -1;
+    let mainHeaderIdx = -1;
+    let hasDoubleHeader = false;
+
+    // Detectar si hay doble cabecera (dos filas consecutivas al inicio con palabras clave en la segunda fila)
+    for (let r = 1; r < Math.min(cleanedRows.length, 4); r++) {
+      const row = cleanedRows[r];
+      let matches = 0;
+      row.forEach(cell => {
+        const val = normalizeName(cell);
+        if (
+          val.includes("HUMEDA") || val.includes("LAB") || val.includes("VIA") || 
+          val.includes("NIR") || val.includes("FOSS") || val.includes("PRED") || 
+          val.includes("REF") || val.includes("QUIMICO")
+        ) {
+          matches++;
+        }
+      });
+
+      // Si al menos 2 columnas tienen términos de método en filas inferiores, asumimos cabecera doble
+      if (matches >= 2) {
+        subHeaderIdx = r;
+        mainHeaderIdx = r - 1;
+        hasDoubleHeader = true;
+        break;
+      }
+    }
+
+    const parsedParams: ParameterData[] = [];
+
+    if (hasDoubleHeader && subHeaderIdx !== -1) {
+      // === CASO 1: DOBLE CABECERA ===
+      const mainHeader = cleanedRows[mainHeaderIdx];
+      const subHeader = cleanedRows[subHeaderIdx];
+      
+      const consolidatedMainHeader: string[] = [];
+      let lastSeenHeader = "";
+      for (let c = 0; c < subHeader.length; c++) {
+        const cellVal = String(mainHeader[c] || '').trim();
+        if (cellVal) {
+          lastSeenHeader = cellVal.toUpperCase();
+        }
+        consolidatedMainHeader[c] = lastSeenHeader;
       }
 
-      const parsedData = rows.slice(1).map((row, i) => {
-        const cols = row.split(delimiter);
-        const valQ = cols[idxQuimico]?.replace(/"/g, '').replace(',', '.');
-        const valN = cols[idxNir]?.replace(/"/g, '').replace(',', '.');
-        return { id: i, quimico: parseFloat(valQ), nir: parseFloat(valN) };
-      }).filter(d => !isNaN(d.quimico) && !isNaN(d.nir));
+      const paramMapping: { [name: string]: { quimicoCol: number; nirCol: number } } = {};
 
-      setData(parsedData);
-      setIsCustomData(true);
-    };
-    reader.readAsText(file);
+      for (let c = 1; c < subHeader.length; c++) {
+        const rawName = consolidatedMainHeader[c];
+        if (!rawName || rawName === 'ID') continue;
+
+        const normalizedParamName = normalizeName(rawName);
+        const subCell = normalizeName(subHeader[c]);
+        
+        if (!paramMapping[normalizedParamName]) {
+          paramMapping[normalizedParamName] = { quimicoCol: -1, nirCol: -1 };
+        }
+
+        if (subCell.includes("HUMEDA") || subCell.includes("LAB") || subCell.includes("QUIMICO") || subCell.includes("REF") || subCell.includes("VIA")) {
+          paramMapping[normalizedParamName].quimicoCol = c;
+        } else if (subCell.includes("NIR") || subCell.includes("NI") || subCell.includes("FOSS") || subCell.includes("PRED") || subCell.includes("MODEL")) {
+          paramMapping[normalizedParamName].nirCol = c;
+        }
+      }
+
+      const paramNames = Object.keys(paramMapping).filter(name => {
+        const mapping = paramMapping[name];
+        return mapping.quimicoCol !== -1 && mapping.nirCol !== -1;
+      });
+
+      const sampleStartIdx = subHeaderIdx + 1;
+      paramNames.forEach(pName => {
+        const mapping = paramMapping[pName];
+        const samples: SampleData[] = [];
+
+        for (let r = sampleStartIdx; r < cleanedRows.length; r++) {
+          const row = cleanedRows[r];
+          if (!row || row.length <= Math.max(mapping.quimicoCol, mapping.nirCol)) continue;
+          
+          const sampleId = String(row[0] || `Muestra-${r - sampleStartIdx + 1}`).trim();
+          const rawQ = String(row[mapping.quimicoCol] || '').replace(',', '.').trim();
+          const rawN = String(row[mapping.nirCol] || '').replace(',', '.').trim();
+          
+          const quimico = parseFloat(rawQ);
+          const nir = parseFloat(rawN);
+
+          if (!isNaN(quimico) && !isNaN(nir)) {
+            samples.push({ id: sampleId, quimico, nir });
+          }
+        }
+
+        if (samples.length > 0) {
+          parsedParams.push({ name: pName, samples });
+        }
+      });
+
+    } else {
+      // === CASO 2: CABECERA ÚNICA COMBINADA (O TABLA PLANA) ===
+      const headerRow = cleanedRows[0];
+      const numCols = headerRow.length;
+
+      const colTypes: ('ID' | 'LAB' | 'NIR' | 'UNKNOWN')[] = [];
+      const colCleanNames: string[] = [];
+
+      for (let c = 0; c < numCols; c++) {
+        const rawCell = String(headerRow[c] || '').trim();
+        const normCell = normalizeName(rawCell);
+
+        if (c === 0 || normCell === 'ID' || normCell === 'CODIGO' || normCell === 'MUESTRA' || normCell === 'SAMPLE') {
+          colTypes.push('ID');
+          colCleanNames.push('ID');
+          continue;
+        }
+
+        // Determinar si la columna representa datos de Laboratorio (Referencia) o NIR (Predicción)
+        let type: 'ID' | 'LAB' | 'NIR' | 'UNKNOWN' = 'UNKNOWN';
+        const isNir = normCell.includes("NIR") || 
+                      normCell.includes("FOSS") || 
+                      normCell.includes("PRED") || 
+                      normCell.includes("MODEL") || 
+                      normCell.includes("ESPECTRO") ||
+                      /\b(NI|NIR|FOSS|PRED|MODELO|MODEL|PREDICT|N)\b/i.test(rawCell.toUpperCase()) ||
+                      rawCell.toUpperCase().endsWith(" NI") ||
+                      rawCell.toUpperCase().endsWith(" NIR") ||
+                      rawCell.toUpperCase().endsWith(" FOSS") ||
+                      rawCell.toUpperCase().endsWith(" PRED") ||
+                      rawCell.toUpperCase().endsWith(" N");
+
+        const isLab = !isNir && (
+                      normCell.includes("VIA HUMEDA") || 
+                      normCell.includes("VIA HÚMEDA") || 
+                      normCell.includes("LAB") || 
+                      normCell.includes("VIA") || 
+                      normCell.includes("REF") || 
+                      normCell.includes("QUIMICO") || 
+                      /\b(LA|LAB|REF|VIA|L|HUMEDA)\b/i.test(rawCell.toUpperCase()) ||
+                      rawCell.toUpperCase().endsWith(" LA") ||
+                      rawCell.toUpperCase().endsWith(" LAB") ||
+                      rawCell.toUpperCase().endsWith(" L") ||
+                      rawCell.toUpperCase().endsWith(" REF")
+                    );
+
+        if (isNir) {
+          type = 'NIR';
+        } else if (isLab) {
+          type = 'LAB';
+        }
+
+        colTypes.push(type);
+
+        // Extraer el nombre del analito eliminando términos de método (pero preservando HUMEDAD)
+        let cleanName = normCell;
+        const removeTerms = [
+          "VIA HUMEDA", "VIA HÚMEDA", "VIA", "HUMEDA", "HUMEDO",
+          "LAB", "LA", "REF", "QUIMICO", "QUÍMICO", "QUIM",
+          "NIR", "NI", "FOSS", "PRED", "MODEL", "MODELO", "ESPECTRO", "PREDICT",
+          "L", "N"
+        ];
+        
+        removeTerms.forEach(term => {
+          const regexStr = `\\b${term}\\b`;
+          const regex = new RegExp(regexStr, 'gi');
+          cleanName = cleanName.replace(regex, '');
+        });
+
+        // Limpiar espacios y numeración residuales
+        cleanName = cleanName.replace(/[^A-Z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
+        colCleanNames.push(cleanName || "ANALITO");
+      }
+
+      // Agrupar columnas identificadas por nombre de componente quimiométrico
+      const paramMapping: { [name: string]: { quimicoCol: number; nirCol: number } } = {};
+
+      for (let c = 1; c < numCols; c++) {
+        const type = colTypes[c];
+        const cleanName = colCleanNames[c];
+
+        if (type === 'ID' || type === 'UNKNOWN') continue;
+
+        const pName = cleanName === "ANALITO" || !cleanName ? "ANALITO GENERAL" : cleanName;
+
+        if (!paramMapping[pName]) {
+          paramMapping[pName] = { quimicoCol: -1, nirCol: -1 };
+        }
+
+        if (type === 'LAB') {
+          paramMapping[pName].quimicoCol = c;
+        } else if (type === 'NIR') {
+          paramMapping[pName].nirCol = c;
+        }
+      }
+
+      const validMappedParams = Object.keys(paramMapping).filter(pName => {
+        return paramMapping[pName].quimicoCol !== -1 && paramMapping[pName].nirCol !== -1;
+      });
+
+      if (validMappedParams.length === 0) {
+        // Rescate heurístico: si encontramos al menos un LabCol y un NirCol, emparejar por el índice de orden
+        const labCols = colTypes.map((t, idx) => t === 'LAB' ? idx : -1).filter(idx => idx !== -1);
+        const nirCols = colTypes.map((t, idx) => t === 'NIR' ? idx : -1).filter(idx => idx !== -1);
+
+        if (labCols.length > 0 && nirCols.length > 0) {
+          const pairsCount = Math.min(labCols.length, nirCols.length);
+          for (let i = 0; i < pairsCount; i++) {
+            const lCol = labCols[i];
+            const nCol = nirCols[i];
+            
+            let pName = colCleanNames[lCol];
+            if (pName === "ANALITO" || !pName) {
+              pName = colCleanNames[nCol] !== "ANALITO" ? colCleanNames[nCol] : `ANALITO ${i + 1}`;
+            }
+
+            const samples: SampleData[] = [];
+            for (let r = 1; r < cleanedRows.length; r++) {
+              const row = cleanedRows[r];
+              if (!row || row.length <= Math.max(lCol, nCol)) continue;
+
+              const sampleId = String(row[0] || `Muestra-${r}`).trim();
+              const rawQ = String(row[lCol] || '').replace(',', '.').trim();
+              const rawN = String(row[nCol] || '').replace(',', '.').trim();
+              
+              const quimico = parseFloat(rawQ);
+              const nir = parseFloat(rawN);
+
+              if (!isNaN(quimico) && !isNaN(nir)) {
+                samples.push({ id: sampleId, quimico, nir });
+              }
+            }
+
+            if (samples.length > 0) {
+              parsedParams.push({ name: pName.toUpperCase(), samples });
+            }
+          }
+        }
+      } else {
+        // Construir datos a partir de columnas mapeadas
+        validMappedParams.forEach(pName => {
+          const mapping = paramMapping[pName];
+          const samples: SampleData[] = [];
+
+          for (let r = 1; r < cleanedRows.length; r++) {
+            const row = cleanedRows[r];
+            if (!row || row.length <= Math.max(mapping.quimicoCol, mapping.nirCol)) continue;
+
+            const sampleId = String(row[0] || `Muestra-${r}`).trim();
+            const rawQ = String(row[mapping.quimicoCol] || '').replace(',', '.').trim();
+            const rawN = String(row[mapping.nirCol] || '').replace(',', '.').trim();
+            
+            const quimico = parseFloat(rawQ);
+            const nir = parseFloat(rawN);
+
+            if (!isNaN(quimico) && !isNaN(nir)) {
+              samples.push({ id: sampleId, quimico, nir });
+            }
+          }
+
+          if (samples.length > 0) {
+            parsedParams.push({ name: pName.toUpperCase(), samples });
+          }
+        });
+      }
+    }
+
+    if (parsedParams.length === 0) {
+      alert("No se pudieron emparejar las columnas de Laboratorio y NIR de forma correcta. Asegúrese de que sus columnas incluyan términos descriptivos como 'LA', 'LAB', 'VIA HUMEDA' para el valor de referencia, y 'NIR', 'FOSS' o 'PRED' para el modelo.");
+      return;
+    }
+
+    setParameters(parsedParams);
+    setSelectedParamIndex(0);
+    setIsCustomData(true);
   };
 
   const getRpdColor = (rpd: number | undefined) => {
@@ -397,16 +870,64 @@ const ModelValidator: React.FC = () => {
             <Download size={14} className={isGeneratingPdf ? 'animate-spin' : 'text-ui-accent'} /> {isGeneratingPdf ? 'Generando PDF...' : 'Exportar PDF'}
           </button>
           <label className="flex items-center gap-2 bg-ui-accent text-[#0a1d4a] hover:bg-[#38bdf8] shadow-[0_0_15px_rgba(14,165,233,0.3)] px-5 py-2.5 rounded-lg transition-all font-bold text-xs cursor-pointer uppercase tracking-wide">
-            <Upload size={14} /> Cargar Datos (.csv)
-            <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+            <Upload size={14} /> Importar Excel / CSV
+            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileUpload} />
           </label>
-          <button onClick={() => {setData(generateMockData()); setIsCustomData(false);}} className="text-slate-500 bg-ui-card hover:bg-ui-darkest p-2.5 rounded-lg transition-colors border border-ui-border shadow-sm" title="Datos de ejemplo">
+          <button 
+            onClick={() => {
+              setParameters(generateDefaultParameters()); 
+              setIsCustomData(false);
+              setSelectedParamIndex(0);
+            }} 
+            className="text-slate-400 bg-ui-card hover:bg-ui-darkest p-2.5 rounded-lg transition-colors border border-ui-border shadow-sm hover:text-white" 
+            title="Restablecer Datos de Ejemplo"
+          >
             <Activity size={18} />
           </button>
         </div>
       </header>
 
       <div className="space-y-6">
+        {/* Selector de Parámetros */}
+        {parameters.length > 0 && (
+          <div className="bg-ui-card p-3 rounded-xl border border-ui-border flex flex-wrap items-center gap-2.5 shadow-sm animate-fade-in">
+            <span className="text-slate-400 text-[11px] font-bold uppercase tracking-wider pl-2 pr-1 select-none">Analito Activo:</span>
+            <div className="flex flex-wrap gap-2">
+              {parameters.map((param, index) => {
+                const isActive = index === selectedParamIndex;
+                const paramStats = calculateStatistics(param.samples);
+                const rpd = paramStats?.rpd || 0;
+                
+                let rpdBadgeBg = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                if (rpd >= 3) rpdBadgeBg = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                else if (rpd >= 2) rpdBadgeBg = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+
+                return (
+                  <button
+                    key={param.name}
+                    onClick={() => setSelectedParamIndex(index)}
+                    className={`flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
+                      isActive 
+                        ? 'bg-ui-accent text-[#0a1d4a] border-[#38bdf8] shadow-md scale-102' 
+                        : 'bg-ui-darkest text-slate-300 hover:text-white border-ui-border hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>{param.name}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold ${isActive ? 'bg-[#0a1d4a]/10 text-[#0a1d4a]' : 'bg-slate-800 text-slate-400'}`}>
+                      {param.samples.length}
+                    </span>
+                    {paramStats && (
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${isActive ? 'bg-white/20 text-[#0a1d4a] border-white/30' : rpdBadgeBg}`}>
+                        RPD {rpd.toFixed(1)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard title="Muestras" value={stats?.n || data.length} icon={ClipboardList} color="bg-indigo-600" description="Total de muestras analizadas." />
           <StatCard title="RPD" value={stats?.rpd} icon={Gauge} color={getRpdColor(stats?.rpd)} description="Capacidad predictiva del modelo." />
