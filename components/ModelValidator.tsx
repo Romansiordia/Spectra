@@ -98,6 +98,114 @@ function normalCDF(x: number) {
   return x > 0 ? 1 - prob : prob;
 }
 
+const getOpportunityZones = (samples: SampleData[], overallSep: number) => {
+  if (samples.length < 3) return [];
+
+  const refs = samples.map(s => s.quimico);
+  const minRef = Math.min(...refs);
+  const maxRef = Math.max(...refs);
+  const range = maxRef - minRef;
+
+  if (range <= 0) return [];
+
+  const numZones = 5;
+  const step = range / numZones;
+  const zones: {
+    min: number;
+    max: number;
+    samples: SampleData[];
+    label: string;
+    bias: number;
+    dispersion: number;
+    status: 'success' | 'warning' | 'error' | 'neutral';
+    statusText: string;
+    description: string;
+  }[] = [];
+
+  for (let i = 0; i < numZones; i++) {
+    const zMin = minRef + i * step;
+    const zMax = minRef + (i + 1) * step;
+    
+    // Filter samples in range
+    const zoneSamples = samples.filter(s => {
+      if (i === numZones - 1) {
+        return s.quimico >= zMin && s.quimico <= zMax;
+      }
+      return s.quimico >= zMin && s.quimico < zMax;
+    });
+
+    let label = "";
+    if (i === 0) {
+      label = `< ${zMax.toFixed(1)}%`;
+    } else if (i === numZones - 1) {
+      label = `> ${zMin.toFixed(1)}%`;
+    } else {
+      label = `${zMin.toFixed(1)}% - ${zMax.toFixed(1)}%`;
+    }
+
+    let bias = 0;
+    let dispersion = 0;
+    
+    if (zoneSamples.length > 0) {
+      const diffs = zoneSamples.map(s => s.nir - s.quimico);
+      bias = diffs.reduce((a, b) => a + b, 0) / zoneSamples.length;
+      
+      if (zoneSamples.length >= 2) {
+        const meanDiff = bias;
+        dispersion = Math.sqrt(diffs.reduce((a, b) => a + Math.pow(b - meanDiff, 2), 0) / (zoneSamples.length - 1));
+      } else {
+        dispersion = diffs.length > 0 ? Math.abs(diffs[0]) : 0;
+      }
+    }
+
+    let status: 'success' | 'warning' | 'error' | 'neutral' = 'neutral';
+    let statusText = "Sin Datos Suficientes";
+    let description = "Se requieren más muestras de calibración física en este rango para evaluar el comportamiento con precisión.";
+
+    if (zoneSamples.length >= 1) {
+      const sepThreshold = overallSep || 0.15;
+      const absBias = Math.abs(bias);
+
+      if (zoneSamples.length >= 2 && absBias > 1.25 * sepThreshold) {
+        status = 'error';
+        if (bias > 0) {
+          statusText = "Debilidad Alta (Sobreestima)";
+          description = "El modelo tiende sistemáticamente a predecir de más (sobreestimación sistemática) en este rango.";
+        } else {
+          statusText = "Debilidad Alta (Subestima)";
+          description = "El modelo tiende sistemáticamente a predecir de menos (subestimación/quedarse corto) en este rango.";
+        }
+      } else if (zoneSamples.length >= 2 && dispersion > 1.35 * sepThreshold) {
+        status = 'warning';
+        statusText = "Debilidad Dispersa";
+        description = "Mucha variabilidad/fluctuación residual. Zona afectada probablemente por matrices inestables, cambios de lote o molienda.";
+      } else if (zoneSamples.length >= 2 && dispersion < 0.85 * sepThreshold && absBias < 0.45 * sepThreshold) {
+        status = 'success';
+        statusText = "Zona Confort / Alta Precisión";
+        description = "Excelente consistencia y precisión del modelo. Errores mínimos y sesgo insignificante; excelente calibración.";
+      } else {
+        status = 'success';
+        statusText = "Zona Estable";
+        description = "Comportamiento calibrado y estable con errores normales distribuidos dentro del margen de tolerancia estándar.";
+      }
+    }
+
+    zones.push({
+      min: zMin,
+      max: zMax,
+      samples: zoneSamples,
+      label,
+      bias,
+      dispersion,
+      status,
+      statusText,
+      description
+    });
+  }
+
+  return zones;
+};
+
 // --- Generador de Datos por Defecto (Simulados para cada Analito) ---
 
 const generateDefaultParameters = (): ParameterData[] => {
@@ -1113,6 +1221,130 @@ const ModelValidator: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* --- DIAGNÓSTICO DE ROBUSTEZ Y ZONAS DE DEBILIDAD --- */}
+        {activeParameter && data.length >= 3 && (
+          <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+              <div>
+                <h2 className="text-lg font-bold flex items-center gap-2 text-slate-100">
+                  <Target size={20} className="text-ui-accent animate-pulse" />
+                  Zonas de Debilidad y Áreas de Oportunidades ({activeParameter.name})
+                </h2>
+                <p className="text-slate-400 text-xs mt-1">
+                  Análisis estadístico dinámico que segmenta el rango de concentraciones reales para identificar dónde el modelo es excelente o presenta sesgo mecánico.
+                </p>
+              </div>
+              <div className="bg-slate-900/60 px-4 py-2 rounded-lg border border-slate-800 text-[10.5px] text-slate-400 flex flex-wrap gap-4 items-center">
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Precisión Máxima</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Dispersión/Matriz</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Sesgo de Predicción</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              {getOpportunityZones(data, stats?.sep || 0.1).map((zone, idx) => {
+                let borderClass = "border-slate-800";
+                let badgeClass = "bg-slate-800 text-slate-400 border-slate-700";
+                
+                if (zone.status === 'success') {
+                  if (zone.statusText.includes("Alta") || zone.statusText.includes("Excelente") || zone.statusText.includes("Confort")) {
+                    borderClass = "border-l-4 border-l-emerald-500 border-t border-r border-b border-[#1e293b]";
+                    badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                  } else {
+                    borderClass = "border-l-4 border-l-emerald-600/70 border-t border-r border-b border-[#1e293b]";
+                    badgeClass = "bg-emerald-500/5 text-emerald-500/80 border-emerald-500/15";
+                  }
+                } else if (zone.status === 'warning') {
+                  borderClass = "border-l-4 border-l-amber-500 border-t border-r border-b border-[#1e293b]";
+                  badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                } else if (zone.status === 'error') {
+                  borderClass = "border-l-4 border-l-rose-500 border-t border-r border-b border-[#1e293b]";
+                  badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                } else {
+                  borderClass = "border-l-4 border-l-slate-600 border-t border-r border-b border-[#1e293b]";
+                }
+
+                return (
+                  <div key={idx} className={`bg-slate-950/40 rounded-xl p-4 flex flex-col justify-between h-full border ${borderClass} hover:bg-slate-900/40 transition-all shadow-sm`}>
+                    <div>
+                      <div className="flex justify-between items-start gap-1 pb-3 border-b border-white/5">
+                        <span className="font-mono font-bold text-xs text-ui-accent">
+                          {zone.label}
+                        </span>
+                        <span className={`text-[8.5px] font-extrabold px-1.5 py-0.5 rounded border uppercase tracking-widest ${badgeClass}`}>
+                          {zone.samples.length === 0 ? 'Vacío' : (zone.status === 'success' ? 'Preciso' : zone.status === 'warning' ? 'Disperso' : 'Sesgado')}
+                        </span>
+                      </div>
+                      
+                      <h4 className="text-xs font-extrabold text-slate-100 mt-3 uppercase tracking-tight flex items-center gap-1.5">
+                        {zone.status === 'success' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>}
+                        {zone.status === 'warning' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>}
+                        {zone.status === 'error' && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>}
+                        {zone.status === 'neutral' && <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0"></span>}
+                        {zone.statusText}
+                      </h4>
+                      
+                      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed min-h-[55px]">
+                        {zone.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-white/5 space-y-2.5 text-[10px]">
+                      <div className="flex justify-between items-center text-slate-400">
+                        <span>Población</span>
+                        <span className="font-bold text-slate-200 bg-slate-800 px-1.5 py-0.2 rounded font-mono">{zone.samples.length} muestras</span>
+                      </div>
+                      {zone.samples.length > 0 && (
+                        <>
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-slate-400">
+                              <span>Tendencia de Sesgo (Bias)</span>
+                              <span className={`font-mono font-bold ${zone.bias > 0 ? 'text-rose-400' : zone.bias < 0 ? 'text-sky-400' : 'text-slate-400'}`}>
+                                {zone.bias >= 0 ? '+' : ''}{zone.bias.toFixed(3)}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-[#0a1530] h-2 rounded-full overflow-hidden relative border border-white/5">
+                              {/* Marca central de cero sesgo */}
+                              <div className="h-full absolute left-1/2 -ml-0.5 w-[1px] bg-slate-600 z-10" />
+                              {zone.bias >= 0 ? (
+                                <div 
+                                  className="h-full bg-rose-500 rounded-r absolute"
+                                  style={{
+                                    left: '50%',
+                                    width: `${Math.min(50, (zone.bias / (stats?.sep || 0.4)) * 50)}%`
+                                  }}
+                                />
+                              ) : (
+                                <div 
+                                  className="h-full bg-sky-500 rounded-l absolute"
+                                  style={{
+                                    right: '50%',
+                                    width: `${Math.min(50, (Math.abs(zone.bias) / (stats?.sep || 0.4)) * 50)}%`
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-slate-400">
+                            <span>Dispersión Interna</span>
+                            <span className="font-mono font-bold text-slate-300">
+                              ±{zone.dispersion.toFixed(3)}%
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 p-3 bg-slate-900/30 rounded-xl text-[10.5px] text-slate-400 border border-slate-800/40 leading-relaxed">
+              💡 <strong>Recomendación Técnica:</strong> Las zonas con <span className="text-rose-400 font-bold">Sesgo</span> o <span className="text-amber-400 font-bold">Dispersión</span> representan áreas de oportunidad donde el modelo de calibración se beneficiará al ingresar nuevas muestras físicas de dichos rangos específicos a la ecuación de ajuste espectral.
+            </div>
+          </div>
+        )}
 
         {/* --- NUEVA TABLA DE DATOS DE VALIDACIÓN --- */}
         <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border animate-fade-in">
