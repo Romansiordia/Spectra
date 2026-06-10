@@ -1276,7 +1276,7 @@ const ModelValidator: React.FC = () => {
                   <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                     <div className={`h-full transition-all duration-500 ${getRpdColor(stats?.rpd)}`} style={{ width: `${stats ? Math.min(100, (stats.rpd / 4) * 100) : 0}%` }} />
                   </div>
-                  <p className="mt-2 text-[10px] text-slate-400">RPD {stats?.rpd.toFixed(2)}: Precisión relativa a la desviación estándar.</p>
+                  <p className="mt-2 text-[10px] text-slate-400">RPD {stats?.rpd !== undefined ? stats.rpd.toFixed(2) : '0.00'}: Precisión relativa a la desviación estándar.</p>
                 </div>
 
                 <div className="overflow-hidden border border-ui-border rounded-lg text-xs">
@@ -1296,27 +1296,27 @@ const ModelValidator: React.FC = () => {
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">Pendiente (Slope)</td>
-                        <td className="px-3 py-2 font-bold text-ui-accent">{stats?.slope.toFixed(4)}</td>
+                        <td className="px-3 py-2 font-bold text-ui-accent">{stats?.slope !== undefined ? stats.slope.toFixed(4) : '0.0000'}</td>
                         <td className="px-3 py-2 text-right text-slate-400">1.000</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">Intercepto</td>
-                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.intercept.toFixed(3)}</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.intercept !== undefined ? stats.intercept.toFixed(3) : '0.000'}</td>
                         <td className="px-3 py-2 text-right text-slate-400">0.000</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">R²</td>
-                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.r2.toFixed(3)}</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.r2 !== undefined ? stats.r2.toFixed(3) : '0.000'}</td>
                         <td className="px-3 py-2 text-right text-slate-400">{"> 0.90"}</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">SEP</td>
-                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.sep.toFixed(3)}%</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.sep !== undefined ? stats.sep.toFixed(3) : '0.000'}%</td>
                         <td className="px-3 py-2 text-right text-slate-400">Mínimo</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">Bias</td>
-                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.bias.toFixed(3)}%</td>
+                        <td className="px-3 py-2 font-bold text-slate-200">{stats?.bias !== undefined ? stats.bias.toFixed(3) : '0.000'}%</td>
                         <td className="px-3 py-2 text-right text-slate-400">{"± 0.05"}</td>
                       </tr>
                     </tbody>
@@ -1332,12 +1332,12 @@ const ModelValidator: React.FC = () => {
               </h3>
               <div className="space-y-3">
                 <p className="text-[11px] leading-relaxed text-slate-400">
-                  La pendiente (slope) mide la sensibilidad del modelo. Un valor de <strong>{stats?.slope.toFixed(2)}</strong> indica que el modelo {stats && stats.slope < 1 ? "infraestima" : "sobreestima"} los cambios en la concentración real. 
+                  La pendiente (slope) mide la sensibilidad del modelo. Un valor de <strong>{stats?.slope !== undefined ? stats.slope.toFixed(2) : '0.00'}</strong> indica que el modelo {stats && stats.slope < 1 ? "infraestima" : "sobreestima"} los cambios en la concentración real. 
                 </p>
                 <div className="p-3 bg-ui-darkest rounded-lg border border-ui-border">
                   <p className="text-brand-300 text-[10px] font-bold uppercase mb-1">Ecuación de Regresión:</p>
                   <p className="text-[12px] font-mono text-white tracking-tight">
-                    NIR = {stats?.slope.toFixed(2)}x {stats && stats.intercept >= 0 ? '+' : '-'} {stats ? Math.abs(stats.intercept).toFixed(2) : '0.00'}
+                    NIR = {stats?.slope !== undefined ? stats.slope.toFixed(2) : '0.00'}x {stats && stats.intercept >= 0 ? '+' : '-'} {stats ? Math.abs(stats.intercept).toFixed(2) : '0.00'}
                   </p>
                 </div>
               </div>
@@ -1601,9 +1601,9 @@ const ModelValidator: React.FC = () => {
               <tfoot className="bg-ui-darkest font-bold">
                 <tr>
                   <td className="px-6 py-3 text-slate-500 uppercase text-[10px]">Promedios</td>
-                  <td className="px-6 py-3 text-right font-mono">{stats?.meanX.toFixed(3)}</td>
-                  <td className="px-6 py-3 text-right font-mono">{stats?.meanY.toFixed(3)}</td>
-                  <td className="px-6 py-3 text-right font-mono text-slate-100">{stats?.bias.toFixed(3)}</td>
+                  <td className="px-6 py-3 text-right font-mono">{stats?.meanX !== undefined ? stats.meanX.toFixed(3) : '0.000'}</td>
+                  <td className="px-6 py-3 text-right font-mono">{stats?.meanY !== undefined ? stats.meanY.toFixed(3) : '0.000'}</td>
+                  <td className="px-6 py-3 text-right font-mono text-slate-100">{stats?.bias !== undefined ? stats.bias.toFixed(3) : '0.000'}</td>
                 </tr>
               </tfoot>
             </table>
