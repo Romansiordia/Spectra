@@ -62,23 +62,38 @@ const calculateStatistics = (data: SampleData[]) => {
   });
 
   // Cálculo de Pendiente (Slope): b = sum((x-meanX)(y-meanY)) / sum((x-meanX)^2)
-  const slope = denRX !== 0 ? numR / denRX : 0;
+  const slope = denRX > 0.000001 ? numR / denRX : 0;
   // Intercepto: a = meanY - slope * meanX
   const intercept = meanY - (slope * meanX);
 
-  const r = numR / Math.sqrt(denRX * denRY);
-  const r2 = Math.pow(r, 2);
+  const denomR = Math.sqrt(denRX * denRY);
+  const r = denomR > 0.000001 ? numR / denomR : 0;
+  let r2 = Math.pow(r, 2);
+  if (r2 > 1) r2 = 1.0;
+  if (isNaN(r2) || r2 < 0) r2 = 0.0;
+
   const bias = sumDiff / n;
-  const sep = Math.sqrt(sumSqDiff / (n - 1));
+  const sep = Math.sqrt(Math.max(0, sumSqDiff / (n - 1)));
   
-  const sdRef = Math.sqrt(denRX / (n - 1));
-  const rpd = sep > 0 ? sdRef / sep : 0;
+  const sdRef = Math.sqrt(Math.max(0, denRX / (n - 1)));
+  const rpd = sep > 0.000001 ? sdRef / sep : 0;
 
   const diffs = data.map(d => d.nir - d.quimico);
   const meanDiff = sumDiff / n;
-  const stdDiff = Math.sqrt(diffs.reduce((a, b) => a + Math.pow(b - meanDiff, 2), 0) / (n - 1));
-  const tValue = Math.abs(meanDiff / (stdDiff / Math.sqrt(n)));
-  const pValue = 2 * (1 - normalCDF(tValue));
+  
+  let pValue = 1.0;
+  const varianceDiff = diffs.reduce((a, b) => a + Math.pow(b - meanDiff, 2), 0) / (n - 1);
+  const stdDiff = Math.sqrt(Math.max(0, varianceDiff));
+
+  if (stdDiff > 0.000001) {
+    const tValue = Math.abs(meanDiff / (stdDiff / Math.sqrt(n)));
+    if (!isNaN(tValue) && tValue !== Infinity && tValue !== -Infinity) {
+      pValue = 2 * (1 - normalCDF(tValue));
+    }
+  }
+
+  if (isNaN(pValue) || pValue < 0) pValue = 0.0;
+  if (pValue > 1) pValue = 1.0;
 
   // Generar puntos para la línea de tendencia
   const minX = Math.min(...data.map(d => d.quimico));
@@ -92,6 +107,7 @@ const calculateStatistics = (data: SampleData[]) => {
 };
 
 function normalCDF(x: number) {
+  if (isNaN(x)) return 0.5;
   const t = 1 / (1 + 0.2316419 * Math.abs(x));
   const d = 0.3989423 * Math.exp(-x * x / 2);
   const prob = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
@@ -273,6 +289,9 @@ const generateDefaultParameters = (): ParameterData[] => {
 const CustomScatterTooltip = ({ active, payload, sep }: any) => {
   if (active && payload && payload.length) {
     const sample = payload[0].payload;
+    if (!sample || sample.id === undefined || sample.quimico === undefined || sample.nir === undefined) {
+      return null;
+    }
     const diff = sample.nir - sample.quimico;
     return (
       <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1.5 font-sans">
@@ -281,16 +300,16 @@ const CustomScatterTooltip = ({ active, payload, sep }: any) => {
         </div>
         <div className="flex justify-between gap-6 text-slate-300">
           <span>Lab (Ref):</span>
-          <span className="font-mono font-bold text-slate-100">{sample.quimico.toFixed(3)}%</span>
+          <span className="font-mono font-bold text-slate-100">{typeof sample.quimico === 'number' ? sample.quimico.toFixed(3) : '0.000'}%</span>
         </div>
         <div className="flex justify-between gap-6 text-slate-300">
           <span>NIR (Pred):</span>
-          <span className="font-mono font-bold text-slate-100">{sample.nir.toFixed(3)}%</span>
+          <span className="font-mono font-bold text-slate-100">{typeof sample.nir === 'number' ? sample.nir.toFixed(3) : '0.000'}%</span>
         </div>
         <div className="flex justify-between gap-6 text-slate-300">
           <span>Diferencia:</span>
-          <span className={`font-mono font-bold ${Math.abs(diff) > (sep || 0.4) ? 'text-rose-400 font-extrabold' : 'text-emerald-400'}`}>
-            {diff >= 0 ? '+' : ''}{diff.toFixed(3)}%
+          <span className={`font-mono font-bold ${Math.abs(diff) > (sep || 0.4) ? 'text-rose-400' : 'text-emerald-400'}`}>
+            {diff >= 0 ? '+' : ''}{typeof diff === 'number' ? diff.toFixed(3) : '0.000'}%
           </span>
         </div>
         <div className="text-[9px] text-slate-400 border-t border-white/5 pt-1 text-center italic mt-1 font-bold">

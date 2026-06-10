@@ -62,6 +62,18 @@
                 Chart.register(ChartZoom);
             }
         }
+
+        // Catch and prevent ResizeObserver loop errors from bubbling up to crash the application
+        window.addEventListener('error', (e) => {
+            if (e.message && (
+                e.message.indexOf('ResizeObserver') !== -1 ||
+                e.message.indexOf('ResizeObserver loop limit exceeded') !== -1 ||
+                e.message.indexOf('ResizeObserver loop completed with undelivered notifications') !== -1
+            )) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+            }
+        });
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');

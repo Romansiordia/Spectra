@@ -15,6 +15,7 @@ import ModelPredictor from './components/ModelPredictor';
 import ModelValidator from './components/ModelValidator';
 import QualityControl from './components/QualityControl';
 import Card from './components/Card';
+import ErrorBoundary from './components/ErrorBoundary';
 
 type AppView = 'calibration' | 'prediction' | 'validation' | 'quality';
 
@@ -243,16 +244,18 @@ const App: React.FC = () => {
                                              <h2 className="text-lg font-bold text-slate-100">Análisis de Resultados del Modelo</h2>
                                         </div>
                                         {modelResults ? (
-                                            <ResultsViewer 
-                                                results={modelResults}
-                                                propertyName={analyticalProperty}
-                                                preprocessingSteps={preprocessingSteps}
-                                                activeSamples={activeSamples.map(s => s.id)}
-                                                activeSamplesData={activeSamples}
-                                                onDeactivateOutliers={handleDeactivateOutliers}
-                                                wavelengths={wavelengths}
-                                                onExportCleanDataset={handleExportCleanDataset}
-                                            />
+                                            <ErrorBoundary fallbackTitle="Error al renderizar los resultados de calibración.">
+                                                <ResultsViewer 
+                                                    results={modelResults}
+                                                    propertyName={analyticalProperty}
+                                                    preprocessingSteps={preprocessingSteps}
+                                                    activeSamples={activeSamples.map(s => s.id)}
+                                                    activeSamplesData={activeSamples}
+                                                    onDeactivateOutliers={handleDeactivateOutliers}
+                                                    wavelengths={wavelengths}
+                                                    onExportCleanDataset={handleExportCleanDataset}
+                                                />
+                                            </ErrorBoundary>
                                         ) : (
                                             <Card>
                                                 <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-ui-dark rounded-lg border-2 border-dashed border-ui-border">
@@ -270,28 +273,34 @@ const App: React.FC = () => {
                         </div>
                     )}
 
-                    {currentView === 'prediction' && (
+                     {currentView === 'prediction' && (
                         <div className="max-w-5xl mx-auto animate-fade-in">
                             <div className="mb-6 mt-4">
                                 <h1 className="text-3xl font-black text-slate-100 uppercase tracking-wide">Gestión de Modelos</h1>
                                 <p className="text-ui-accent font-semibold mt-2 text-sm tracking-wide">Sincronice y administre su librería de modelos predictivos.</p>
                             </div>
-                            <ModelPredictor />
+                            <ErrorBoundary fallbackTitle="Error al inicializar el Módulo de Predicción.">
+                                <ModelPredictor />
+                            </ErrorBoundary>
                         </div>
                     )}
 
                     {currentView === 'validation' && (
                         <div className="animate-fade-in">
-                            <ModelValidator />
+                            <ErrorBoundary fallbackTitle="Error al inicializar el Módulo de Validación de Modelos (Recharts / Cálculo Estadístico).">
+                                <ModelValidator />
+                            </ErrorBoundary>
                         </div>
                     )}
 
                     {currentView === 'quality' && (
-                        <QualityControl 
-                            wavelengths={wavelengths}
-                            preprocessingSteps={preprocessingSteps}
-                            onWavelengthsUpdate={setWavelengths}
-                        />
+                        <ErrorBoundary fallbackTitle="Error en sección de Control de Calidad.">
+                            <QualityControl 
+                                wavelengths={wavelengths}
+                                preprocessingSteps={preprocessingSteps}
+                                onWavelengthsUpdate={setWavelengths}
+                            />
+                        </ErrorBoundary>
                     )}
 
                         </div>
