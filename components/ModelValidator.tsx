@@ -269,23 +269,70 @@ const generateDefaultParameters = (): ParameterData[] => {
   ];
 };
 
+// --- Tooltip de Dispersión Customizado ---
+const CustomScatterTooltip = ({ active, payload, sep }: any) => {
+  if (active && payload && payload.length) {
+    const sample = payload[0].payload;
+    const diff = sample.nir - sample.quimico;
+    return (
+      <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1.5 font-sans">
+        <div className="font-extrabold text-[#38bdf8] pb-1 border-b border-white/10 uppercase tracking-wider text-[10px]">
+          Muestra: {sample.id}
+        </div>
+        <div className="flex justify-between gap-6 text-slate-300">
+          <span>Lab (Ref):</span>
+          <span className="font-mono font-bold text-slate-100">{sample.quimico.toFixed(3)}%</span>
+        </div>
+        <div className="flex justify-between gap-6 text-slate-300">
+          <span>NIR (Pred):</span>
+          <span className="font-mono font-bold text-slate-100">{sample.nir.toFixed(3)}%</span>
+        </div>
+        <div className="flex justify-between gap-6 text-slate-300">
+          <span>Diferencia:</span>
+          <span className={`font-mono font-bold ${Math.abs(diff) > (sep || 0.4) ? 'text-rose-400 font-extrabold' : 'text-emerald-400'}`}>
+            {diff >= 0 ? '+' : ''}{diff.toFixed(3)}%
+          </span>
+        </div>
+        <div className="text-[9px] text-slate-400 border-t border-white/5 pt-1 text-center italic mt-1 font-bold">
+          Ref: Haz clic sobre el punto para seleccionarla
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const ModelValidator: React.FC = () => {
   const [parameters, setParameters] = useState<ParameterData[]>([]);
   const [selectedParamIndex, setSelectedParamIndex] = useState<number>(0);
   const [isCustomData, setIsCustomData] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  
+  // Estados de manipulación de muestras para exclusión o selección interactiva
+  const [excludedSamples, setExcludedSamples] = useState<{ [paramName: string]: string[] }>({});
+  const [selectedSample, setSelectedSample] = useState<SampleData | null>(null);
 
   useEffect(() => {
     setParameters(generateDefaultParameters());
+    setExcludedSamples({});
+    setSelectedSample(null);
   }, []);
 
   const activeParameter = useMemo(() => {
     return parameters[selectedParamIndex] || null;
   }, [parameters, selectedParamIndex]);
 
+  // Set de muestras deseleccionadas / excluidas de forma activa para este analito
+  const activeExcludedSet = useMemo(() => {
+    if (!activeParameter) return new Set<string>();
+    return new Set((excludedSamples[activeParameter.name] || []).map(id => String(id)));
+  }, [excludedSamples, activeParameter]);
+
+  // Datos filtrados para cálculos y para pintar los activos en la gráfica
   const data = useMemo(() => {
-    return activeParameter ? activeParameter.samples : [];
-  }, [activeParameter]);
+    if (!activeParameter) return [];
+    return activeParameter.samples.filter(s => !activeExcludedSet.has(String(s.id)));
+  }, [activeParameter, activeExcludedSet]);
 
   const stats = useMemo(() => calculateStatistics(data), [data]);
 
@@ -932,6 +979,8 @@ const ModelValidator: React.FC = () => {
 
     setParameters(parsedParams);
     setSelectedParamIndex(0);
+    setExcludedSamples({});
+    setSelectedSample(null);
     setIsCustomData(true);
   };
 
@@ -986,6 +1035,8 @@ const ModelValidator: React.FC = () => {
               setParameters(generateDefaultParameters()); 
               setIsCustomData(false);
               setSelectedParamIndex(0);
+              setExcludedSamples({});
+              setSelectedSample(null);
             }} 
             className="text-slate-400 bg-ui-card hover:bg-ui-darkest p-2.5 rounded-lg transition-colors border border-ui-border shadow-sm hover:text-white" 
             title="Restablecer Datos de Ejemplo"
@@ -1013,7 +1064,10 @@ const ModelValidator: React.FC = () => {
                 return (
                   <button
                     key={param.name}
-                    onClick={() => setSelectedParamIndex(index)}
+                    onClick={() => {
+                      setSelectedParamIndex(index);
+                      setSelectedSample(null);
+                    }}
                     className={`flex items-center gap-2.5 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
                       isActive 
                         ? 'bg-ui-accent text-[#0a1d4a] border-[#38bdf8] shadow-md scale-102' 
@@ -1053,25 +1107,159 @@ const ModelValidator: React.FC = () => {
             <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={data} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis type="number" dataKey="quimico" stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']}><Label value="Ref. Laboratorio (%)" offset={-10} position="insideBottom" /></XAxis>
-                  <YAxis type="number" dataKey="nir" stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']}><Label value="Predicción NIR (%)" angle={-90} position="insideLeft" /></YAxis>
-                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                  <XAxis type="number" dataKey="quimico" stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']}>
+                    <Label value={`${activeParameter ? activeParameter.name : "Ref."} LAB (%)`} offset={-10} position="insideBottom" fill="#94a3b8" />
+                  </XAxis>
+                  <YAxis type="number" dataKey="nir" stroke="#94a3b8" fontSize={11} domain={['auto', 'auto']}>
+                    <Label value="Predicción NIR (%)" angle={-90} position="insideLeft" fill="#94a3b8" />
+                  </YAxis>
+                  <Tooltip content={<CustomScatterTooltip sep={stats?.sep || 0.4} />} cursor={{ strokeDasharray: '3 3' }} />
                   
                   {/* Línea Ideal de 45 grados */}
-                  <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 100, y: 100 }]} stroke="#cbd5e1" strokeDasharray="5 5" label={{ position: 'top', value: 'Ideal (1:1)', fill: '#94a3b8', fontSize: 10 }} />
+                  <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 100, y: 100 }]} stroke="#475569" strokeDasharray="5 5" label={{ position: 'top', value: 'Ideal (1:1)', fill: '#64748b', fontSize: 10 }} />
                   
                   {/* Puntos de Datos */}
-                  <Scatter name="Muestras" data={data} fill="#0ea5e9" fillOpacity={0.6} />
+                  <Scatter 
+                    name="Muestras" 
+                    data={data} 
+                    fill="#0ea5e9" 
+                    fillOpacity={0.6} 
+                    onClick={(node) => {
+                      if (node && node.payload) {
+                        setSelectedSample(node.payload);
+                      } else if (node) {
+                        setSelectedSample(node);
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+
+                  {/* Punto de Muestra Seleccionado Resaltado */}
+                  {selectedSample && !activeExcludedSet.has(String(selectedSample.id)) && (
+                    <Scatter 
+                      name="Punto Seleccionado" 
+                      data={[selectedSample]} 
+                      fill="#f43f5e" 
+                      r={9} 
+                      stroke="#ffffff" 
+                      strokeWidth={2.5} 
+                      legendType="none"
+                    />
+                  )}
                   
                   {/* Línea de Tendencia calculada */}
-                  <Line data={stats?.trendLine} dataKey="trend" stroke="#0284c7" strokeWidth={2} dot={false} activeDot={false} legendType="none" />
+                  <Line data={stats?.trendLine} dataKey="trend" stroke="#0ea5e9" strokeWidth={2.5} dot={false} activeDot={false} legendType="none" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           <div className="space-y-6">
+            {/* --- CARD ACCIONES DE MUESTRA SELECCIONADA --- */}
+            {selectedSample && (
+              <div className="bg-slate-900 border border-ui-accent rounded-xl p-5 shadow-2xl animate-fade-in text-xs space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                  <h3 className="font-extrabold text-slate-100 flex items-center gap-1.5 text-sm uppercase tracking-tight">
+                    <Target size={16} className="text-ui-accent animate-pulse" />
+                    Muestra Seleccionada
+                  </h3>
+                  <button 
+                    onClick={() => setSelectedSample(null)} 
+                    className="text-slate-400 hover:text-white text-[13px] bg-slate-800 hover:bg-slate-700 w-5 h-5 rounded-full flex items-center justify-center font-extrabold"
+                    title="Cerrar selección"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="bg-slate-950/60 rounded-lg p-3 border border-slate-800 space-y-2">
+                  <div className="flex justify-between items-center text-slate-400 text-[10.5px]">
+                    <span className="font-bold">ID Muestra:</span>
+                    <span className="font-mono text-xs font-extrabold text-ui-accent bg-ui-accent/15 px-2 py-0.5 rounded border border-ui-accent/20">{selectedSample.id}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400 text-[10.5px]">
+                    <span>Laboratorio (Lab):</span>
+                    <span className="font-mono text-slate-200 font-bold">{selectedSample.quimico.toFixed(3)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400 text-[10.5px]">
+                    <span>Predicción NIR:</span>
+                    <span className="font-mono text-slate-200 font-bold">{selectedSample.nir.toFixed(3)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400 text-[10.5px]">
+                    <span>Estatus:</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${activeExcludedSet.has(String(selectedSample.id)) ? 'bg-amber-500/10 text-amber-400 border border-amber-500/15' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15'}`}>
+                      {activeExcludedSet.has(String(selectedSample.id)) ? 'EXCLUIDO' : 'ACTIVO'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400 text-[10.5px] pt-1 border-t border-white/5">
+                    <span>Diferencia (Error):</span>
+                    <span className={`font-mono font-bold ${(selectedSample.nir - selectedSample.quimico) >= 0 ? 'text-rose-400' : 'text-sky-400'}`}>
+                      {((selectedSample.nir - selectedSample.quimico) >= 0 ? '+' : '')}{(selectedSample.nir - selectedSample.quimico).toFixed(3)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <button
+                    onClick={() => {
+                      if (!activeParameter) return;
+                      const sampleIdStr = String(selectedSample.id);
+                      const isExcluded = activeExcludedSet.has(sampleIdStr);
+                      
+                      let updatedList = [...(excludedSamples[activeParameter.name] || [])];
+                      if (isExcluded) {
+                        updatedList = updatedList.filter(id => id !== sampleIdStr);
+                      } else {
+                        updatedList.push(sampleIdStr);
+                      }
+                      
+                      setExcludedSamples({
+                        ...excludedSamples,
+                        [activeParameter.name]: updatedList
+                      });
+                    }}
+                    className={`w-full py-2 px-3 rounded-lg text-[10.5px] font-extrabold font-sans transition-all text-center uppercase tracking-wider border flex items-center justify-center gap-1.5 ${
+                      activeExcludedSet.has(String(selectedSample.id))
+                        ? 'bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border-emerald-500/20 cursor-pointer shadow-sm'
+                        : 'bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border-amber-500/20 cursor-pointer shadow-sm'
+                    }`}
+                  >
+                    {activeExcludedSet.has(String(selectedSample.id)) ? '✓ Re-Incluir en Validación' : '⚠ Excluir / Deseleccionar Muestra'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (!activeParameter) return;
+                      const confirmDelete = window.confirm(`¿Está seguro de que desea ELIMINAR permanentemente la muestra "${selectedSample.id}" del análisis de ${activeParameter.name}?`);
+                      if (confirmDelete) {
+                        const updatedSamples = activeParameter.samples.filter(s => String(s.id) !== String(selectedSample.id));
+                        const updatedParams = parameters.map((param, idx) => {
+                          if (idx === selectedParamIndex) {
+                            return { ...param, samples: updatedSamples };
+                          }
+                          return param;
+                        });
+                        setParameters(updatedParams);
+                        
+                        // Limpiar de excluidos por si estaba ahí
+                        const updatedExcluded = (excludedSamples[activeParameter.name] || []).filter(id => id !== String(selectedSample.id));
+                        setExcludedSamples({
+                          ...excludedSamples,
+                          [activeParameter.name]: updatedExcluded
+                        });
+
+                        setSelectedSample(null);
+                      }
+                    }}
+                    className="w-full py-2 px-3 rounded-lg text-[10.5px] font-extrabold font-sans transition-all bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-slate-100 border border-rose-500/20 text-center uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    🗑 Borrar de Calibración
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
               <h2 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-100">
                 <ClipboardList size={20} className="text-ui-accent" />
@@ -1363,20 +1551,46 @@ const ModelValidator: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data.map((row) => {
+                {(activeParameter?.samples || []).map((row) => {
+                  const isExcluded = activeExcludedSet.has(String(row.id));
+                  const isSelected = selectedSample?.id === row.id;
                   const diff = row.nir - row.quimico;
                   return (
-                    <tr key={row.id} className="hover:bg-ui-darkest transition-colors">
-                      <td className="px-6 py-3 font-medium text-slate-200">{row.id}</td>
-                      <td className="px-6 py-3 text-right font-mono text-slate-300">{row.quimico.toFixed(3)}</td>
-                      <td className="px-6 py-3 text-right font-mono text-slate-300">{row.nir.toFixed(3)}</td>
-                      <td className={`px-6 py-3 text-right font-mono font-bold ${Math.abs(diff) > (stats?.sep || 1) ? 'text-red-500' : 'text-ui-success'}`}>
+                    <tr 
+                      key={row.id} 
+                      onClick={() => setSelectedSample(row)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected 
+                          ? 'bg-ui-accent/15 border-l-2 border-l-ui-accent' 
+                          : isExcluded 
+                            ? 'opacity-40 bg-slate-950/20 text-slate-500 hover:bg-slate-900/35' 
+                            : 'hover:bg-ui-darkest'
+                      }`}
+                    >
+                      <td className="px-6 py-3 font-medium text-slate-200 flex items-center gap-2">
+                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-ui-accent animate-pulse inline-block shrink-0"></span>}
+                        <span className={isExcluded ? 'line-through text-slate-500' : ''}>{row.id}</span>
+                        {isExcluded && (
+                          <span className="text-[8.5px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/15 uppercase tracking-wide shrink-0 font-sans">
+                            Excluido
+                          </span>
+                        )}
+                      </td>
+                      <td className={`px-6 py-3 text-right font-mono text-slate-300 ${isExcluded ? 'line-through text-slate-500 font-normal' : ''}`}>{row.quimico.toFixed(3)}</td>
+                      <td className={`px-6 py-3 text-right font-mono text-slate-300 ${isExcluded ? 'line-through text-slate-500' : ''}`}>{row.nir.toFixed(3)}</td>
+                      <td className={`px-6 py-3 text-right font-mono font-bold ${
+                        isExcluded 
+                          ? 'text-slate-500 line-through' 
+                          : Math.abs(diff) > (stats?.sep || 1) 
+                            ? 'text-rose-400 font-extrabold' 
+                            : 'text-ui-success'
+                      }`}>
                         {diff >= 0 ? '+' : ''}{diff.toFixed(3)}
                       </td>
                     </tr>
                   );
                 })}
-                {data.length === 0 && (
+                {(!activeParameter || activeParameter.samples.length === 0) && (
                   <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-slate-400 italic">
                       No hay datos cargados para mostrar.
