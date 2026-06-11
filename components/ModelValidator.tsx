@@ -14,7 +14,8 @@ import {
   Target,
   Gauge,
   Table as TableIcon,
-  Download
+  Download,
+  ChevronDown
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -232,66 +233,78 @@ const getOpportunityZones = (samples: SampleData[], overallSep: number) => {
   return zones;
 };
 
-// --- Generador de Datos por Defecto (Simulados para cada Analito) ---
+// --- Interfaces para Multianalito y Multimaterial ---
 
-const generateDefaultParameters = (): ParameterData[] => {
+interface MaterialData {
+  name: string;
+  parameters: ParameterData[];
+}
+
+// --- Generador de Datos por Defecto para Múltiples Materiales ---
+
+const generateDefaultMaterials = (): MaterialData[] => {
   const numSamples = 30;
-  
-  // PROTEÍNA (Ref: 7.5 - 10.5)
-  const proteinaSamples = Array.from({ length: numSamples }, (_, i) => {
-    const quimico = 7.5 + Math.random() * 3.0;
-    const noise = (Math.random() - 0.5) * 0.25;
-    const nir = (quimico * 0.98) + noise + 0.15;
-    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
-  });
 
-  // GRASA (Ref: 1.5 - 3.8)
-  const grasaSamples = Array.from({ length: numSamples }, (_, i) => {
-    const quimico = 1.5 + Math.random() * 2.3;
-    const noise = (Math.random() - 0.5) * 0.35;
-    const nir = (quimico * 0.95) + noise + 0.25;
-    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
-  });
-
-  // HUMEDAD (Ref: 10.0 - 13.8)
-  const humedadSamples = Array.from({ length: numSamples }, (_, i) => {
-    const quimico = 11.5 + Math.random() * 2.3;
-    const noise = (Math.random() - 0.5) * 0.20;
-    const nir = (quimico * 0.99) + noise + 0.08;
-    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
-  });
-
-  // CENIZA (Ref: 0.1 - 2.5)
-  const cenizaSamples = Array.from({ length: numSamples }, (_, i) => {
-    const quimico = 0.5 + Math.random() * 2.0;
-    const noise = (Math.random() - 0.5) * 0.18;
-    const nir = (quimico * 0.97) + noise + 0.09;
-    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
-  });
-
-  // FIBRA (Ref: 1.8 - 4.2)
-  const fibraSamples = Array.from({ length: numSamples }, (_, i) => {
-    const quimico = 1.8 + Math.random() * 2.4;
-    const noise = (Math.random() - 0.5) * 0.22;
-    const nir = (quimico * 0.96) + noise + 0.12;
-    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
-  });
-
-  // ALMIDÓN (Ref: 63.0 - 69.5)
-  const almidonSamples = Array.from({ length: numSamples }, (_, i) => {
-    const quimico = 63.0 + Math.random() * 5.5;
-    const noise = (Math.random() - 0.5) * 0.85;
-    const nir = (quimico * 0.99) + noise + 0.40;
-    return { id: `M-${23080001 + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
-  });
+  const createSamples = (min: number, range: number, factor: number, noiseFactor: number, biasOffset: number, sampleIdStart = 23080001) => {
+    return Array.from({ length: numSamples }, (_, i) => {
+      const quimico = min + Math.random() * range;
+      const noise = (Math.random() - 0.5) * noiseFactor;
+      const nir = (quimico * factor) + noise + biasOffset;
+      return { id: `M-${sampleIdStart + i}`, quimico: parseFloat(quimico.toFixed(2)), nir: parseFloat(nir.toFixed(2)) };
+    });
+  };
 
   return [
-    { name: 'PROTEÍNA', samples: proteinaSamples },
-    { name: 'GRASA', samples: grasaSamples },
-    { name: 'HUMEDAD', samples: humedadSamples },
-    { name: 'CENIZA', samples: cenizaSamples },
-    { name: 'FIBRA', samples: fibraSamples },
-    { name: 'ALMIDÓN', samples: almidonSamples }
+    {
+      name: 'MAÍZ',
+      parameters: [
+        { name: 'PROTEÍNA', samples: createSamples(7.0, 3.0, 0.98, 0.25, 0.15, 24010001) },
+        { name: 'GRASA', samples: createSamples(3.0, 2.0, 0.96, 0.20, 0.10, 24010001) },
+        { name: 'HUMEDAD', samples: createSamples(11.0, 4.0, 0.99, 0.18, 0.08, 24010001) },
+        { name: 'FIBRA', samples: createSamples(1.8, 1.5, 0.95, 0.15, 0.12, 24010001) },
+        { name: 'ALMIDÓN', samples: createSamples(60.0, 10.0, 0.99, 0.85, 0.40, 24010001) }
+      ]
+    },
+    {
+      name: 'SORGO',
+      parameters: [
+        { name: 'PROTEÍNA', samples: createSamples(8.0, 3.5, 0.97, 0.28, 0.20, 24020001) },
+        { name: 'GRASA', samples: createSamples(2.5, 2.0, 0.95, 0.22, 0.12, 24020001) },
+        { name: 'HUMEDAD', samples: createSamples(10.5, 4.0, 0.99, 0.20, 0.09, 24020001) },
+        { name: 'FIBRA', samples: createSamples(2.0, 2.0, 0.94, 0.18, 0.15, 24020001) },
+        { name: 'ALMIDÓN', samples: createSamples(62.0, 10.0, 0.98, 0.90, 0.50, 24020001) }
+      ]
+    },
+    {
+      name: 'SOYA',
+      parameters: [
+        { name: 'PROTEÍNA', samples: createSamples(34.0, 7.0, 0.99, 0.45, 0.30, 24030001) },
+        { name: 'GRASA', samples: createSamples(17.0, 5.0, 0.97, 0.38, 0.25, 24030001) },
+        { name: 'HUMEDAD', samples: createSamples(9.0, 4.0, 0.99, 0.15, 0.06, 24030001) },
+        { name: 'FIBRA', samples: createSamples(4.5, 2.5, 0.96, 0.22, 0.18, 24030001) },
+        { name: 'CENIZA', samples: createSamples(4.0, 2.0, 0.96, 0.14, 0.10, 24030001) }
+      ]
+    },
+    {
+      name: 'CANOLA',
+      parameters: [
+        { name: 'PROTEÍNA', samples: createSamples(18.0, 6.0, 0.98, 0.35, 0.22, 24040001) },
+        { name: 'GRASA', samples: createSamples(37.0, 7.0, 0.98, 0.55, 0.40, 24040001) },
+        { name: 'HUMEDAD', samples: createSamples(6.5, 3.5, 0.99, 0.14, 0.05, 24040001) },
+        { name: 'FIBRA', samples: createSamples(6.5, 3.5, 0.95, 0.25, 0.20, 24040001) },
+        { name: 'CENIZA', samples: createSamples(3.5, 2.0, 0.96, 0.16, 0.12, 24040001) }
+      ]
+    },
+    {
+      name: 'DDGS',
+      parameters: [
+        { name: 'PROTEÍNA', samples: createSamples(24.0, 6.0, 0.97, 0.40, 0.28, 24050001) },
+        { name: 'GRASA', samples: createSamples(6.5, 4.5, 0.96, 0.30, 0.18, 24050001) },
+        { name: 'HUMEDAD', samples: createSamples(8.0, 4.0, 0.99, 0.16, 0.07, 24050001) },
+        { name: 'FIBRA', samples: createSamples(6.0, 3.0, 0.94, 0.22, 0.15, 24050001) },
+        { name: 'CENIZA', samples: createSamples(3.0, 2.5, 0.95, 0.15, 0.10, 24050001) }
+      ]
+    }
   ];
 };
 
@@ -348,7 +361,8 @@ const CustomScatterTooltip = ({ active, payload, sep }: any) => {
 };
 
 const ModelValidator: React.FC = () => {
-  const [parameters, setParameters] = useState<ParameterData[]>([]);
+  const [materials, setMaterials] = useState<MaterialData[]>([]);
+  const [selectedMaterialIndex, setSelectedMaterialIndex] = useState<number>(0);
   const [selectedParamIndex, setSelectedParamIndex] = useState<number>(0);
   const [isCustomData, setIsCustomData] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -356,24 +370,33 @@ const ModelValidator: React.FC = () => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   // Estados de manipulación de muestras para exclusión o selección interactiva
-  const [excludedSamples, setExcludedSamples] = useState<{ [paramName: string]: string[] }>({});
+  const [excludedSamples, setExcludedSamples] = useState<{ [key: string]: string[] }>({});
   const [selectedSample, setSelectedSample] = useState<SampleData | null>(null);
 
   useEffect(() => {
-    setParameters(generateDefaultParameters());
+    setMaterials(generateDefaultMaterials());
     setExcludedSamples({});
     setSelectedSample(null);
   }, []);
+
+  const parameters = useMemo(() => {
+    return materials[selectedMaterialIndex]?.parameters || [];
+  }, [materials, selectedMaterialIndex]);
 
   const activeParameter = useMemo(() => {
     return parameters[selectedParamIndex] || null;
   }, [parameters, selectedParamIndex]);
 
-  // Set de muestras deseleccionadas / excluidas de forma activa para este analito
+  const activeKey = useMemo(() => {
+    if (!activeParameter || !materials[selectedMaterialIndex]) return "";
+    return `${materials[selectedMaterialIndex].name}_${activeParameter.name}`;
+  }, [materials, selectedMaterialIndex, activeParameter]);
+
+  // Set de muestras deseleccionadas / excluidas de forma activa para este analito de este material
   const activeExcludedSet = useMemo(() => {
-    if (!activeParameter) return new Set<string>();
-    return new Set((excludedSamples[activeParameter.name] || []).map(id => String(id)));
-  }, [excludedSamples, activeParameter]);
+    if (!activeKey) return new Set<string>();
+    return new Set((excludedSamples[activeKey] || []).map(id => String(id)));
+  }, [excludedSamples, activeKey]);
 
   // Datos filtrados para cálculos y para pintar los activos en la gráfica
   const data = useMemo(() => {
@@ -457,7 +480,7 @@ const ModelValidator: React.FC = () => {
       doc.setFontSize(22);
       doc.setTextColor(14, 165, 233);
       doc.setFont('helvetica', 'bold');
-      doc.text('Reporte de Validación Externa NIR', 14, 24);
+      doc.text(`Reporte de Validación Externa: ${materials[selectedMaterialIndex]?.name || 'NIR'}`, 14, 24);
       
       doc.setFontSize(10);
       doc.setTextColor(71, 85, 105);
@@ -483,7 +506,7 @@ const ModelValidator: React.FC = () => {
       
       doc.text(`Supervisor QC: romansiordias@gmail.com`, 110, 49);
       doc.text(`Instrumentación: FOSS NIR Predictor Engine`, 110, 54);
-      doc.text(`Estado del Sistema: Validación Activa`, 110, 59);
+      doc.text(`Material / Producto: ${materials[selectedMaterialIndex]?.name || 'TODOS'}`, 110, 59);
 
       // Section 1: Executive Comparison Table
       doc.setFontSize(14);
@@ -696,12 +719,34 @@ const ModelValidator: React.FC = () => {
         try {
           const buffer = event.target?.result as ArrayBuffer;
           const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
-          const firstSheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[firstSheetName];
           
-          // Read raw rows (2D array)
-          const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-          parseMultiParameterRows(rows);
+          const newMaterials: MaterialData[] = [];
+          
+          // Iteramos por cada pestaña (sheet) del archivo de Excel
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+            const parsedParamsForSheet = parseRowsToParameters(rows);
+            
+            if (parsedParamsForSheet && parsedParamsForSheet.length > 0) {
+              newMaterials.push({
+                name: sheetName.trim().toUpperCase(),
+                parameters: parsedParamsForSheet
+              });
+            }
+          }
+          
+          if (newMaterials.length === 0) {
+            alert("No se pudieron extraer datos de validación válidos de ninguna pestaña. Asegúrese de que sus columnas incluyan términos descriptivos como 'LAB' o 'VIA HUMEDA' para referencia, y 'NIR' o 'PRED' para el modelo.");
+            return;
+          }
+          
+          setMaterials(newMaterials);
+          setSelectedMaterialIndex(0);
+          setSelectedParamIndex(0);
+          setExcludedSamples({});
+          setSelectedSample(null);
+          setIsCustomData(true);
         } catch (error: any) {
           console.error("Error al procesar el archivo Excel:", error);
           alert(`Error al procesar el archivo Excel: ${error.message || error}`);
@@ -709,14 +754,14 @@ const ModelValidator: React.FC = () => {
       };
       reader.readAsArrayBuffer(file);
     } else {
-      // It's a CSV
+      // Es un CSV
       reader.onload = (event) => {
         try {
           const text = event.target?.result as string;
           const rawRows = text.split(/\r?\n/).filter(r => r.trim() !== '');
           if (rawRows.length === 0) return;
           
-          // Detect delimiter
+          // Detectar delimitador
           const firstRow = rawRows[0];
           const delimiter = firstRow.includes(';') ? ';' : (firstRow.includes('\t') ? '\t' : ',');
           
@@ -726,7 +771,25 @@ const ModelValidator: React.FC = () => {
             });
           });
           
-          parseMultiParameterRows(rows);
+          const parsedParams = parseRowsToParameters(rows);
+          
+          if (!parsedParams || parsedParams.length === 0) {
+            alert("No se pudieron emparejar las columnas del CSV. Asegúrese de que incluyan 'LAB' (para referencia) y 'NIR' (para predicciones).");
+            return;
+          }
+
+          const baseName = file.name.replace(/\.[^/.]+$/, "").toUpperCase();
+          setMaterials([
+            {
+              name: baseName,
+              parameters: parsedParams
+            }
+          ]);
+          setSelectedMaterialIndex(0);
+          setSelectedParamIndex(0);
+          setExcludedSamples({});
+          setSelectedSample(null);
+          setIsCustomData(true);
         } catch (error: any) {
           console.error("Error al cargar el archivo CSV:", error);
           alert(`Error al procesar el archivo CSV: ${error.message || error}`);
@@ -736,14 +799,11 @@ const ModelValidator: React.FC = () => {
     }
   };
 
-  const parseMultiParameterRows = (rows: any[][]) => {
-    if (rows.length < 2) {
-      alert("El archivo no tiene suficientes filas para ser analizado.");
-      return;
-    }
+  const parseRowsToParameters = (rows: any[][]): ParameterData[] => {
+    if (rows.length < 2) return [];
 
     const cleanedRows = rows.filter(row => row && row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== ''));
-    if (cleanedRows.length < 2) return;
+    if (cleanedRows.length < 2) return [];
 
     // Helper para normalizar nombres y eliminar acentos
     const normalizeName = (name: string) => {
@@ -853,7 +913,7 @@ const ModelValidator: React.FC = () => {
       });
 
     } else {
-      // === CASO 2: CABECERA ÚNICA COMBINADA (O TABLA PLANA) ===
+      // === CASO 2: CABECERA ÚNICA COMBINADA ===
       const headerRow = cleanedRows[0];
       const numCols = headerRow.length;
 
@@ -870,7 +930,6 @@ const ModelValidator: React.FC = () => {
           continue;
         }
 
-        // Determinar si la columna representa datos de Laboratorio (Referencia) o NIR (Predicción)
         let type: 'ID' | 'LAB' | 'NIR' | 'UNKNOWN' = 'UNKNOWN';
         const isNir = normCell.includes("NIR") || 
                       normCell.includes("FOSS") || 
@@ -906,7 +965,6 @@ const ModelValidator: React.FC = () => {
 
         colTypes.push(type);
 
-        // Extraer el nombre del analito eliminando términos de método (pero preservando HUMEDAD)
         let cleanName = normCell;
         const removeTerms = [
           "VIA HUMEDA", "VIA HÚMEDA", "VIA", "HUMEDA", "HUMEDO",
@@ -921,12 +979,10 @@ const ModelValidator: React.FC = () => {
           cleanName = cleanName.replace(regex, '');
         });
 
-        // Limpiar espacios y numeración residuales
         cleanName = cleanName.replace(/[^A-Z0-9]/gi, ' ').replace(/\s+/g, ' ').trim();
         colCleanNames.push(cleanName || "ANALITO");
       }
 
-      // Agrupar columnas identificadas por nombre de componente quimiométrico
       const paramMapping: { [name: string]: { quimicoCol: number; nirCol: number } } = {};
 
       for (let c = 1; c < numCols; c++) {
@@ -953,7 +1009,6 @@ const ModelValidator: React.FC = () => {
       });
 
       if (validMappedParams.length === 0) {
-        // Rescate heurístico: si encontramos al menos un LabCol y un NirCol, emparejar por el índice de orden
         const labCols = colTypes.map((t, idx) => t === 'LAB' ? idx : -1).filter(idx => idx !== -1);
         const nirCols = colTypes.map((t, idx) => t === 'NIR' ? idx : -1).filter(idx => idx !== -1);
 
@@ -991,7 +1046,6 @@ const ModelValidator: React.FC = () => {
           }
         }
       } else {
-        // Construir datos a partir de columnas mapeadas
         validMappedParams.forEach(pName => {
           const mapping = paramMapping[pName];
           const samples: SampleData[] = [];
@@ -1019,16 +1073,7 @@ const ModelValidator: React.FC = () => {
       }
     }
 
-    if (parsedParams.length === 0) {
-      alert("No se pudieron emparejar las columnas de Laboratorio y NIR de forma correcta. Asegúrese de que sus columnas incluyan términos descriptivos como 'LA', 'LAB', 'VIA HUMEDA' para el valor de referencia, y 'NIR', 'FOSS' o 'PRED' para el modelo.");
-      return;
-    }
-
-    setParameters(parsedParams);
-    setSelectedParamIndex(0);
-    setExcludedSamples({});
-    setSelectedSample(null);
-    setIsCustomData(true);
+    return parsedParams;
   };
 
   const getRpdColor = (rpd: number | undefined) => {
@@ -1086,8 +1131,9 @@ const ModelValidator: React.FC = () => {
           </label>
           <button 
             onClick={() => {
-              setParameters(generateDefaultParameters()); 
+              setMaterials(generateDefaultMaterials()); 
               setIsCustomData(false);
+              setSelectedMaterialIndex(0);
               setSelectedParamIndex(0);
               setExcludedSamples({});
               setSelectedSample(null);
@@ -1101,6 +1147,42 @@ const ModelValidator: React.FC = () => {
       </header>
 
       <div className="space-y-6">
+        {/* Selector de Material/Producto */}
+        {materials.length > 0 && (
+          <div className="bg-ui-card p-4 rounded-xl border border-ui-border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-ui-accent/10 rounded-lg text-ui-accent">
+                <Target size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wide">Material / Producto Seleccionado</h3>
+                <p className="text-[10px] text-slate-400">Seleccione la matriz espectral para validar su regresión y estadísticas particulares.</p>
+              </div>
+            </div>
+            <div className="relative min-w-[200px]">
+              <select
+                value={selectedMaterialIndex}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setSelectedMaterialIndex(val);
+                  setSelectedParamIndex(0);
+                  setSelectedSample(null);
+                }}
+                className="w-full bg-ui-darkest text-slate-100 hover:text-white border border-ui-border hover:border-[#38bdf8] rounded-xl px-4 py-2.5 text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-ui-accent max-w-xs cursor-pointer appearance-none shadow-sm pr-10"
+              >
+                {materials.map((m, index) => (
+                  <option key={m.name} value={index} className="bg-[#0a1d4a] text-slate-100">
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
+                <ChevronDown size={14} className="text-ui-accent" />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Selector de Parámetros */}
         {parameters.length > 0 && (
           <div className="bg-ui-card p-3 rounded-xl border border-ui-border flex flex-wrap items-center gap-2.5 shadow-sm animate-fade-in">
@@ -1262,11 +1344,11 @@ const ModelValidator: React.FC = () => {
                 <div className="space-y-2 pt-1">
                   <button
                     onClick={() => {
-                      if (!activeParameter) return;
+                      if (!activeParameter || !activeKey) return;
                       const sampleIdStr = String(selectedSample.id);
                       const isExcluded = activeExcludedSet.has(sampleIdStr);
                       
-                      let updatedList = [...(excludedSamples[activeParameter.name] || [])];
+                      let updatedList = [...(excludedSamples[activeKey] || [])];
                       if (isExcluded) {
                         updatedList = updatedList.filter(id => id !== sampleIdStr);
                       } else {
@@ -1275,7 +1357,7 @@ const ModelValidator: React.FC = () => {
                       
                       setExcludedSamples({
                         ...excludedSamples,
-                        [activeParameter.name]: updatedList
+                        [activeKey]: updatedList
                       });
                     }}
                     className={`w-full py-2 px-3 rounded-lg text-[10.5px] font-extrabold font-sans transition-all text-center uppercase tracking-wider border flex items-center justify-center gap-1.5 ${
@@ -1299,14 +1381,23 @@ const ModelValidator: React.FC = () => {
                           }
                           return param;
                         });
-                        setParameters(updatedParams);
+                        
+                        const updatedMaterials = materials.map((m, mIdx) => {
+                          if (mIdx === selectedMaterialIndex) {
+                            return { ...m, parameters: updatedParams };
+                          }
+                          return m;
+                        });
+                        setMaterials(updatedMaterials);
                         
                         // Limpiar de excluidos por si estaba ahí
-                        const updatedExcluded = (excludedSamples[activeParameter.name] || []).filter(id => id !== String(selectedSample.id));
-                        setExcludedSamples({
-                          ...excludedSamples,
-                          [activeParameter.name]: updatedExcluded
-                        });
+                        if (activeKey) {
+                          const updatedExcluded = (excludedSamples[activeKey] || []).filter(id => id !== String(selectedSample.id));
+                          setExcludedSamples({
+                            ...excludedSamples,
+                            [activeKey]: updatedExcluded
+                          });
+                        }
 
                         setSelectedSample(null);
                         setConfirmDeleteId(null);
@@ -1711,7 +1802,8 @@ const ModelValidator: React.FC = () => {
                 </thead>
                 <tbody>
                   {parameters.map((param, index) => {
-                    const activeExcl = new Set((excludedSamples[param.name] || []).map(id => String(id)));
+                    const keyForM = `${materials[selectedMaterialIndex]?.name || 'default'}_${param.name}`;
+                    const activeExcl = new Set((excludedSamples[keyForM] || []).map(id => String(id)));
                     const filteredData = param.samples.filter(s => !activeExcl.has(String(s.id)));
                     const st = calculateStatistics(filteredData);
                     
