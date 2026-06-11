@@ -95,12 +95,22 @@ const calculateStatistics = (data: SampleData[]) => {
   if (isNaN(pValue) || pValue < 0) pValue = 0.0;
   if (pValue > 1) pValue = 1.0;
 
-  // Generar puntos para la línea de tendencia
+  // Generar puntos para la línea de tendencia y límites de control (+/- 1 SEP)
   const minX = Math.min(...data.map(d => d.quimico));
   const maxX = Math.max(...data.map(d => d.quimico));
   const trendLine = [
-    { quimico: minX, trend: slope * minX + intercept },
-    { quimico: maxX, trend: slope * maxX + intercept }
+    { 
+      quimico: minX, 
+      trend: slope * minX + intercept,
+      ucl: (slope * minX + intercept) + sep,
+      lcl: (slope * minX + intercept) - sep
+    },
+    { 
+      quimico: maxX, 
+      trend: slope * maxX + intercept,
+      ucl: (slope * maxX + intercept) + sep,
+      lcl: (slope * maxX + intercept) - sep
+    }
   ];
 
   return { r2, sep, bias, pValue, n, meanX, meanY, rpd, slope, intercept, trendLine };
@@ -285,6 +295,22 @@ const generateDefaultParameters = (): ParameterData[] => {
   ];
 };
 
+const renderActiveShape = (props: any) => {
+  const { cx, cy, payload, fill } = props;
+  if (!payload || !payload.id) return null;
+  
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={7} fill={fill} stroke="#ffffff" strokeWidth={2} />
+      {/* Tooltip bubble for hovered point */}
+      <rect x={cx - 35} y={cy - 35} width={70} height={20} rx={4} fill="#0ea5e9" opacity={0.9} />
+      <text x={cx} y={cy - 21} textAnchor="middle" fill="#ffffff" fontSize={10} fontWeight="bold">
+        {payload.id}
+      </text>
+    </g>
+  );
+};
+
 // --- Tooltip de Dispersión Customizado ---
 const CustomScatterTooltip = ({ active, payload, sep }: any) => {
   if (active && payload && payload.length) {
@@ -326,6 +352,8 @@ const ModelValidator: React.FC = () => {
   const [selectedParamIndex, setSelectedParamIndex] = useState<number>(0);
   const [isCustomData, setIsCustomData] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   // Estados de manipulación de muestras para exclusión o selección interactiva
   const [excludedSamples, setExcludedSamples] = useState<{ [paramName: string]: string[] }>({});
@@ -1038,6 +1066,13 @@ const ModelValidator: React.FC = () => {
         
         <div className="flex gap-3 items-center">
           <button 
+            onClick={() => setShowSummaryModal(true)} 
+            className="flex items-center gap-2 bg-slate-800 text-slate-100 hover:bg-slate-700 px-5 py-2.5 rounded-lg transition-all font-bold text-xs border border-slate-700 uppercase tracking-wide shadow-sm"
+            title="Ver Resumen de Validaciones"
+          >
+            <ClipboardList size={14} className="text-ui-accent" /> Resumen
+          </button>
+          <button 
             onClick={handleDownloadPDF} 
             disabled={isGeneratingPdf}
             className={`flex items-center gap-2 bg-slate-800 text-slate-100 hover:bg-slate-700 px-5 py-2.5 rounded-lg transition-all font-bold text-xs border border-slate-700 uppercase tracking-wide shadow-sm ${isGeneratingPdf ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1143,7 +1178,8 @@ const ModelValidator: React.FC = () => {
                     name="Muestras" 
                     data={data} 
                     fill="#0ea5e9" 
-                    fillOpacity={0.6} 
+                    fillOpacity={0.6}
+                    activeShape={renderActiveShape}
                     onClick={(node) => {
                       if (node && node.payload) {
                         setSelectedSample(node.payload);
@@ -1169,6 +1205,10 @@ const ModelValidator: React.FC = () => {
                   
                   {/* Línea de Tendencia calculada */}
                   <Line data={stats?.trendLine} dataKey="trend" stroke="#0ea5e9" strokeWidth={2.5} dot={false} activeDot={false} legendType="none" />
+                  
+                  {/* Límites de Control (+/- 1 SEP) */}
+                  <Line data={stats?.trendLine} dataKey="ucl" stroke="#f43f5e" strokeWidth={1} strokeDasharray="3 3" dot={false} activeDot={false} legendType="none" />
+                  <Line data={stats?.trendLine} dataKey="lcl" stroke="#f43f5e" strokeWidth={1} strokeDasharray="3 3" dot={false} activeDot={false} legendType="none" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -1250,8 +1290,8 @@ const ModelValidator: React.FC = () => {
                   <button
                     onClick={() => {
                       if (!activeParameter) return;
-                      const confirmDelete = window.confirm(`¿Está seguro de que desea ELIMINAR permanentemente la muestra "${selectedSample.id}" del análisis de ${activeParameter.name}?`);
-                      if (confirmDelete) {
+                      
+                      if (confirmDeleteId === String(selectedSample.id)) {
                         const updatedSamples = activeParameter.samples.filter(s => String(s.id) !== String(selectedSample.id));
                         const updatedParams = parameters.map((param, idx) => {
                           if (idx === selectedParamIndex) {
@@ -1269,11 +1309,19 @@ const ModelValidator: React.FC = () => {
                         });
 
                         setSelectedSample(null);
+                        setConfirmDeleteId(null);
+                      } else {
+                        setConfirmDeleteId(String(selectedSample.id));
+                        setTimeout(() => setConfirmDeleteId(null), 3000);
                       }
                     }}
-                    className="w-full py-2 px-3 rounded-lg text-[10.5px] font-extrabold font-sans transition-all bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-slate-100 border border-rose-500/20 text-center uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer"
+                    className={`w-full py-2 px-3 rounded-lg text-[10.5px] font-extrabold font-sans transition-all border text-center uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer ${
+                      confirmDeleteId === String(selectedSample.id)
+                        ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                        : 'bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-slate-100 border-rose-500/20'
+                    }`}
                   >
-                    🗑 Borrar de Calibración
+                    {confirmDeleteId === String(selectedSample.id) ? '¿Confirmar Borrado?' : '🗑 Borrar de Calibración'}
                   </button>
                 </div>
               </div>
@@ -1632,6 +1680,83 @@ const ModelValidator: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {showSummaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-ui-card max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl border border-ui-border p-6 font-sans">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-2">
+                <ClipboardList className="text-ui-accent" size={24} /> Resumen de Validación por Parámetro
+              </h2>
+              <button 
+                onClick={() => setShowSummaryModal(false)}
+                className="text-slate-400 hover:text-white transition-colors p-2"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-slate-400 uppercase bg-slate-800/50">
+                  <tr>
+                    <th className="px-4 py-3 rounded-tl-lg">Parámetro</th>
+                    <th className="px-4 py-3">Muestras</th>
+                    <th className="px-4 py-3 text-right">R²</th>
+                    <th className="px-4 py-3 text-right">SEP (%)</th>
+                    <th className="px-4 py-3 text-right">Bias (%)</th>
+                    <th className="px-4 py-3 text-right">RPD</th>
+                    <th className="px-4 py-3 rounded-tr-lg">Desempeño</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parameters.map((param, index) => {
+                    const activeExcl = new Set((excludedSamples[param.name] || []).map(id => String(id)));
+                    const filteredData = param.samples.filter(s => !activeExcl.has(String(s.id)));
+                    const st = calculateStatistics(filteredData);
+                    
+                    if (!st) return null;
+                    
+                    let performance = "Excelente";
+                    let perfColor = "text-emerald-400";
+                    if (st.rpd < 2) {
+                       performance = "Revisar";
+                       perfColor = "text-red-400";
+                    } else if (st.rpd < 3) {
+                       performance = "Aceptable";
+                       perfColor = "text-yellow-400";
+                    }
+
+                    return (
+                      <tr key={index} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-4 font-bold text-slate-200">{param.name}</td>
+                        <td className="px-4 py-4 text-slate-400">{st.n}</td>
+                        <td className={`px-4 py-4 text-right font-mono font-medium ${st.r2 >= 0.9 ? 'text-emerald-400' : 'text-slate-200'}`}>
+                          {st.r2.toFixed(3)}
+                        </td>
+                        <td className="px-4 py-4 text-right font-mono text-slate-200">{st.sep.toFixed(3)}</td>
+                        <td className="px-4 py-4 text-right font-mono text-slate-200">{st.bias.toFixed(3)}</td>
+                        <td className="px-4 py-4 text-right font-mono text-slate-200">{st.rpd.toFixed(2)}</td>
+                        <td className={`px-4 py-4 font-bold ${perfColor}`}>{performance}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setShowSummaryModal(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-100 px-6 py-2 rounded-lg font-bold text-sm border border-slate-600 transition-colors uppercase tracking-wide"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
