@@ -36,7 +36,7 @@ export function parseOPUS(
             const spectraBlocks: { dataType: number; channelType: number; offset: number; size: number }[] = [];
             const parameters: Record<string, any> = {};
 
-            // Parse directory entries
+            // Parse directory entries first to read all parameter blocks
             for (let i = 0; i < dirSize; i++) {
                 const entryOffset = dirOffset + i * 12;
                 if (entryOffset + 12 > arrayBuffer.byteLength) {
@@ -57,16 +57,10 @@ export function parseOPUS(
                 if (dataType === 0) {
                     // Parameter block
                     parseParameterBlock(dataView, blockOffset, blockSize, parameters);
-                } else if (dataType === 15 || dataType === 22) {
-                    // 15 = Absorbance (AB), 22 = Single Channel Sample (SC)
+                } else {
+                    // Candidate spectral data block (any non-parameter block)
                     spectraBlocks.push({ dataType, channelType, offset: blockOffset, size: blockSize });
                 }
-            }
-
-            // Find the best spectrum block (prefer Absorbance (15), fallback to Single Channel (22))
-            const spectrumBlock = spectraBlocks.find(b => b.dataType === 15) || spectraBlocks.find(b => b.dataType === 22);
-            if (!spectrumBlock) {
-                throw new Error("No se encontró ningún espectro de Absorbancia (AB) o Canal Único (SC) en el archivo OPUS.");
             }
 
             const NPT = parameters["NPT"]; // Number of points
@@ -74,18 +68,62 @@ export function parseOPUS(
             const LXT = parameters["LXT"]; // Last X value (wavenumber)
 
             if (NPT === undefined || FXV === undefined || LXT === undefined) {
-                throw new Error("El archivo OPUS no contiene los parámetros espectrales necesarios (NPT, FXV, LXT).");
+                const keys = Object.keys(parameters).join(", ");
+                throw new Error(`El archivo OPUS no contiene los parámetros espectrales necesarios (NPT, FXV, LXT). Parámetros encontrados: [${keys || 'ninguno'}]`);
             }
 
             if (NPT <= 1) {
                 throw new Error(`El número de puntos (NPT: ${NPT}) no es válido.`);
             }
 
+            // Expanded list of known Bruker spectra block data types:
+            // 14, 15, 25 = Absorbance (AB)
+            // 12, 24 = Transmittance (TR)
+            // 13, 16 = Reflectance (RE)
+            // 11, 22 = Single Channel Sample (SC)
+            // 10, 23 = Single Channel Reference (SC_Ref)
+            const preferredTypes = [14, 15, 25, 12, 24, 13, 16, 11, 22, 10, 23];
+            const candidates = spectraBlocks.filter(b => b.dataType !== 0);
+
+            if (candidates.length === 0) {
+                throw new Error("No se encontró ningún bloque de datos de espectro en el archivo OPUS.");
+            }
+
+            // Find the best block matching the criteria (exact size match is a huge indicator)
+            let bestBlock = candidates[0];
+            let bestScore = -1;
+
+            for (const b of candidates) {
+                let score = 0;
+
+                // 1. Math check: perfect size match (NPT points * 4 bytes per Float32)
+                if (b.size === NPT * 4) {
+                    score += 1000;
+                } else if (b.size >= NPT * 4 && b.size <= NPT * 4 + 64) {
+                    score += 500; // close size with potential headers/padding
+                }
+
+                // 2. Heuristics check: standard spectral dataType prioritization
+                const typeIndex = preferredTypes.indexOf(b.dataType);
+                if (typeIndex !== -1) {
+                    score += (100 - typeIndex); // Prefer items earlier in the list
+                }
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestBlock = b;
+                }
+            }
+
+            const spectrumBlock = bestBlock;
+
             // Read Float32 data points
             const values: number[] = [];
             const valOffset = spectrumBlock.offset;
             const requiredBytes = NPT * 4;
 
+            // In some files, the block size might be reported as slightly larger,
+            // so we guard against arrayBuffer limits strictly with requiredBytes.
             if (valOffset + requiredBytes > arrayBuffer.byteLength) {
                 throw new Error("El archivo de espectro está incompleto o truncado.");
             }
@@ -117,7 +155,7 @@ export function parseOPUS(
             onComplete({
                 wavelengths: wavelengths,
                 samples: [sample],
-                analyticalProperty: spectrumBlock.dataType === 15 ? "Absorbancia" : "Canal Único"
+                analyticalProperty: getAnalyticalProperty(spectrumBlock.dataType)
             });
 
         } catch (error: any) {
@@ -133,6 +171,29 @@ export function parseOPUS(
     };
 
     reader.readAsArrayBuffer(file);
+}
+
+function getAnalyticalProperty(dataType: number): string {
+    switch (dataType) {
+        case 14:
+        case 15:
+        case 25:
+            return "Absorbancia";
+        case 12:
+        case 24:
+            return "Transmitancia";
+        case 13:
+        case 16:
+            return "Reflectancia";
+        case 11:
+        case 22:
+            return "Canal Único (Muestra)";
+        case 10:
+        case 23:
+            return "Canal Único (Referencia)";
+        default:
+            return `Espectro (Tipo ${dataType})`;
+    }
 }
 
 function parseParameterBlock(
@@ -164,7 +225,7 @@ function parseParameterBlock(
         let valSize = 0;
 
         if (type === 0) {
-            // 16-bit signed integer
+            // 16-bit signed integer (short)
             if (p + 2 <= end) {
                 val = dataView.getInt16(p, true);
             }
@@ -189,6 +250,18 @@ function parseParameterBlock(
                 }
                 val = str.trim();
             }
+        } else if (type === 3) {
+            // 32-bit signed integer (dword)
+            if (p + 4 <= end) {
+                val = dataView.getInt32(p, true);
+            }
+            valSize = 4;
+        } else if (type === 4) {
+            // 32-bit float
+            if (p + 4 <= end) {
+                val = dataView.getFloat32(p, true);
+            }
+            valSize = 4;
         } else {
             // Unknown types
             valSize = length * 2;
