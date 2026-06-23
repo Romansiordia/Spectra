@@ -49,16 +49,19 @@ export function parseOPUS(
 
                 const dataType = blockType & 0xFF;
                 const channelType = (blockType >> 8) & 0xFF;
+                const block_type = (blockType >> 16) & 0xFF;
+
+                console.log(`Directory Entry #${i}: dataType=${dataType}, channelType=${channelType}, block_type=${block_type}, offset=${blockOffset}, size=${blockSize}`);
 
                 if (blockOffset + blockSize > arrayBuffer.byteLength) {
                     continue;
                 }
 
-                if (dataType === 0) {
+                if (block_type === 0) {
                     // Parameter block
                     parseParameterBlock(dataView, blockOffset, blockSize, parameters);
-                } else {
-                    // Candidate spectral data block (any non-parameter block)
+                } else if (block_type === 1) {
+                    // Candidate spectral data block (Data Block)
                     spectraBlocks.push({ dataType, channelType, offset: blockOffset, size: blockSize });
                 }
             }
