@@ -1,5 +1,6 @@
 {
   "name": "Spectra Pro - Plataforma Quimiométrica NIR",
   "description": "Plataforma quimiométrica NIR avanzada con módulos de calibración PLS, predicción independiente y un nuevo sistema de Control de Calidad para identificación automática de ingredientes y detección de no conformidades.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

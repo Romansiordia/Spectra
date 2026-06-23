@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Sample, PreprocessingStep, ModelResults } from './types';
 import { parseCSV } from './services/csvParser';
 import { parseDX } from './services/dxParser';
+import { parseOPUS } from './services/opusParser';
 import { applyPreprocessingLogic, runPlsAnalysis } from './services/chemometrics';
 import Header from './components/Header';
 import Loader from './components/Loader';
@@ -43,6 +44,13 @@ const App: React.FC = () => {
         const ext = file.name.toLowerCase().split('.').pop();
         if (ext === 'dx' || ext === 'jdx') {
             parseDX(file, (results) => {
+                if (results) {
+                    handleDataLoaded(results);
+                }
+                setLoadingMessage(null);
+            });
+        } else if (ext === 'opus' || /^\d+$/.test(ext || '')) {
+            parseOPUS(file, (results) => {
                 if (results) {
                     handleDataLoaded(results);
                 }
