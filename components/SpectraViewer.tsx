@@ -11,6 +11,7 @@ interface SpectraViewerProps {
     samples: (Sample | {id: string | number, values: number[], color: string})[];
     isProcessed: boolean;
     onReset: () => void;
+    analyticalProperty?: string;
 }
 
 // --- TABLA DE REFERENCIA DE BANDAS NIR ---
@@ -34,15 +35,25 @@ const ChartIcon: React.FC = () => (
     </svg>
 );
 
-const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isProcessed, onReset }) => {
+const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isProcessed, onReset, analyticalProperty }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
     const [startWl, setStartWl] = useState('');
     const [endWl, setEndWl] = useState('');
     const [activeBands, setActiveBands] = useState<Set<string>>(new Set());
     const [samplingLimit, setSamplingLimit] = useState<number>(50);
+    const [invertY, setInvertY] = useState(false);
     
     const hasData = samples.length > 0;
+
+    // Detectar automáticamente si el tipo de dato es reflectancia o transmitancia para invertir el eje Y
+    useEffect(() => {
+        if (analyticalProperty === 'Reflectancia' || analyticalProperty === 'Transmitancia') {
+            setInvertY(true);
+        } else {
+            setInvertY(false);
+        }
+    }, [analyticalProperty]);
 
     const displayedSamples = useMemo(() => {
         if (samplingLimit === 0 || samples.length <= samplingLimit) {
@@ -176,9 +187,19 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                                 grid: { color: '#334155' } 
                             },
                             y: {
-                                title: { display: true, text: isProcessed ? 'Intensidad / Derivada' : 'Absorbancia', color: '#94a3b8', font: {size: 11} },
+                                title: { 
+                                    display: true, 
+                                    text: isProcessed 
+                                        ? 'Intensidad / Derivada' 
+                                        : (invertY 
+                                            ? `${analyticalProperty || 'Absorbancia'} (Eje Invertido)` 
+                                            : (analyticalProperty || 'Absorbancia')), 
+                                    color: '#94a3b8', 
+                                    font: {size: 11} 
+                                },
                                 ticks: { color: '#94a3b8', font: {family: 'JetBrains Mono', size: 10} },
-                                grid: { color: '#334155' }
+                                grid: { color: '#334155' },
+                                reverse: invertY
                             }
                         },
                         interaction: {
@@ -198,7 +219,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                 chartInstanceRef.current = null;
             }
         };
-    }, [isProcessed, bandHighlighterPlugin]);
+    }, [isProcessed, bandHighlighterPlugin, invertY, analyticalProperty]);
 
     // Handle Data Updates
     useEffect(() => {
@@ -283,6 +304,19 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    {hasData && (
+                        <button
+                            onClick={() => setInvertY(!invertY)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                invertY 
+                                    ? 'bg-brand-500/10 border-brand-500 text-brand-400 hover:bg-brand-500/20' 
+                                    : 'bg-ui-dark border-ui-border text-slate-400 hover:border-slate-500'
+                            }`}
+                            title="Invierte verticalmente el eje Y (útil para que reflectancia/transmitancia muestren picos de absorción)"
+                        >
+                            {invertY ? '✓ Eje Y Invertido' : '⇅ Invertir Eje Y'}
+                        </button>
+                    )}
                     <Button variant="secondary" onClick={handleResetZoom} className="text-xs" size="sm" disabled={!hasData}>
                         {isProcessed ? 'Resetear Pre-proc.' : 'Resetear Zoom'}
                     </Button>

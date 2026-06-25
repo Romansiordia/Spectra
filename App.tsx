@@ -322,6 +322,7 @@ const App: React.FC = () => {
                                         samples={spectraToDisplay}
                                         isProcessed={!!processedSpectra}
                                         onReset={handleResetVisualization}
+                                        analyticalProperty={analyticalProperty}
                                     />
                                     <SampleManager
                                         samples={samples}
