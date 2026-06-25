@@ -4,6 +4,9 @@ export interface Sample {
     color: string;
     active: boolean;
     analyticalValue: number;
+    material?: string;
+    provider?: string;
+    client?: string;
 }
 
 export interface PreprocessingStep {

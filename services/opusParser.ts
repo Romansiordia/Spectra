@@ -28,6 +28,67 @@ export function textToWindows1252Bytes(text: string): Uint8Array {
     return bytes;
 }
 
+function arrayBufferToLatin1(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let str = "";
+    const chunkSize = 65536;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        str += String.fromCharCode.apply(null, chunk as any);
+    }
+    return str;
+}
+
+function scanParameter(bytes: Uint8Array, name: string): any {
+    const nameBytes = new Uint8Array(4);
+    for (let i = 0; i < 4; i++) {
+        nameBytes[i] = i < name.length ? name.charCodeAt(i) : 32;
+    }
+
+    for (let i = 0; i < bytes.length - 16; i++) {
+        let found = true;
+        for (let j = 0; j < 4; j++) {
+            if (bytes[i + j] !== nameBytes[j]) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            const type = bytes[i + 4] | (bytes[i + 5] << 8);
+            const length = bytes[i + 6] | (bytes[i + 7] << 8);
+            const valOffset = i + 8;
+
+            if (type === 0 && valOffset + 2 <= bytes.length) {
+                const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                return dataView.getInt16(valOffset, true);
+            } else if (type === 1 && valOffset + 8 <= bytes.length) {
+                const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                return dataView.getFloat64(valOffset, true);
+            } else if (type === 3 && valOffset + 4 <= bytes.length) {
+                const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                return dataView.getInt32(valOffset, true);
+            } else if (type === 4 && valOffset + 4 <= bytes.length) {
+                const dataView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+                return dataView.getFloat32(valOffset, true);
+            } else if (type === 2) {
+                const valSize = length * 2;
+                if (valOffset + valSize <= bytes.length) {
+                    let str = "";
+                    for (let j = 0; j < valSize; j++) {
+                        const b = bytes[valOffset + j];
+                        if (b === 0) break;
+                        if (b >= 32 && b <= 126) {
+                            str += String.fromCharCode(b);
+                        }
+                    }
+                    return str.trim();
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
 export function parseOPUS(
     fileOrBuffer: File | ArrayBuffer,
     onComplete: (results: ParseResult | null) => void,
@@ -67,6 +128,7 @@ export function parseOPUS(
             } else if (startOffset > 0) {
                 console.log(`Firma Bruker OPUS (0xFE 0xFE) encontrada en el offset ${startOffset}. Recortando buffer.`);
                 arrayBuffer = arrayBuffer.slice(startOffset);
+                bytes = new Uint8Array(arrayBuffer);
             }
 
             const dataView = new DataView(arrayBuffer);
@@ -74,151 +136,227 @@ export function parseOPUS(
                 throw new Error("El archivo es demasiado pequeño para ser un archivo OPUS válido.");
             }
 
-            // Offset 24: pointer to first directory (uint32)
-            // Offset 28: number of directory entries (int32)
+            // Extract Latin-1 text strings delimited or matching the pattern in OPUS files
+            // (e.g. FD2 for Client, FD5 for Provider, FD9 for Code, etc.)
+            const latin1Text = arrayBufferToLatin1(arrayBuffer);
+            const textMatches: Record<string, string> = {};
+            const textRegex = /([A-Z0-9]{3})\s+(?:\x0c)?\s*([^\r\n]{1,100}?)\s+END/gi;
+            let match;
+            while ((match = textRegex.exec(latin1Text)) !== null) {
+                const tag = match[1].trim().toUpperCase();
+                const val = match[2].trim();
+                if (tag.length === 3) {
+                    textMatches[tag] = val;
+                }
+            }
+            console.log("Resilient text tags matched in OPUS:", textMatches);
+
+            // Attempt standard Bruker OPUS directory parsing first
+            let standardSuccess = false;
+            let wavelengths: number[] = [];
+            let values: number[] = [];
+            let analyticalProperty = "Absorbancia";
+            let sampleId = textMatches["FD9"] || name.replace(/\.[^/.]+$/, "");
+
             const dirOffset = dataView.getUint32(24, true);
             const dirSize = dataView.getUint32(28, true);
 
-            if (dirOffset < 24 || dirOffset >= arrayBuffer.byteLength) {
-                const hexStart = Array.from(new Uint8Array(arrayBuffer.slice(0, 32))).map(b => b.toString(16).padStart(2, '0')).join(' ');
-                throw new Error(`Puntero de directorio inválido o fuera de rango (dirOffset: ${dirOffset}, dirSize: ${dirSize}, totalBytes: ${arrayBuffer.byteLength}). Primeros 32 bytes (hex): [${hexStart}]`);
-            }
+            if (dirOffset >= 24 && dirOffset < arrayBuffer.byteLength && dirSize > 0) {
+                try {
+                    const spectraBlocks: { dataType: number; channelType: number; offset: number; size: number }[] = [];
+                    const parameters: Record<string, any> = {};
 
-            const spectraBlocks: { dataType: number; channelType: number; offset: number; size: number }[] = [];
-            const parameters: Record<string, any> = {};
+                    // Parse directory entries to read all parameter blocks
+                    for (let i = 0; i < dirSize; i++) {
+                        const entryOffset = dirOffset + i * 12;
+                        if (entryOffset + 12 > arrayBuffer.byteLength) {
+                            break;
+                        }
 
-            // Parse directory entries first to read all parameter blocks
-            for (let i = 0; i < dirSize; i++) {
-                const entryOffset = dirOffset + i * 12;
-                if (entryOffset + 12 > arrayBuffer.byteLength) {
-                    break;
-                }
+                        const blockType = dataView.getUint32(entryOffset, true);
+                        const blockSize = dataView.getUint32(entryOffset + 4, true);
+                        const blockOffset = dataView.getUint32(entryOffset + 8, true);
 
-                const blockType = dataView.getUint32(entryOffset, true);
-                const blockSize = dataView.getUint32(entryOffset + 4, true);
-                const blockOffset = dataView.getUint32(entryOffset + 8, true);
+                        const dataType = blockType & 0xFF;
+                        const channelType = (blockType >> 8) & 0xFF;
+                        const block_type = (blockType >> 16) & 0xFF;
 
-                const dataType = blockType & 0xFF;
-                const channelType = (blockType >> 8) & 0xFF;
-                const block_type = (blockType >> 16) & 0xFF;
+                        if (blockOffset >= arrayBuffer.byteLength) {
+                            continue;
+                        }
 
-                console.log(`Directory Entry #${i}: dataType=${dataType}, channelType=${channelType}, block_type=${block_type}, offset=${blockOffset}, size=${blockSize}`);
+                        let byteSize = blockSize;
+                        if (blockOffset + blockSize * 4 <= arrayBuffer.byteLength) {
+                            byteSize = blockSize * 4;
+                        }
 
-                if (blockOffset >= arrayBuffer.byteLength) {
-                    continue;
-                }
+                        if (block_type === 0) {
+                            parseParameterBlock(dataView, blockOffset, byteSize, parameters);
+                        } else if (block_type === 1) {
+                            spectraBlocks.push({ dataType, channelType, offset: blockOffset, size: byteSize });
+                        }
+                    }
 
-                // Dynamically detect word-based vs byte-based sizes.
-                // Standard block sizes are in 32-bit words (dwords).
-                // If blockOffset + blockSize * 4 is within the file size, use blockSize * 4 as the actual byte size.
-                // Otherwise, fall back to blockSize (if it was already in bytes).
-                let byteSize = blockSize;
-                if (blockOffset + blockSize * 4 <= arrayBuffer.byteLength) {
-                    byteSize = blockSize * 4;
-                }
+                    const NPT = parameters["NPT"];
+                    const FXV = parameters["FXV"];
+                    const LXT = parameters["LXT"] !== undefined ? parameters["LXT"] : parameters["LXV"];
 
-                if (block_type === 0) {
-                    // Parameter block
-                    parseParameterBlock(dataView, blockOffset, byteSize, parameters);
-                } else if (block_type === 1) {
-                    // Candidate spectral data block (Data Block)
-                    spectraBlocks.push({ dataType, channelType, offset: blockOffset, size: byteSize });
-                }
-            }
+                    if (NPT !== undefined && FXV !== undefined && LXT !== undefined && NPT > 1) {
+                        const preferredTypes = [14, 15, 25, 12, 24, 13, 16, 11, 22, 10, 23];
+                        const candidates = spectraBlocks.filter(b => b.dataType !== 0);
 
-            const NPT = parameters["NPT"]; // Number of points
-            const FXV = parameters["FXV"]; // First X value (wavenumber)
-            const LXT = parameters["LXT"] !== undefined ? parameters["LXT"] : parameters["LXV"]; // Last X value (wavenumber)
+                        if (candidates.length > 0) {
+                            let bestBlock = candidates[0];
+                            let bestScore = -1;
 
-            if (NPT === undefined || FXV === undefined || LXT === undefined) {
-                const keys = Object.keys(parameters).join(", ");
-                throw new Error(`El archivo OPUS no contiene los parámetros espectrales necesarios (NPT, FXV, LXV/LXT). Parámetros encontrados: [${keys || 'ninguno'}]`);
-            }
+                            for (const b of candidates) {
+                                let score = 0;
+                                if (b.size === NPT * 4) {
+                                    score += 1000;
+                                } else if (b.size >= NPT * 4 && b.size <= NPT * 4 + 64) {
+                                    score += 500;
+                                }
 
-            if (NPT <= 1) {
-                throw new Error(`El número de puntos (NPT: ${NPT}) no es válido.`);
-            }
+                                const typeIndex = preferredTypes.indexOf(b.dataType);
+                                if (typeIndex !== -1) {
+                                    score += (100 - typeIndex);
+                                }
 
-            // Expanded list of known Bruker spectra block data types:
-            // 14, 15, 25 = Absorbance (AB)
-            // 12, 24 = Transmittance (TR)
-            // 13, 16 = Reflectance (RE)
-            // 11, 22 = Single Channel Sample (SC)
-            // 10, 23 = Single Channel Reference (SC_Ref)
-            const preferredTypes = [14, 15, 25, 12, 24, 13, 16, 11, 22, 10, 23];
-            const candidates = spectraBlocks.filter(b => b.dataType !== 0);
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestBlock = b;
+                                }
+                            }
 
-            if (candidates.length === 0) {
-                throw new Error("No se encontró ningún bloque de datos de espectro en el archivo OPUS.");
-            }
+                            const spectrumBlock = bestBlock;
+                            const valOffset = spectrumBlock.offset;
+                            const requiredBytes = NPT * 4;
 
-            // Find the best block matching the criteria (exact size match is a huge indicator)
-            let bestBlock = candidates[0];
-            let bestScore = -1;
+                            if (valOffset + requiredBytes <= arrayBuffer.byteLength) {
+                                for (let i = 0; i < NPT; i++) {
+                                    values.push(dataView.getFloat32(valOffset + i * 4, true));
+                                }
 
-            for (const b of candidates) {
-                let score = 0;
+                                const step = (LXT - FXV) / (NPT - 1);
+                                for (let i = 0; i < NPT; i++) {
+                                    wavelengths.push(FXV + i * step);
+                                }
 
-                // 1. Math check: perfect size match (NPT points * 4 bytes per Float32)
-                if (b.size === NPT * 4) {
-                    score += 1000;
-                } else if (b.size >= NPT * 4 && b.size <= NPT * 4 + 64) {
-                    score += 500; // close size with potential headers/padding
-                }
-
-                // 2. Heuristics check: standard spectral dataType prioritization
-                const typeIndex = preferredTypes.indexOf(b.dataType);
-                if (typeIndex !== -1) {
-                    score += (100 - typeIndex); // Prefer items earlier in the list
-                }
-
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestBlock = b;
+                                analyticalProperty = getAnalyticalProperty(spectrumBlock.dataType);
+                                if (parameters["SNM"]) {
+                                    sampleId = parameters["SNM"];
+                                }
+                                standardSuccess = true;
+                                console.log("Standard OPUS binary parsing succeeded!");
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Standard OPUS parsing failed, falling back to Resilient Scan:", e);
                 }
             }
 
-            const spectrumBlock = bestBlock;
+            // Fallback: Resilient Parameter and Spectrum Block Scanner
+            if (!standardSuccess) {
+                console.log("Initiating resilient raw OPUS scanner...");
+                const NPT = scanParameter(bytes, "NPT");
+                const FXV = scanParameter(bytes, "FXV");
+                const LXT = scanParameter(bytes, "LXT") !== undefined ? scanParameter(bytes, "LXT") : scanParameter(bytes, "LXV");
 
-            // Read Float32 data points
-            const values: number[] = [];
-            const valOffset = spectrumBlock.offset;
-            const requiredBytes = NPT * 4;
+                if (NPT === undefined || FXV === undefined || LXT === undefined || NPT <= 1) {
+                    throw new Error("No se encontraron los parámetros espectrales necesarios (NPT, FXV, LXT/LXV) mediante escaneo resiliente.");
+                }
 
-            // In some files, the block size might be reported as slightly larger,
-            // so we guard against arrayBuffer limits strictly with requiredBytes.
-            if (valOffset + requiredBytes > arrayBuffer.byteLength) {
-                throw new Error("El archivo de espectro está incompleto o truncado.");
+                console.log(`Resilient scanner found header: NPT=${NPT}, FXV=${FXV}, LXT=${LXT}`);
+
+                // Scan for the spectrum block (contiguous block of Float32)
+                let foundOffset = -1;
+
+                // Method A: Look for directory entry in the whole file
+                for (let i = 0; i < bytes.length - 12; i += 4) {
+                    const blockSizeVal = dataView.getUint32(i + 4, true);
+                    const blockOffsetVal = dataView.getUint32(i + 8, true);
+
+                    if ((blockSizeVal === NPT || blockSizeVal === NPT * 4) &&
+                        blockOffsetVal > 24 &&
+                        blockOffsetVal + NPT * 4 <= bytes.length) {
+                        foundOffset = blockOffsetVal;
+                        break;
+                    }
+                }
+
+                // Method B: Heuristic float smoothness scan
+                if (foundOffset === -1) {
+                    let bestOffset = -1;
+                    let bestSmoothness = Infinity;
+
+                    for (let offset = 512; offset <= bytes.length - NPT * 4; offset += 4) {
+                        let sumDiffs = 0;
+                        let isValid = true;
+                        let prevVal = dataView.getFloat32(offset, true);
+
+                        for (let j = 1; j < Math.min(NPT, 50); j++) {
+                            const val = dataView.getFloat32(offset + j * 4, true);
+                            if (isNaN(val) || Math.abs(val) > 15) {
+                                isValid = false;
+                                break;
+                            }
+                            sumDiffs += Math.abs(val - prevVal);
+                            prevVal = val;
+                        }
+
+                        if (isValid && sumDiffs > 0) {
+                            const avgDiff = sumDiffs / Math.min(NPT - 1, 49);
+                            if (avgDiff < bestSmoothness && avgDiff > 1e-6) {
+                                bestSmoothness = avgDiff;
+                                bestOffset = offset;
+                            }
+                        }
+                    }
+
+                    if (bestOffset !== -1) {
+                        foundOffset = bestOffset;
+                        console.log(`Resilient scanner selected spectrum block at offset ${foundOffset} with smoothness ${bestSmoothness}`);
+                    }
+                }
+
+                if (foundOffset === -1) {
+                    throw new Error("No se pudo localizar el bloque de datos espectrales en el archivo.");
+                }
+
+                values = [];
+                for (let i = 0; i < NPT; i++) {
+                    values.push(dataView.getFloat32(foundOffset + i * 4, true));
+                }
+
+                wavelengths = [];
+                const step = (LXT - FXV) / (NPT - 1);
+                for (let i = 0; i < NPT; i++) {
+                    wavelengths.push(FXV + i * step);
+                }
+
+                const snm = scanParameter(bytes, "SNM");
+                if (snm) {
+                    sampleId = snm;
+                }
             }
 
-            for (let i = 0; i < NPT; i++) {
-                const val = dataView.getFloat32(valOffset + i * 4, true); // little-endian float
-                values.push(val);
-            }
-
-            // Generate wavenumbers (wavelengths scale)
-            const wavelengths: number[] = [];
-            const step = (LXT - FXV) / (NPT - 1);
-            for (let i = 0; i < NPT; i++) {
-                wavelengths.push(FXV + i * step);
-            }
-
-            // Determine sample name
-            const sampleName = parameters["SNM"] || name.replace(/\.[^/.]+$/, "");
-            const color = `hsl(210, 70%, 50%)`;
-
+            // Create sample with extracted metadata
             const sample: Sample = {
-                id: sampleName,
+                id: textMatches["FD9"] || sampleId,
                 values: values,
-                color: color,
+                color: "hsl(210, 70%, 50%)",
                 active: true,
-                analyticalValue: 0
+                analyticalValue: 0,
+                client: textMatches["FD2"] || undefined,
+                provider: textMatches["FD5"] || undefined,
+                material: textMatches["FD8"] || textMatches["FD1"] || textMatches["FD3"] || textMatches["FD4"] || textMatches["MAT"] || textMatches["PRD"] || undefined
             };
 
             onComplete({
                 wavelengths: wavelengths,
                 samples: [sample],
-                analyticalProperty: getAnalyticalProperty(spectrumBlock.dataType)
+                analyticalProperty: analyticalProperty
             });
 
         } catch (error: any) {

@@ -35,6 +35,7 @@ const SampleManager: React.FC<SampleManagerProps> = ({
 
     const activeSamples = samples.filter(s => s.active);
     const activeSampleCount = activeSamples.length;
+    const hasMetadata = samples.some(s => s.material || s.provider || s.client);
 
     const handlePasteSubmit = () => {
         setPasteError(null);
@@ -190,9 +191,16 @@ const SampleManager: React.FC<SampleManagerProps> = ({
                                         onChange={() => onToggle(index)}
                                         className="w-4 h-4 rounded border-slate-300 text-ui-accent focus:ring-ui-accent cursor-pointer flex-shrink-0"
                                     />
-                                    <label htmlFor={`sample-${index}`} className={`text-sm cursor-pointer truncate max-w-[150px] transition-colors font-medium ${sample.active ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
-                                        {sample.id}
-                                    </label>
+                                    <div className="flex flex-col min-w-0">
+                                        <label htmlFor={`sample-${index}`} className={`text-sm cursor-pointer truncate max-w-[150px] transition-colors font-medium ${sample.active ? 'text-slate-200' : 'text-slate-500 line-through'}`}>
+                                            {sample.id}
+                                        </label>
+                                        {sample.active && (sample.material || sample.provider || sample.client) && (
+                                            <span className="text-[10px] text-slate-400 truncate max-w-[150px]" title={`${sample.material || ''} | ${sample.provider || ''} | ${sample.client || ''}`}>
+                                                {sample.material || sample.provider || sample.client}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {sample.active && (
@@ -220,6 +228,19 @@ const SampleManager: React.FC<SampleManagerProps> = ({
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
                                         ID de Muestra
                                     </th>
+                                    {hasMetadata && (
+                                        <>
+                                            <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                Material
+                                            </th>
+                                            <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                Proveedor
+                                            </th>
+                                            <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                Cliente
+                                            </th>
+                                        </>
+                                    )}
                                     <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-400 uppercase tracking-wider w-72">
                                         <div className="flex items-center gap-2">
                                             <span className="text-ui-accent">Valor de Referencia:</span>
@@ -275,6 +296,21 @@ const SampleManager: React.FC<SampleManagerProps> = ({
                                                 {sample.id}
                                             </span>
                                         </td>
+                                        
+                                        {/* Metadata Columns */}
+                                        {hasMetadata && (
+                                            <>
+                                                <td className="px-4 py-2 text-xs text-slate-300 truncate max-w-[150px]" title={sample.material}>
+                                                    {sample.material || '-'}
+                                                </td>
+                                                <td className="px-4 py-2 text-xs text-slate-300 truncate max-w-[150px]" title={sample.provider}>
+                                                    {sample.provider || '-'}
+                                                </td>
+                                                <td className="px-4 py-2 text-xs text-slate-300 truncate max-w-[150px]" title={sample.client}>
+                                                    {sample.client || '-'}
+                                                </td>
+                                            </>
+                                        )}
                                         
                                         {/* Analytical value editable input */}
                                         <td className="px-4 py-2">
