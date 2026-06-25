@@ -292,7 +292,9 @@ export function parseOPUS(
 
                                 const step = (LXT - FXV) / (NPT - 1);
                                 for (let i = 0; i < NPT; i++) {
-                                    wavelengths.push(FXV + i * step);
+                                    const wavenumber = FXV + i * step;
+                                    const wavelength = wavenumber !== 0 ? 10000000 / wavenumber : 0;
+                                    wavelengths.push(wavelength);
                                 }
 
                                 analyticalProperty = getAnalyticalProperty(spectrumBlock.dataType);
@@ -386,7 +388,9 @@ export function parseOPUS(
                 wavelengths = [];
                 const step = (LXT - FXV) / (NPT - 1);
                 for (let i = 0; i < NPT; i++) {
-                    wavelengths.push(FXV + i * step);
+                    const wavenumber = FXV + i * step;
+                    const wavelength = wavenumber !== 0 ? 10000000 / wavenumber : 0;
+                    wavelengths.push(wavelength);
                 }
 
                 const snm = scanParameter(bytes, "SNM");
