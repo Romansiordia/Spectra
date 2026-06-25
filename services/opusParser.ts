@@ -88,16 +88,25 @@ export function parseOPUS(
 
                 console.log(`Directory Entry #${i}: dataType=${dataType}, channelType=${channelType}, block_type=${block_type}, offset=${blockOffset}, size=${blockSize}`);
 
-                if (blockOffset + blockSize > arrayBuffer.byteLength) {
+                if (blockOffset >= arrayBuffer.byteLength) {
                     continue;
+                }
+
+                // Dynamically detect word-based vs byte-based sizes.
+                // Standard block sizes are in 32-bit words (dwords).
+                // If blockOffset + blockSize * 4 is within the file size, use blockSize * 4 as the actual byte size.
+                // Otherwise, fall back to blockSize (if it was already in bytes).
+                let byteSize = blockSize;
+                if (blockOffset + blockSize * 4 <= arrayBuffer.byteLength) {
+                    byteSize = blockSize * 4;
                 }
 
                 if (block_type === 0) {
                     // Parameter block
-                    parseParameterBlock(dataView, blockOffset, blockSize, parameters);
+                    parseParameterBlock(dataView, blockOffset, byteSize, parameters);
                 } else if (block_type === 1) {
                     // Candidate spectral data block (Data Block)
-                    spectraBlocks.push({ dataType, channelType, offset: blockOffset, size: blockSize });
+                    spectraBlocks.push({ dataType, channelType, offset: blockOffset, size: byteSize });
                 }
             }
 
@@ -302,9 +311,13 @@ function parseParameterBlock(
             parameters[name] = val;
         }
 
+        const prevP = p;
         p += valSize;
         if (p % 2 !== 0) {
             p++;
+        }
+        if (p <= prevP) {
+            p += 2; // Guarantee progress
         }
     }
 }

@@ -52,13 +52,19 @@ const App: React.FC = () => {
 
                 const bytes = new Uint8Array(arrayBuffer);
                 
-                // 1. Detectar si es un archivo OPUS original en binario puro (comienza con 0xFE 0xFE)
-                const isRawBinaryOpus = bytes.length >= 4 && bytes[0] === 0xFE && bytes[1] === 0xFE;
+                // 1. Detectar si es un archivo OPUS original en binario puro (comienza con 0xFE 0xFE, tolerando offsets menores o BOMs)
+                let isRawBinaryOpus = false;
+                for (let i = 0; i < Math.min(bytes.length - 1, 16); i++) {
+                    if (bytes[i] === 0xFE && bytes[i + 1] === 0xFE) {
+                        isRawBinaryOpus = true;
+                        break;
+                    }
+                }
                 
                 // 2. Intentar decodificar como texto para ver si fue guardado como texto UTF-8 o ANSI
                 const decoder = new TextDecoder('utf-8');
                 const text = decoder.decode(bytes);
-                const isTextOpus = text.startsWith("þþ") || text.substring(0, 10).includes("þþ");
+                const isTextOpus = text.includes("þþ") && text.indexOf("þþ") < 200;
 
                 if (isRawBinaryOpus) {
                     // Es un archivo Bruker OPUS binario puro

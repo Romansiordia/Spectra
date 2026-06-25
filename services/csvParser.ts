@@ -1,4 +1,3 @@
-
 import { Sample } from '../types';
 
 declare var Papa: any;
@@ -9,12 +8,121 @@ type ParseResult = {
     analyticalProperty: string;
 };
 
+export function preprocessCSVText(rawText: string): { cleanText: string, delimiter: string } {
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const dataLines = lines.filter(l => !l.startsWith('#') && !l.startsWith('*') && !l.startsWith(';'));
+
+    if (dataLines.length === 0) {
+        return { cleanText: rawText, delimiter: ',' };
+    }
+
+    let semiCount = 0;
+    let tabCount = 0;
+    let commaCount = 0;
+    let spaceCount = 0;
+
+    const sampleSize = Math.min(dataLines.length, 20);
+    for (let i = 0; i < sampleSize; i++) {
+        const line = dataLines[i];
+        if (line.includes(';')) semiCount++;
+        if (line.includes('\t')) tabCount++;
+        if (line.includes(',')) commaCount++;
+        const partsBySpace = line.split(/\s+/);
+        if (partsBySpace.length >= 2) spaceCount++;
+    }
+
+    let delimiter = ',';
+    let isCommaDecimal = false;
+
+    if (semiCount >= sampleSize * 0.8) {
+        delimiter = ';';
+        isCommaDecimal = true;
+    } else if (tabCount >= sampleSize * 0.8) {
+        delimiter = '\t';
+        isCommaDecimal = true;
+    } else if (spaceCount >= sampleSize * 0.8) {
+        delimiter = ' ';
+        isCommaDecimal = true;
+    } else if (commaCount >= sampleSize * 0.8) {
+        let hasDots = false;
+        for (let i = 0; i < sampleSize; i++) {
+            if (dataLines[i].includes('.')) {
+                hasDots = true;
+                break;
+            }
+        }
+        if (hasDots) {
+            delimiter = ',';
+            isCommaDecimal = false;
+        } else {
+            let avgCommas = 0;
+            for (let i = 0; i < sampleSize; i++) {
+                avgCommas += (dataLines[i].match(/,/g) || []).length;
+            }
+            avgCommas /= sampleSize;
+
+            if (avgCommas > 1.5) {
+                delimiter = ',';
+                isCommaDecimal = false;
+            } else {
+                delimiter = ',';
+                isCommaDecimal = false;
+            }
+        }
+    }
+
+    let cleanText = rawText;
+    if (isCommaDecimal) {
+        // Replace commas with dots
+        cleanText = rawText.replace(/,/g, '.');
+    }
+
+    // Standardize whitespace delimiters (multiple spaces or tabs) to commas
+    if (delimiter === ' ' || delimiter === '\t') {
+        const processedLines = lines.map(line => {
+            if (line.startsWith('#') || line.startsWith('*')) return line;
+            return line.replace(/\s+/g, ',');
+        });
+        cleanText = processedLines.join('\n');
+        delimiter = ',';
+    }
+
+    return { cleanText, delimiter };
+}
+
 export function parseCSV(
     fileOrString: File | string,
     onComplete: (results: ParseResult) => void,
     hasAnalyticalProperty: boolean = true
 ) {
-    Papa.parse(fileOrString, {
+    if (fileOrString instanceof File) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result as string;
+            if (!text) {
+                alert("No se pudieron leer los datos del archivo.");
+                return;
+            }
+            processCSVText(text, fileOrString.name, onComplete, hasAnalyticalProperty);
+        };
+        reader.onerror = () => {
+            alert("Error al leer el archivo CSV.");
+        };
+        reader.readAsText(fileOrString);
+    } else {
+        processCSVText(fileOrString, "Espectro", onComplete, hasAnalyticalProperty);
+    }
+}
+
+function processCSVText(
+    rawText: string,
+    filename: string,
+    onComplete: (results: ParseResult) => void,
+    hasAnalyticalProperty: boolean = true
+) {
+    const { cleanText, delimiter } = preprocessCSVText(rawText);
+
+    Papa.parse(cleanText, {
         header: false,
         dynamicTyping: true,
         skipEmptyLines: true,
@@ -31,33 +139,20 @@ export function parseCSV(
                 const row = data[i];
                 if (!row || row.length === 0) continue;
 
-                // Si la fila tiene longitud 1, podría ser que Papaparse no detectó el delimitador de espacios múltiples
-                if (row.length === 1 && typeof row[0] === 'string') {
-                    const trimmed = row[0].trim();
-                    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('*')) continue;
-                    const parts = trimmed.split(/[\s,;]+/);
-                    if (parts.length >= 2) {
-                        const x = Number(parts[0]);
-                        const y = Number(parts[1]);
-                        if (!isNaN(x) && !isNaN(y)) {
-                            xyPairs.push({ x, y });
-                        }
-                    }
-                } else if (row.length >= 2) {
+                if (row.length >= 2) {
                     const x = Number(row[0]);
                     const y = Number(row[1]);
-                    // Asegurar que sean números válidos y no cabeceras de texto
                     if (!isNaN(x) && !isNaN(y)) {
                         xyPairs.push({ x, y });
                     }
                 }
             }
 
-            // Si detectamos al menos 2 puntos XY puros y el formato parece ser de un solo espectro
+            // Si detectamos al menos 2 puntos XY puros
             if (xyPairs.length >= 2 && (data[0].length < 3 || xyPairs.length > data.length * 0.8)) {
                 const wavelengths = xyPairs.map(p => p.x);
                 const values = xyPairs.map(p => p.y);
-                const sampleName = typeof fileOrString === 'string' ? 'Espectro' : fileOrString.name.replace(/\.[^/.]+$/, "");
+                const sampleName = filename.replace(/\.[^/.]+$/, "");
                 const color = `hsl(210, 70%, 50%)`;
 
                 onComplete({
@@ -82,7 +177,7 @@ export function parseCSV(
 
             const header = data[0];
             const numCols = header.length;
-            const analyticalProperty = hasAnalyticalProperty ? header[numCols - 1] : "Unknown";
+            const analyticalProperty = hasAnalyticalProperty ? String(header[numCols - 1]) : "Unknown";
             const wavelengths = hasAnalyticalProperty ? header.slice(1, numCols - 1).map(Number) : header.slice(1).map(Number);
             
             if (wavelengths.some(isNaN)) {
@@ -91,7 +186,7 @@ export function parseCSV(
             }
 
             const samplesData: Sample[] = data.slice(1).map((row, index): Sample | null => {
-                const id = row[0];
+                const id = String(row[0]);
                 
                 let analyticalValue = 0;
                 let values: number[] = [];
@@ -101,17 +196,17 @@ export function parseCSV(
                         console.warn(`Fila ${index + 2} ignorada por tener un número incorrecto de columnas.`);
                         return null;
                     }
-                    analyticalValue = row[numCols - 1];
-                    if (typeof analyticalValue !== 'number' || isNaN(analyticalValue)) {
+                    analyticalValue = Number(row[numCols - 1]);
+                    if (isNaN(analyticalValue)) {
                         console.warn(`Fila ${index + 2} (ID: ${id}) ignorada: el valor de la propiedad no es numérico.`);
                         return null;
                     }
-                    values = row.slice(1, numCols - 1);
+                    values = row.slice(1, numCols - 1).map(Number);
                 } else {
-                    values = row.slice(1);
+                    values = row.slice(1).map(Number);
                 }
 
-                if (values.some(v => typeof v !== 'number' || isNaN(v))) {
+                if (values.some(v => isNaN(v))) {
                     console.warn(`Fila ${index + 2} (ID: ${id}) ignorada: el espectro contiene valores no numéricos.`);
                     return null;
                 }
