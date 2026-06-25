@@ -41,27 +41,70 @@ const App: React.FC = () => {
 
     const handleFileSelected = (file: File) => {
         setLoadingMessage('Cargando datos...');
-        const ext = file.name.toLowerCase().split('.').pop();
-        if (ext === 'dx' || ext === 'jdx') {
-            parseDX(file, (results) => {
-                if (results) {
-                    handleDataLoaded(results);
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const arrayBuffer = e.target?.result as ArrayBuffer;
+                if (!arrayBuffer) {
+                    throw new Error("No se pudieron leer los datos del archivo.");
                 }
-                setLoadingMessage(null);
-            });
-        } else if (ext === 'opus' || /^\d+$/.test(ext || '')) {
-            parseOPUS(file, (results) => {
-                if (results) {
-                    handleDataLoaded(results);
+
+                // Analizar los primeros 1024 bytes para ver si el archivo contiene bytes binarios (ej. nulos)
+                const bytes = new Uint8Array(arrayBuffer.slice(0, Math.min(arrayBuffer.byteLength, 1024)));
+                let isBinary = false;
+                let nullCount = 0;
+                for (let i = 0; i < bytes.length; i++) {
+                    if (bytes[i] === 0) {
+                        nullCount++;
+                    }
+                    if (bytes[i] === 0 || (bytes[i] < 9 && bytes[i] !== 0) || (bytes[i] > 13 && bytes[i] < 32 && bytes[i] !== 0) || bytes[i] > 127) {
+                        isBinary = true;
+                    }
                 }
+
+                // Si tiene bytes nulos o muchos bytes binarios, es Bruker OPUS
+                if (nullCount > 2 || (isBinary && bytes.length > 10)) {
+                    parseOPUS(file, (results) => {
+                        if (results) {
+                            handleDataLoaded(results);
+                        }
+                        setLoadingMessage(null);
+                    });
+                } else {
+                    // Es un archivo de texto
+                    const decoder = new TextDecoder('utf-8');
+                    const text = decoder.decode(bytes);
+
+                    if (text.includes('##TITLE') || text.includes('##JCAMP')) {
+                        parseDX(file, (results) => {
+                            if (results) {
+                                handleDataLoaded(results);
+                            }
+                            setLoadingMessage(null);
+                        });
+                    } else {
+                        parseCSV(file, (results) => {
+                            if (results) {
+                                handleDataLoaded(results);
+                            }
+                            setLoadingMessage(null);
+                        });
+                    }
+                }
+            } catch (error: any) {
+                console.error("Error al detectar formato:", error);
+                alert(`Error al procesar el archivo: ${error.message}`);
                 setLoadingMessage(null);
-            });
-        } else {
-            parseCSV(file, (results) => {
-                handleDataLoaded(results);
-                setLoadingMessage(null);
-            });
-        }
+            }
+        };
+
+        reader.onerror = () => {
+            alert("Error al leer el archivo.");
+            setLoadingMessage(null);
+        };
+
+        reader.readAsArrayBuffer(file);
     };
 
     const handleToggleSample = (index: number) => {

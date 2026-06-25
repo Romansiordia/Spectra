@@ -39,10 +39,10 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
             const fileName = file.name.toLowerCase();
             const ext = fileName.split('.').pop() || '';
             const isOpus = ext === 'opus' || /^\d+$/.test(ext);
-            if (fileName.endsWith('.csv') || fileName.endsWith('.dx') || fileName.endsWith('.jdx') || isOpus) {
+            if (fileName.endsWith('.csv') || fileName.endsWith('.txt') || fileName.endsWith('.dx') || fileName.endsWith('.jdx') || isOpus) {
                 processFile(file);
             } else {
-                alert("Por favor suba un archivo .csv, jcamp-dx (.dx, .jdx) o Bruker OPUS (.opus, .0, .1...)");
+                alert("Por favor suba un archivo .csv, .txt, jcamp-dx (.dx, .jdx) o Bruker OPUS (.opus, .0, .1...)");
             }
         }
     };
@@ -66,7 +66,7 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
                         <input
                             type="file"
                             ref={fileInputRef}
-                            accept=".csv,.dx,.jdx,.opus,.0,.1,.2,.3,.4,.5"
+                            accept=".csv,.txt,.dx,.jdx,.opus,.0,.1,.2,.3,.4,.5"
                             onChange={handleFileChange}
                             className="hidden"
                         />
@@ -77,7 +77,7 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
                                 <line x1="12" y1="3" x2="12" y2="15"></line>
                             </svg>
                         </div>
-                        <p className="text-sm font-semibold text-slate-200">Click o arrastre un CSV, JCAMP-DX o Bruker OPUS</p>
+                        <p className="text-sm font-semibold text-slate-200">Click o arrastre un CSV, TXT, JCAMP-DX o Bruker OPUS</p>
                         <p className="text-xs text-slate-400 mt-1">para iniciar el análisis</p>
                     </div>
 
@@ -90,9 +90,10 @@ const DataUploader: React.FC<DataUploaderProps> = ({ onFileSelected }) => {
                         )}
                         <div className="text-[10px] text-slate-400 leading-relaxed bg-ui-dark p-2 rounded-lg border border-ui-border">
                             <strong className="text-slate-200">Formatos soportados:</strong><br/>
-                            - <strong>CSV:</strong> 1ª fila headers. Última col Propiedad (Y). <br/>
-                            - <strong>JCAMP-DX:</strong> Archivos .dx o .jdx de equipos FOSS/Brukker. <br/>
-                            - <strong>Bruker OPUS:</strong> Archivos .opus o extensiones numéricas (.0, .1...) de espectros puros.
+                            - <strong>CSV:</strong> 1ª fila cabecera. Última col Propiedad (Y). <br/>
+                            - <strong>TXT (XY):</strong> Formato de 2 columnas (Wavenumber vs Absorbance) para espectros individuales exportados. <br/>
+                            - <strong>JCAMP-DX:</strong> Archivos .dx o .jdx de equipos FOSS/Bruker. <br/>
+                            - <strong>Bruker OPUS:</strong> Archivos .opus o extensiones numéricas (.0, .1...) binarios.
                         </div>
                     </div>
                 </div>
