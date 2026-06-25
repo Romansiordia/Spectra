@@ -72,6 +72,16 @@ const App: React.FC = () => {
         setSamples(prev => prev.map(s => ({ ...s, active })));
     };
 
+    const handleUpdateAnalyticalValue = (index: number, value: number) => {
+        setSamples(prev => prev.map((s, i) => i === index ? { ...s, analyticalValue: value } : s));
+        setModelResults(null);
+    };
+
+    const handleUpdatePropertyName = (name: string) => {
+        setAnalyticalProperty(name);
+        setModelResults(null);
+    };
+
     const handleVisualizePreprocessing = () => {
         const activeSamples = samples.filter(s => s.active);
         if (activeSamples.length === 0) return;
@@ -245,6 +255,9 @@ const App: React.FC = () => {
                                         samples={samples}
                                         onToggle={handleToggleSample}
                                         onToggleAll={handleToggleAllSamples}
+                                        analyticalProperty={analyticalProperty}
+                                        onUpdateAnalyticalValue={handleUpdateAnalyticalValue}
+                                        onUpdatePropertyName={handleUpdatePropertyName}
                                     />
                                     <div>
                                         <div className="flex items-center gap-3 mb-4">
