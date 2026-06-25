@@ -52,19 +52,38 @@ const App: React.FC = () => {
 
                 const bytes = new Uint8Array(arrayBuffer);
                 
-                // 1. Detectar si es un archivo OPUS original en binario puro (comienza con 0xFE 0xFE, tolerando offsets menores o BOMs)
-                let isRawBinaryOpus = false;
-                for (let i = 0; i < Math.min(bytes.length - 1, 16); i++) {
-                    if (bytes[i] === 0xFE && bytes[i + 1] === 0xFE) {
-                        isRawBinaryOpus = true;
-                        break;
+                // Count binary control characters in the first 512 bytes to determine if it is binary
+                let controlCharCount = 0;
+                const checkLength = Math.min(bytes.length, 512);
+                for (let i = 0; i < checkLength; i++) {
+                    const b = bytes[i];
+                    // Control characters (excluding tab 0x09, LF 0x0A, CR 0x0D)
+                    if (b < 32 && b !== 9 && b !== 10 && b !== 13) {
+                        controlCharCount++;
                     }
                 }
+                const isBinary = (controlCharCount / checkLength) > 0.02;
                 
-                // 2. Intentar decodificar como texto para ver si fue guardado como texto UTF-8 o ANSI
-                const decoder = new TextDecoder('utf-8');
-                const text = decoder.decode(bytes);
-                const isTextOpus = text.includes("þþ") && text.indexOf("þþ") < 200;
+                let isRawBinaryOpus = false;
+                let isTextOpus = false;
+                let isJcamp = false;
+                let text = "";
+
+                if (isBinary) {
+                    // Check for OPUS magic number (0x0A 0x0A or 0xFE 0xFE) in the first 128 bytes
+                    for (let i = 0; i < Math.min(bytes.length - 1, 128); i++) {
+                        if ((bytes[i] === 0x0A && bytes[i + 1] === 0x0A) || 
+                            (bytes[i] === 0xFE && bytes[i + 1] === 0xFE)) {
+                            isRawBinaryOpus = true;
+                            break;
+                        }
+                    }
+                } else {
+                    const decoder = new TextDecoder('utf-8');
+                    text = decoder.decode(bytes);
+                    isJcamp = text.includes('##TITLE') || text.includes('##JCAMP');
+                    isTextOpus = text.includes("þþ") || (text.includes("END") && /([A-Z0-9]{3})\s+END/i.test(text));
+                }
 
                 if (isRawBinaryOpus) {
                     // Es un archivo Bruker OPUS binario puro
@@ -86,7 +105,7 @@ const App: React.FC = () => {
                     }, file.name);
                 } else {
                     // Otros formatos de texto (JCAMP-DX o CSV/TXT de dos columnas)
-                    if (text.includes('##TITLE') || text.includes('##JCAMP')) {
+                    if (isJcamp) {
                         parseDX(file, (results) => {
                             if (results) {
                                 handleDataLoaded(results);
