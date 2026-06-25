@@ -54,6 +54,21 @@ export function parseOPUS(
 
     function processBuffer(arrayBuffer: ArrayBuffer, name: string) {
         try {
+            let bytes = new Uint8Array(arrayBuffer);
+            let startOffset = -1;
+            for (let i = 0; i < Math.min(bytes.length - 1, 1024); i++) {
+                if (bytes[i] === 0xFE && bytes[i + 1] === 0xFE) {
+                    startOffset = i;
+                    break;
+                }
+            }
+            if (startOffset === -1) {
+                console.warn("Firma Bruker OPUS (0xFE 0xFE) no encontrada en los primeros 1024 bytes.");
+            } else if (startOffset > 0) {
+                console.log(`Firma Bruker OPUS (0xFE 0xFE) encontrada en el offset ${startOffset}. Recortando buffer.`);
+                arrayBuffer = arrayBuffer.slice(startOffset);
+            }
+
             const dataView = new DataView(arrayBuffer);
             if (arrayBuffer.byteLength < 32) {
                 throw new Error("El archivo es demasiado pequeño para ser un archivo OPUS válido.");
@@ -65,7 +80,8 @@ export function parseOPUS(
             const dirSize = dataView.getUint32(28, true);
 
             if (dirOffset < 24 || dirOffset >= arrayBuffer.byteLength) {
-                throw new Error("Puntero de directorio inválido o fuera de rango.");
+                const hexStart = Array.from(new Uint8Array(arrayBuffer.slice(0, 32))).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                throw new Error(`Puntero de directorio inválido o fuera de rango (dirOffset: ${dirOffset}, dirSize: ${dirSize}, totalBytes: ${arrayBuffer.byteLength}). Primeros 32 bytes (hex): [${hexStart}]`);
             }
 
             const spectraBlocks: { dataType: number; channelType: number; offset: number; size: number }[] = [];

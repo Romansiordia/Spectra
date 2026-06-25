@@ -32,42 +32,25 @@ export function preprocessCSVText(rawText: string): { cleanText: string, delimit
     }
 
     let delimiter = ',';
-    let isCommaDecimal = false;
-
     if (semiCount >= sampleSize * 0.8) {
         delimiter = ';';
-        isCommaDecimal = true;
     } else if (tabCount >= sampleSize * 0.8) {
         delimiter = '\t';
-        isCommaDecimal = true;
-    } else if (spaceCount >= sampleSize * 0.8) {
+    } else if (spaceCount >= sampleSize * 0.8 && commaCount < sampleSize * 0.2) {
         delimiter = ' ';
-        isCommaDecimal = true;
     } else if (commaCount >= sampleSize * 0.8) {
-        let hasDots = false;
-        for (let i = 0; i < sampleSize; i++) {
-            if (dataLines[i].includes('.')) {
-                hasDots = true;
-                break;
-            }
-        }
-        if (hasDots) {
-            delimiter = ',';
-            isCommaDecimal = false;
-        } else {
-            let avgCommas = 0;
-            for (let i = 0; i < sampleSize; i++) {
-                avgCommas += (dataLines[i].match(/,/g) || []).length;
-            }
-            avgCommas /= sampleSize;
+        delimiter = ',';
+    }
 
-            if (avgCommas > 1.5) {
-                delimiter = ',';
-                isCommaDecimal = false;
-            } else {
-                delimiter = ',';
-                isCommaDecimal = false;
-            }
+    // Detect if we should use comma as decimal (only if delimiter is not comma itself)
+    let isCommaDecimal = false;
+    if (delimiter !== ',') {
+        let commasFound = 0;
+        for (let i = 0; i < sampleSize; i++) {
+            if (dataLines[i].includes(',')) commasFound++;
+        }
+        if (commasFound >= sampleSize * 0.5) {
+            isCommaDecimal = true;
         }
     }
 
@@ -77,10 +60,10 @@ export function preprocessCSVText(rawText: string): { cleanText: string, delimit
         cleanText = rawText.replace(/,/g, '.');
     }
 
-    // Standardize whitespace delimiters (multiple spaces or tabs) to commas
-    if (delimiter === ' ' || delimiter === '\t') {
+    // Standardize multiple spaces delimiter (tabs are preserved and passed to Papa.parse)
+    if (delimiter === ' ') {
         const processedLines = lines.map(line => {
-            if (line.startsWith('#') || line.startsWith('*')) return line;
+            if (line.startsWith('#') || line.startsWith('*') || line.startsWith(';')) return line;
             return line.replace(/\s+/g, ',');
         });
         cleanText = processedLines.join('\n');
@@ -123,6 +106,7 @@ function processCSVText(
     const { cleanText, delimiter } = preprocessCSVText(rawText);
 
     Papa.parse(cleanText, {
+        delimiter: delimiter,
         header: false,
         dynamicTyping: true,
         skipEmptyLines: true,
