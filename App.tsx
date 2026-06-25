@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Sample, PreprocessingStep, ModelResults } from './types';
 import { parseCSV } from './services/csvParser';
 import { parseDX } from './services/dxParser';
-import { parseOPUS } from './services/opusParser';
+import { parseOPUS, textToWindows1252Bytes } from './services/opusParser';
 import { applyPreprocessingLogic, runPlsAnalysis } from './services/chemometrics';
 import Header from './components/Header';
 import Loader from './components/Loader';
@@ -50,32 +50,36 @@ const App: React.FC = () => {
                     throw new Error("No se pudieron leer los datos del archivo.");
                 }
 
-                // Analizar los primeros 1024 bytes para ver si el archivo contiene bytes binarios (ej. nulos)
-                const bytes = new Uint8Array(arrayBuffer.slice(0, Math.min(arrayBuffer.byteLength, 1024)));
-                let isBinary = false;
-                let nullCount = 0;
-                for (let i = 0; i < bytes.length; i++) {
-                    if (bytes[i] === 0) {
-                        nullCount++;
-                    }
-                    if (bytes[i] === 0 || (bytes[i] < 9 && bytes[i] !== 0) || (bytes[i] > 13 && bytes[i] < 32 && bytes[i] !== 0) || bytes[i] > 127) {
-                        isBinary = true;
-                    }
-                }
+                const bytes = new Uint8Array(arrayBuffer);
+                
+                // 1. Detectar si es un archivo OPUS original en binario puro (comienza con 0xFE 0xFE)
+                const isRawBinaryOpus = bytes.length >= 4 && bytes[0] === 0xFE && bytes[1] === 0xFE;
+                
+                // 2. Intentar decodificar como texto para ver si fue guardado como texto UTF-8 o ANSI
+                const decoder = new TextDecoder('utf-8');
+                const text = decoder.decode(bytes);
+                const isTextOpus = text.startsWith("þþ") || text.substring(0, 10).includes("þþ");
 
-                // Si tiene bytes nulos o muchos bytes binarios, es Bruker OPUS
-                if (nullCount > 2 || (isBinary && bytes.length > 10)) {
-                    parseOPUS(file, (results) => {
+                if (isRawBinaryOpus) {
+                    // Es un archivo Bruker OPUS binario puro
+                    parseOPUS(arrayBuffer, (results) => {
                         if (results) {
                             handleDataLoaded(results);
                         }
                         setLoadingMessage(null);
-                    });
+                    }, file.name);
+                } else if (isTextOpus) {
+                    // Es un archivo Bruker OPUS que se guardó o copió como texto (UTF-8 / ANSI)
+                    // Reconstruimos los bytes binarios originales desde los caracteres de texto
+                    const reconstructedBytes = textToWindows1252Bytes(text);
+                    parseOPUS(reconstructedBytes.buffer, (results) => {
+                        if (results) {
+                            handleDataLoaded(results);
+                        }
+                        setLoadingMessage(null);
+                    }, file.name);
                 } else {
-                    // Es un archivo de texto
-                    const decoder = new TextDecoder('utf-8');
-                    const text = decoder.decode(bytes);
-
+                    // Otros formatos de texto (JCAMP-DX o CSV/TXT de dos columnas)
                     if (text.includes('##TITLE') || text.includes('##JCAMP')) {
                         parseDX(file, (results) => {
                             if (results) {

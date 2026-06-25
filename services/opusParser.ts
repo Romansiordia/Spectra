@@ -6,19 +6,54 @@ type ParseResult = {
     analyticalProperty: string;
 };
 
-export function parseOPUS(
-    file: File,
-    onComplete: (results: ParseResult | null) => void
-) {
-    const reader = new FileReader();
+export function textToWindows1252Bytes(text: string): Uint8Array {
+    const bytes = new Uint8Array(text.length);
+    const unicodeToW1252: Record<number, number> = {
+        0x20AC: 0x80, 0x201A: 0x82, 0x0192: 0x83, 0x201E: 0x84, 0x2026: 0x85, 0x2020: 0x86, 0x2021: 0x87,
+        0x02C6: 0x88, 0x2030: 0x89, 0x0160: 0x8A, 0x2039: 0x8B, 0x0152: 0x8C, 0x017D: 0x8E, 0x2018: 0x91,
+        0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97, 0x02DC: 0x98,
+        0x2122: 0x99, 0x0161: 0x9A, 0x203A: 0x9B, 0x0153: 0x9C, 0x017E: 0x9E, 0x0178: 0x9F
+    };
 
-    reader.onload = (e) => {
-        try {
+    for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code <= 0xFF) {
+            bytes[i] = code;
+        } else if (unicodeToW1252[code] !== undefined) {
+            bytes[i] = unicodeToW1252[code];
+        } else {
+            bytes[i] = 0x3F; // '?' fallback for unmappable characters
+        }
+    }
+    return bytes;
+}
+
+export function parseOPUS(
+    fileOrBuffer: File | ArrayBuffer,
+    onComplete: (results: ParseResult | null) => void,
+    fileName: string = "Espectro"
+) {
+    if (fileOrBuffer instanceof ArrayBuffer) {
+        processBuffer(fileOrBuffer, fileName);
+    } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
             const arrayBuffer = e.target?.result as ArrayBuffer;
             if (!arrayBuffer) {
-                throw new Error("No se pudieron leer los datos binarios del archivo.");
+                onComplete(null);
+                return;
             }
+            processBuffer(arrayBuffer, fileOrBuffer.name);
+        };
+        reader.onerror = () => {
+            alert("Error al leer el archivo Bruker OPUS.");
+            onComplete(null);
+        };
+        reader.readAsArrayBuffer(fileOrBuffer);
+    }
 
+    function processBuffer(arrayBuffer: ArrayBuffer, name: string) {
+        try {
             const dataView = new DataView(arrayBuffer);
             if (arrayBuffer.byteLength < 32) {
                 throw new Error("El archivo es demasiado pequeño para ser un archivo OPUS válido.");
@@ -68,11 +103,11 @@ export function parseOPUS(
 
             const NPT = parameters["NPT"]; // Number of points
             const FXV = parameters["FXV"]; // First X value (wavenumber)
-            const LXT = parameters["LXT"]; // Last X value (wavenumber)
+            const LXT = parameters["LXT"] !== undefined ? parameters["LXT"] : parameters["LXV"]; // Last X value (wavenumber)
 
             if (NPT === undefined || FXV === undefined || LXT === undefined) {
                 const keys = Object.keys(parameters).join(", ");
-                throw new Error(`El archivo OPUS no contiene los parámetros espectrales necesarios (NPT, FXV, LXT). Parámetros encontrados: [${keys || 'ninguno'}]`);
+                throw new Error(`El archivo OPUS no contiene los parámetros espectrales necesarios (NPT, FXV, LXV/LXT). Parámetros encontrados: [${keys || 'ninguno'}]`);
             }
 
             if (NPT <= 1) {
@@ -144,7 +179,7 @@ export function parseOPUS(
             }
 
             // Determine sample name
-            const sampleName = parameters["SNM"] || file.name.replace(/\.[^/.]+$/, "");
+            const sampleName = parameters["SNM"] || name.replace(/\.[^/.]+$/, "");
             const color = `hsl(210, 70%, 50%)`;
 
             const sample: Sample = {
@@ -166,14 +201,7 @@ export function parseOPUS(
             alert(`Error al procesar el archivo Bruker OPUS: ${error.message}`);
             onComplete(null);
         }
-    };
-
-    reader.onerror = () => {
-        alert("Error al leer el archivo Bruker OPUS.");
-        onComplete(null);
-    };
-
-    reader.readAsArrayBuffer(file);
+    }
 }
 
 function getAnalyticalProperty(dataType: number): string {
