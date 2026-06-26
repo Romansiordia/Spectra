@@ -35,6 +35,14 @@ const ChartIcon: React.FC = () => (
     </svg>
 );
 
+const DownloadIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+);
+
 const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isProcessed, onReset, analyticalProperty }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
@@ -289,6 +297,42 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
         chart.update();
     };
 
+    const handleExportCSV = () => {
+        if (!hasData || wavelengths.length === 0 || samples.length === 0) return;
+
+        // Create headers: "Longitud de onda (nm)" followed by all active/processed sample IDs
+        const headers = ['Longitud de onda (nm)', ...samples.map(s => `"${s.id}"`)];
+        
+        const rows: string[] = [headers.join(',')];
+
+        // For each wavelength, add a row
+        for (let i = 0; i < wavelengths.length; i++) {
+            const wl = wavelengths[i];
+            const rowValues = [wl.toFixed(4)];
+
+            for (const sample of samples) {
+                const val = sample.values[i];
+                rowValues.push(val !== undefined && val !== null ? val.toFixed(6) : '');
+            }
+            rows.push(rowValues.join(','));
+        }
+
+        const csvContent = rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        const filename = isProcessed 
+            ? 'espectros_procesados.csv' 
+            : 'espectros_absorbancia.csv';
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <Card>
             <div className="flex justify-between items-start mb-4">
@@ -304,6 +348,16 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    {hasData && (
+                        <button
+                            onClick={handleExportCSV}
+                            className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+                            title="Exportar espectros a un archivo CSV (en formato de columnas por muestra)"
+                        >
+                            <DownloadIcon />
+                            <span>Descargar CSV</span>
+                        </button>
+                    )}
                     {hasData && (
                         <button
                             onClick={() => setInvertY(!invertY)}
