@@ -17,7 +17,6 @@ import ModelValidator from './components/ModelValidator';
 import QualityControl from './components/QualityControl';
 import Card from './components/Card';
 import ErrorBoundary from './components/ErrorBoundary';
-import AIAssistant from './components/AIAssistant';
 
 type AppView = 'calibration' | 'prediction' | 'validation' | 'quality';
 
@@ -257,11 +256,6 @@ const App: React.FC = () => {
     return (
         <>
             {loadingMessage && <Loader message={loadingMessage} />}
-            <AIAssistant contextData={{
-                activeSamplesCount: activeSamples.length,
-                isModelGenerated: !!modelResults,
-                preprocesses: preprocessingSteps.map(p => p.method)
-            }} />
             <div className="h-screen flex flex-col text-slate-100 font-sans bg-transparent overflow-hidden">
                 <Header />
                 <div className="flex-grow flex overflow-hidden">
