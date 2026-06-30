@@ -182,7 +182,7 @@ const SampleManager: React.FC<SampleManagerProps> = ({
                     /* Grid View - Compact Layout */
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
                         {samples.map((sample, index) => (
-                            <div key={sample.id} className="flex items-center justify-between rounded-md p-1 hover:bg-ui-dark/30 transition-all">
+                            <div key={`${sample.id}-${index}`} className="flex items-center justify-between rounded-md p-1 hover:bg-ui-dark/30 transition-all">
                                 <div className="flex items-center gap-3 overflow-hidden">
                                     <input
                                         type="checkbox"
@@ -272,7 +272,7 @@ const SampleManager: React.FC<SampleManagerProps> = ({
                             <tbody className="divide-y divide-ui-border/50">
                                 {samples.map((sample, index) => (
                                     <tr 
-                                        key={sample.id} 
+                                        key={`${sample.id}-${index}`} 
                                         className={`transition-colors hover:bg-ui-dark/20 ${sample.active ? '' : 'bg-ui-darkest/10 opacity-60'}`}
                                     >
                                         {/* Status Checkbox */}
