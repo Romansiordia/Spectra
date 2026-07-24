@@ -3,6 +3,7 @@ import { Sample, PreprocessingStep, ModelResults } from './types';
 import { parseCSV } from './services/csvParser';
 import { parseDX } from './services/dxParser';
 import { parseOPUS, textToWindows1252Bytes } from './services/opusParser';
+import { parseFOSS } from './services/fossParser';
 import { applyPreprocessingLogic, runPlsAnalysis } from './services/chemometrics';
 import Header from './components/Header';
 import Loader from './components/Loader';
@@ -52,6 +53,18 @@ const App: React.FC = () => {
 
                 const bytes = new Uint8Array(arrayBuffer);
                 
+                if (file.name.toLowerCase().endsWith('.nir')) {
+                    parseFOSS(arrayBuffer, (results) => {
+                        if (results) {
+                            handleDataLoaded(results);
+                        } else {
+                            alert("No se pudo procesar el archivo .nir como FOSS binario.");
+                        }
+                        setLoadingMessage(null);
+                    }, file.name);
+                    return;
+                }
+
                 // Count binary control characters in the first 512 bytes to determine if it is binary
                 let controlCharCount = 0;
                 const checkLength = Math.min(bytes.length, 512);
