@@ -5,6 +5,7 @@ import Button from './Button';
 import { PreprocessingStep } from '../types';
 import { applyPreprocessingLogic, predictPLS } from '../services/chemometrics';
 import { parseDX } from '../services/dxParser';
+import { parseFOSS } from '../services/fossParser';
 
 declare var Papa: any;
 
@@ -202,7 +203,34 @@ const ModelPredictor: React.FC = () => {
 
         const ext = file.name.toLowerCase().split('.').pop();
 
-        if (ext === 'dx' || ext === 'jdx') {
+        if (ext === 'nir') {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const arrayBuffer = e.target?.result as ArrayBuffer;
+                    if (!arrayBuffer) {
+                        throw new Error("No se pudieron leer los datos del archivo.");
+                    }
+                    parseFOSS(arrayBuffer, (results) => {
+                        if (results) {
+                            const samplesData = results.samples.map(s => ({
+                                id: String(s.id),
+                                values: s.values
+                            }));
+                            processSpectra(samplesData, results.wavelengths);
+                        } else {
+                            alert("No se pudo procesar el archivo .nir");
+                            if (csvInputRef.current) csvInputRef.current.value = '';
+                        }
+                    }, file.name);
+                } catch (error) {
+                    console.error("Error crítico procesando NIR:", error);
+                    alert("Ocurrió un error inesperado al procesar el archivo NIR.");
+                    if (csvInputRef.current) csvInputRef.current.value = '';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        } else if (ext === 'dx' || ext === 'jdx') {
             parseDX(file, (results) => {
                 if (results) {
                     try {
@@ -342,12 +370,12 @@ const ModelPredictor: React.FC = () => {
                         
                         <div className="flex-1 flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-black text-ui-accent uppercase tracking-widest">Espectros Nuevos (.csv / .dx)</label>
+                                <label className="text-[10px] font-black text-ui-accent uppercase tracking-widest">Espectros Nuevos (.csv / .dx / .nir)</label>
                                 <div className="flex gap-2">
                                     <div className="flex-1 bg-ui-dark border border-ui-border rounded-lg flex items-center px-3 text-xs text-slate-400">
                                         Subir matriz de absorbancia o espectros...
                                     </div>
-                                    <input type="file" ref={csvInputRef} onChange={handleDataUpload} accept=".csv,.dx,.jdx" className="hidden" />
+                                    <input type="file" ref={csvInputRef} onChange={handleDataUpload} accept=".csv,.dx,.jdx,.nir" className="hidden" />
                                     <Button onClick={() => csvInputRef.current?.click()} size="sm" variant="primary" disabled={models.length === 0} className="rounded-lg shadow-none px-4">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                                     </Button>
