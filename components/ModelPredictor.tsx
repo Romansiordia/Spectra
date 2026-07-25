@@ -6,12 +6,16 @@ import { PreprocessingStep } from '../types';
 import { applyPreprocessingLogic, predictPLS } from '../services/chemometrics';
 import { parseDX } from '../services/dxParser';
 import { parseFOSS } from '../services/fossParser';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 declare var Papa: any;
 
 interface SavedModel {
     fileName: string; 
     analyticalProperty: string;
+    bias?: number;
+    slope?: number;
     metrics: {
         plsIntercept: number;
         coefficients: number[];
@@ -45,9 +49,17 @@ const TrashIcon: React.FC = () => (
 const ModelPredictor: React.FC = () => {
     const [models, setModels] = useState<SavedModel[]>([]);
     const [predictions, setPredictions] = useState<PredictionResult[]>([]);
+    const [editingModelIdx, setEditingModelIdx] = useState<number | null>(null);
     
     const modelInputRef = useRef<HTMLInputElement>(null);
     const csvInputRef = useRef<HTMLInputElement>(null);
+
+    const updateModelConfig = (idx: number, bias: number, slope: number) => {
+        const newModels = [...models];
+        newModels[idx].bias = bias;
+        newModels[idx].slope = slope;
+        setModels(newModels);
+    };
 
     const handleModelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -292,7 +304,12 @@ const ModelPredictor: React.FC = () => {
 
         // Construir Filas
         const rows = predictions.map(p => {
-            const values = propertyNames.map(prop => p.values[prop]?.toFixed(4) || "Error");
+            const values = models.map(m => {
+                const rawVal = p.values[m.analyticalProperty];
+                if (rawVal === undefined) return "Error";
+                const val = (rawVal * (m.slope ?? 1)) + (m.bias ?? 0);
+                return val.toFixed(4);
+            });
             return `${p.id},${values.join(",")}`;
         }).join("\n");
 
@@ -303,6 +320,43 @@ const ModelPredictor: React.FC = () => {
         a.href = url;
         a.download = "predicciones_multiparametricas.csv";
         a.click();
+    };
+
+    const downloadPdfResults = () => {
+        if (predictions.length === 0 || models.length === 0) return;
+
+        const doc = new jsPDF();
+        
+        doc.setFontSize(16);
+        doc.text("Reporte Analítico - Predicciones Multiparamétricas", 14, 22);
+        
+        doc.setFontSize(10);
+        const date = new Date().toLocaleDateString();
+        doc.text(`Fecha: ${date}`, 14, 30);
+        
+        const propertyNames = models.map(m => m.analyticalProperty);
+        const headers = ["ID Muestra", ...propertyNames];
+
+        const rows = predictions.map(p => {
+            const values = models.map(m => {
+                const rawVal = p.values[m.analyticalProperty];
+                if (rawVal === undefined) return "-";
+                const val = (rawVal * (m.slope ?? 1)) + (m.bias ?? 0);
+                return val.toFixed(4);
+            });
+            return [p.id, ...values];
+        });
+
+        autoTable(doc, {
+            head: [headers],
+            body: rows,
+            startY: 40,
+            theme: 'striped',
+            headStyles: { fillColor: [41, 128, 185] },
+            margin: { top: 40 }
+        });
+
+        doc.save("reporte_analitico_resultados.pdf");
     };
 
     return (
@@ -333,24 +387,38 @@ const ModelPredictor: React.FC = () => {
                                 <p className="text-xs text-slate-500 text-center italic py-4 bg-ui-dark rounded-lg border border-ui-border border-dashed">Ningún modelo local cargado</p>
                             ) : (
                                 models.map((m, idx) => (
-                                    <div key={idx} className="flex items-center justify-between text-xs bg-ui-card p-3 rounded-xl border border-ui-border hover:border-ui-accent transition-colors shadow-sm group">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-1.5 bg-ui-darkest rounded-md border border-ui-border text-ui-accent group-hover:bg-ui-accent/10">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                    <div key={idx} className="flex flex-col gap-2 text-xs bg-ui-card p-3 rounded-xl border border-ui-border hover:border-ui-accent transition-colors shadow-sm group">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-1.5 bg-ui-darkest rounded-md border border-ui-border text-ui-accent group-hover:bg-ui-accent/10">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                                </div>
+                                                <div>
+                                                    <span className="font-extrabold text-slate-100 block uppercase tracking-wide text-[10px]">{m.analyticalProperty}</span>
+                                                    <span className="text-[10px] text-slate-400 capitalize">{m.fileName} • {m.preprocessing.length ? 'Pre-proc' : 'Raw'}</span>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <span className="font-extrabold text-slate-100 block uppercase tracking-wide text-[10px]">{m.analyticalProperty}</span>
-                                                <span className="text-[10px] text-slate-400 capitalize">{m.fileName} • {m.preprocessing.length ? 'Pre-proc' : 'Raw'}</span>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => setEditingModelIdx(editingModelIdx === idx ? null : idx)} className={`text-slate-500 hover:text-ui-accent p-1.5 transition-colors rounded-md border border-ui-border hover:border-ui-accent ${editingModelIdx === idx ? 'bg-ui-accent/10 border-ui-accent text-ui-accent' : 'bg-ui-dark'}`} title="Ajustes (Bias/Slope)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                </button>
+                                                <button onClick={() => removeModel(idx)} className="text-slate-500 hover:text-red-500 p-1.5 transition-colors bg-ui-dark rounded-md border border-ui-border hover:border-red-500/50 hover:bg-red-500/10" title="Eliminar">
+                                                    <TrashIcon />
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button className="text-slate-500 hover:text-ui-accent p-1.5 transition-colors bg-ui-dark rounded-md border border-ui-border hover:border-ui-accent" title="Ajustes (Simulado)">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                                            </button>
-                                            <button onClick={() => removeModel(idx)} className="text-slate-500 hover:text-red-500 p-1.5 transition-colors bg-ui-dark rounded-md border border-ui-border hover:border-red-500/50 hover:bg-red-500/10" title="Eliminar">
-                                                <TrashIcon />
-                                            </button>
-                                        </div>
+                                        {editingModelIdx === idx && (
+                                            <div className="pt-2 mt-1 border-t border-ui-border flex gap-3 animate-fade-in">
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] text-slate-400 font-bold block mb-1">Bias</label>
+                                                    <input type="number" step="0.001" value={m.bias ?? 0} onChange={(e) => updateModelConfig(idx, parseFloat(e.target.value) || 0, m.slope ?? 1)} className="w-full bg-ui-dark border border-ui-border rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:border-ui-accent" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] text-slate-400 font-bold block mb-1">Slope</label>
+                                                    <input type="number" step="0.001" value={m.slope ?? 1} onChange={(e) => updateModelConfig(idx, m.bias ?? 0, parseFloat(e.target.value) || 1)} className="w-full bg-ui-dark border border-ui-border rounded-md px-2 py-1 text-xs text-white focus:outline-none focus:border-ui-accent" />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))
                             )}
@@ -396,9 +464,15 @@ const ModelPredictor: React.FC = () => {
                     <div className="animate-fade-in">
                         <div className="flex justify-between items-end mb-3">
                             <h3 className="text-sm font-bold text-slate-100">Resultados Consolidados</h3>
-                            <Button size="sm" variant="secondary" onClick={downloadResults} className="text-xs">
-                                Descargar Tabla Completa
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="secondary" onClick={downloadPdfResults} className="text-xs border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                    Reporte PDF
+                                </Button>
+                                <Button size="sm" variant="secondary" onClick={downloadResults} className="text-xs">
+                                    Descargar CSV
+                                </Button>
+                            </div>
                         </div>
                         
                         <div className="max-h-[500px] overflow-y-auto custom-scrollbar border border-ui-border rounded-lg bg-ui-dark shadow-inner">
@@ -419,7 +493,8 @@ const ModelPredictor: React.FC = () => {
                                         <tr key={idx} className="hover:bg-ui-card transition-colors">
                                             <td className="px-6 py-3 font-medium text-slate-200 border-r border-ui-border">{p.id}</td>
                                             {models.map((m, mIdx) => {
-                                                const val = p.values[m.analyticalProperty];
+                                                const rawVal = p.values[m.analyticalProperty];
+                                                const val = rawVal !== undefined ? (rawVal * (m.slope ?? 1)) + (m.bias ?? 0) : undefined;
                                                 const gh = p.ghs[m.analyticalProperty];
                                                 const isOutlier = gh > 3.0;
                                                 
