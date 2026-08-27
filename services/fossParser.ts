@@ -81,6 +81,10 @@ export const parseFossNirBinary = (buffer: ArrayBuffer): { wavelengths: number[]
   
   // Posibles configuraciones de espectro FOSS (Longitud de onda inicial, cantidad de puntos, step)
   const commonSpecs = [
+    { points: 851, start: 800, step: 2 },    // 800 - 2500 nm (2nm step)
+    { points: 850, start: 800, step: 2 },    // 800 - 2498 nm (2nm step)
+    { points: 3401, start: 800, step: 0.5 }, // 800 - 2500 nm (0.5nm step)
+    { points: 1701, start: 800, step: 1 },   // 800 - 2500 nm (1nm step)
     { points: 825, start: 850, step: 2 },    // 850 - 2498 nm (FOSS NIRS DS3 F / Optimo)
     { points: 826, start: 850, step: 2 },    // 850 - 2500 nm 
     { points: 700, start: 1100, step: 2 },   // 1100 - 2498 nm
@@ -215,7 +219,11 @@ export const parseFossNirBinary = (buffer: ArrayBuffer): { wavelengths: number[]
       if (maxSeq.length > 200 && maxSeq.length < 5000) {
           let start = 400;
           let end = 2500;
-          if (maxSeq.length === 826) { start = 850; end = 2500; }
+          if (maxSeq.length === 851) { start = 800; end = 2500; }
+          else if (maxSeq.length === 850) { start = 800; end = 2498; }
+          else if (maxSeq.length === 3401) { start = 800; end = 2500; }
+          else if (maxSeq.length === 1701) { start = 800; end = 2500; }
+          else if (maxSeq.length === 826) { start = 850; end = 2500; }
           else if (maxSeq.length === 825) { start = 850; end = 2498; }
           else if (maxSeq.length === 701) { start = 1100; end = 2500; }
           else if (maxSeq.length === 700) { start = 1100; end = 2498; }
