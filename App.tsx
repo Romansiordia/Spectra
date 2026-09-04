@@ -7,20 +7,14 @@ import { parseFOSS } from './services/fossParser';
 import { applyPreprocessingLogic, runPlsAnalysis } from './services/chemometrics';
 import Header from './components/Header';
 import Loader from './components/Loader';
-import DataUploader from './components/DataUploader';
-import SampleManager from './components/SampleManager';
-import SpectraViewer from './components/SpectraViewer';
-import PreprocessingEditor from './components/PreprocessingEditor';
-import ModelGenerator, { ModelParams } from './components/ModelGenerator';
-import ResultsViewer from './components/ResultsViewer';
+import { ModelParams } from './components/ModelGenerator';
 import ModelPredictor from './components/ModelPredictor';
 import ModelValidator from './components/ModelValidator';
 import QualityControl from './components/QualityControl';
-import PcaAnalyzer from './components/PcaAnalyzer';
-import Card from './components/Card';
 import ErrorBoundary from './components/ErrorBoundary';
+import CalibrationWorkflow from './components/CalibrationWorkflow';
 
-type AppView = 'calibration' | 'pca' | 'prediction' | 'validation' | 'quality';
+type AppView = 'calibration' | 'prediction' | 'validation' | 'quality';
 
 const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<AppView>('calibration');
@@ -280,29 +274,12 @@ const App: React.FC = () => {
                 <div className="flex-grow flex overflow-hidden">
                     {/* Sidebar */}
                     <aside className="w-20 bg-ui-darkest border-r border-ui-border flex flex-col items-center pt-16 pb-6 gap-6 z-40 shrink-0">
-                    {/* Placeholder for icons like in the image */}
                     <button 
                         onClick={() => setCurrentView('calibration')}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'calibration' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
-                        title="Entrenamiento & Calibración"
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'calibration' ? 'bg-ui-card border border-ui-accent text-ui-accent shadow-lg shadow-ui-accent/10' : 'text-slate-400 hover:text-white'}`}
+                        title="Entrenamiento & Calibración (4 Fases)"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h5"/><path d="M17 12h5"/><path d="M7 12a5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5Z"/></svg>
-                    </button>
-                    <button 
-                        onClick={() => setCurrentView('pca')}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all relative ${currentView === 'pca' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
-                        title="Análisis PCA & Detección de Outliers"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="7.5" cy="7.5" r="2.5"/>
-                            <circle cx="16.5" cy="8.5" r="2.5"/>
-                            <circle cx="12" cy="16.5" r="2.5"/>
-                            <path d="M9.5 8.5l4.5 7"/>
-                            <path d="M9.5 9l5-1"/>
-                        </svg>
-                        {samples.length > 0 && samples.some(s => s.active) && (
-                            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-ui-accent"></span>
-                        )}
                     </button>
                     <button 
                         onClick={() => setCurrentView('prediction')}
@@ -318,135 +295,34 @@ const App: React.FC = () => {
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     </button>
-                    {/* 
-                    <button 
-                        onClick={() => setCurrentView('quality')}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'quality' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
-                        title="Predicción Espectral"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </button>
-                    */}
-                </aside>
+                    </aside>
 
                     <main className="flex-grow flex flex-col min-w-0 overflow-y-auto relative">
                         <div className="flex-grow p-4 lg:p-6 pb-20">
                     
                     {currentView === 'calibration' && (
-                        <div className="flex flex-col gap-6 animate-fade-in">
-                            <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-                                <div className="flex flex-col gap-6 lg:col-span-2">
-                                    <DataUploader onFileSelected={handleFileSelected} />
-                                    <PreprocessingEditor
-                                        steps={preprocessingSteps}
-                                        setSteps={setPreprocessingSteps}
-                                        onVisualize={handleVisualizePreprocessing}
-                                        disabled={activeSamples.length === 0}
-                                    />
-                                    {/* Módulo de Diagnóstico PCA y Detección de Outliers */}
-                                    <Card>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="8.5" r="2.5"/><circle cx="12" cy="16.5" r="2.5"/><path d="M9.5 8.5l4.5 7"/><path d="M9.5 9l5-1"/>
-                                                    </svg>
-                                                </div>
-                                                <h3 className="text-sm font-bold text-slate-100">Filtro de Outliers (PCA)</h3>
-                                            </div>
-                                            <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
-                                                NIPALS
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-slate-400 mb-3">
-                                            Inspeccione la dispersión multivariante de scores (PC1/PC2), detecte muestras con Mahalanobis GH &gt; 3.0 o Hotelling T² y purifique el lote.
-                                        </p>
-                                        <button
-                                            onClick={() => setCurrentView('pca')}
-                                            disabled={activeSamples.length < 3}
-                                            className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                                                activeSamples.length >= 3
-                                                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500 hover:text-slate-900 shadow-sm cursor-pointer'
-                                                    : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-                                            }`}
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
-                                            Abrir Análisis PCA & Outliers ({activeSamples.length} muestras)
-                                        </button>
-                                    </Card>
-                                    <ModelGenerator 
-                                        onRunModel={handleRunModel} 
-                                        disabled={activeSamples.length < 3}
-                                        activeSamples={activeSamples}
-                                        preprocessingSteps={preprocessingSteps}
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-6 lg:col-span-5">
-                                    <SpectraViewer
-                                        wavelengths={wavelengths}
-                                        samples={spectraToDisplay}
-                                        isProcessed={!!processedSpectra}
-                                        onReset={handleResetVisualization}
-                                        analyticalProperty={analyticalProperty}
-                                    />
-                                    <SampleManager
-                                        samples={samples}
-                                        onToggle={handleToggleSample}
-                                        onToggleAll={handleToggleAllSamples}
-                                        analyticalProperty={analyticalProperty}
-                                        onUpdateAnalyticalValue={handleUpdateAnalyticalValue}
-                                        onUpdatePropertyName={handleUpdatePropertyName}
-                                    />
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-4">
-                                             <div className="h-7 w-7 bg-ui-darkest text-ui-accent border border-ui-accent rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">4</div>
-                                             <h2 className="text-lg font-bold text-slate-100">Análisis de Resultados del Modelo</h2>
-                                        </div>
-                                        {modelResults ? (
-                                            <ErrorBoundary fallbackTitle="Error al renderizar los resultados de calibración.">
-                                                <ResultsViewer 
-                                                    results={modelResults}
-                                                    propertyName={analyticalProperty}
-                                                    preprocessingSteps={preprocessingSteps}
-                                                    activeSamples={activeSamples.map(s => s.id)}
-                                                    activeSamplesData={activeSamples}
-                                                    onDeactivateOutliers={handleDeactivateOutliers}
-                                                    wavelengths={wavelengths}
-                                                    onExportCleanDataset={handleExportCleanDataset}
-                                                />
-                                            </ErrorBoundary>
-                                        ) : (
-                                            <Card>
-                                                <div className="flex flex-col items-center justify-center h-64 text-slate-400 bg-ui-dark rounded-lg border-2 border-dashed border-ui-border">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                    <p className="font-semibold text-slate-200 text-lg">Resultados del Modelo</p>
-                                                    <p className="text-sm text-slate-400 mt-1">Genere un modelo en el paso 3 para ver el análisis estadístico aquí.</p>
-                                                </div>
-                                            </Card>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {currentView === 'pca' && (
-                        <div className="max-w-7xl mx-auto animate-fade-in">
-                            <ErrorBoundary fallbackTitle="Error al inicializar el Módulo de Análisis PCA y Outliers.">
-                                <PcaAnalyzer
-                                    samples={samples}
-                                    preprocessingSteps={preprocessingSteps}
-                                    onToggleSample={handleToggleSample}
-                                    onExcludeOutliers={handleDeactivateOutliers}
-                                    onIncludeAll={handleIncludeAllSamples}
-                                    onProceedToCalibration={() => setCurrentView('calibration')}
-                                    analyticalProperty={analyticalProperty}
-                                />
-                            </ErrorBoundary>
-                        </div>
+                        <ErrorBoundary fallbackTitle="Error al renderizar el flujo de entrenamiento y calibración.">
+                            <CalibrationWorkflow 
+                                wavelengths={wavelengths}
+                                samples={samples}
+                                analyticalProperty={analyticalProperty}
+                                preprocessingSteps={preprocessingSteps}
+                                modelResults={modelResults}
+                                processedSpectra={processedSpectra}
+                                onFileSelected={handleFileSelected}
+                                setPreprocessingSteps={setPreprocessingSteps}
+                                onVisualizePreprocessing={handleVisualizePreprocessing}
+                                onResetVisualization={handleResetVisualization}
+                                onToggleSample={handleToggleSample}
+                                onToggleAllSamples={handleToggleAllSamples}
+                                onUpdateAnalyticalValue={handleUpdateAnalyticalValue}
+                                onUpdatePropertyName={handleUpdatePropertyName}
+                                onRunModel={handleRunModel}
+                                onDeactivateOutliers={handleDeactivateOutliers}
+                                onIncludeAllSamples={handleIncludeAllSamples}
+                                onExportCleanDataset={handleExportCleanDataset}
+                            />
+                        </ErrorBoundary>
                     )}
 
                      {currentView === 'prediction' && (
