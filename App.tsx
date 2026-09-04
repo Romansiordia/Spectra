@@ -16,10 +16,11 @@ import ResultsViewer from './components/ResultsViewer';
 import ModelPredictor from './components/ModelPredictor';
 import ModelValidator from './components/ModelValidator';
 import QualityControl from './components/QualityControl';
+import PcaAnalyzer from './components/PcaAnalyzer';
 import Card from './components/Card';
 import ErrorBoundary from './components/ErrorBoundary';
 
-type AppView = 'calibration' | 'prediction' | 'validation' | 'quality';
+type AppView = 'calibration' | 'pca' | 'prediction' | 'validation' | 'quality';
 
 const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<AppView>('calibration');
@@ -238,6 +239,11 @@ const App: React.FC = () => {
          }
     };
 
+    const handleIncludeAllSamples = () => {
+        setSamples(prev => prev.map(s => ({ ...s, active: true })));
+        setProcessedSpectra(null);
+    };
+
     const handleExportCleanDataset = () => {
         const activeSamples = samples.filter(s => s.active);
         if (activeSamples.length === 0) return;
@@ -283,6 +289,22 @@ const App: React.FC = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h5"/><path d="M17 12h5"/><path d="M7 12a5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5Z"/></svg>
                     </button>
                     <button 
+                        onClick={() => setCurrentView('pca')}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all relative ${currentView === 'pca' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
+                        title="Análisis PCA & Detección de Outliers"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="7.5" cy="7.5" r="2.5"/>
+                            <circle cx="16.5" cy="8.5" r="2.5"/>
+                            <circle cx="12" cy="16.5" r="2.5"/>
+                            <path d="M9.5 8.5l4.5 7"/>
+                            <path d="M9.5 9l5-1"/>
+                        </svg>
+                        {samples.length > 0 && samples.some(s => s.active) && (
+                            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-ui-accent"></span>
+                        )}
+                    </button>
+                    <button 
                         onClick={() => setCurrentView('prediction')}
                         className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'prediction' ? 'bg-ui-card border border-ui-accent text-ui-accent' : 'text-slate-400 hover:text-white'}`}
                         title="Predicción"
@@ -321,6 +343,37 @@ const App: React.FC = () => {
                                         onVisualize={handleVisualizePreprocessing}
                                         disabled={activeSamples.length === 0}
                                     />
+                                    {/* Módulo de Diagnóstico PCA y Detección de Outliers */}
+                                    <Card>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="8.5" r="2.5"/><circle cx="12" cy="16.5" r="2.5"/><path d="M9.5 8.5l4.5 7"/><path d="M9.5 9l5-1"/>
+                                                    </svg>
+                                                </div>
+                                                <h3 className="text-sm font-bold text-slate-100">Filtro de Outliers (PCA)</h3>
+                                            </div>
+                                            <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
+                                                NIPALS
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mb-3">
+                                            Inspeccione la dispersión multivariante de scores (PC1/PC2), detecte muestras con Mahalanobis GH &gt; 3.0 o Hotelling T² y purifique el lote.
+                                        </p>
+                                        <button
+                                            onClick={() => setCurrentView('pca')}
+                                            disabled={activeSamples.length < 3}
+                                            className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                                                activeSamples.length >= 3
+                                                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500 hover:text-slate-900 shadow-sm cursor-pointer'
+                                                    : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                                            }`}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
+                                            Abrir Análisis PCA & Outliers ({activeSamples.length} muestras)
+                                        </button>
+                                    </Card>
                                     <ModelGenerator 
                                         onRunModel={handleRunModel} 
                                         disabled={activeSamples.length < 3}
@@ -377,6 +430,22 @@ const App: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {currentView === 'pca' && (
+                        <div className="max-w-7xl mx-auto animate-fade-in">
+                            <ErrorBoundary fallbackTitle="Error al inicializar el Módulo de Análisis PCA y Outliers.">
+                                <PcaAnalyzer
+                                    samples={samples}
+                                    preprocessingSteps={preprocessingSteps}
+                                    onToggleSample={handleToggleSample}
+                                    onExcludeOutliers={handleDeactivateOutliers}
+                                    onIncludeAll={handleIncludeAllSamples}
+                                    onProceedToCalibration={() => setCurrentView('calibration')}
+                                    analyticalProperty={analyticalProperty}
+                                />
+                            </ErrorBoundary>
                         </div>
                     )}
 

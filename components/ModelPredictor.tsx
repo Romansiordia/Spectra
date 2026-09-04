@@ -325,38 +325,205 @@ const ModelPredictor: React.FC = () => {
     const downloadPdfResults = () => {
         if (predictions.length === 0 || models.length === 0) return;
 
-        const doc = new jsPDF();
-        
-        doc.setFontSize(16);
-        doc.text("Reporte Analítico - Predicciones Multiparamétricas", 14, 22);
-        
-        doc.setFontSize(10);
-        const date = new Date().toLocaleDateString();
-        doc.text(`Fecha: ${date}`, 14, 30);
-        
-        const propertyNames = models.map(m => m.analyticalProperty);
-        const headers = ["ID Muestra", ...propertyNames];
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const folioId = `CERT-NIR-${Date.now().toString().slice(-6)}`;
+        const emissionDate = new Date().toLocaleDateString('es-ES', { 
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+        });
 
-        const rows = predictions.map(p => {
+        // 1. Encabezado corporativo institucional
+        doc.setFillColor(10, 29, 74); // #0a1d4a Navy brand color
+        doc.rect(0, 0, pageWidth, 28, 'F');
+        
+        doc.setFontSize(14);
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text("INFORME ANALÍTICO DE ENSAYO ESPECTRAL NIR", 14, 12);
+        
+        doc.setFontSize(8.5);
+        doc.setTextColor(56, 189, 248); // #38bdf8 cyan accent
+        doc.setFont('helvetica', 'normal');
+        doc.text("LABORATORIO DE CONTROL DE CALIDAD Y ANÁLISIS QUIMIOMÉTRICO FT-NIR", 14, 19);
+        
+        doc.setFontSize(7.5);
+        doc.setTextColor(203, 213, 225);
+        doc.text(`Emisión Oficial • Documento Certificado para Cliente • Folio: ${folioId}`, 14, 25);
+
+        // 2. Metadatos del Certificado (Caja informativa)
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(14, 32, pageWidth - 28, 25, 2, 2, 'FD');
+
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.setFont('helvetica', 'bold');
+        doc.text("N° Certificado / Folio:", 18, 38);
+        doc.text("Fecha y Hora de Emisión:", 18, 44);
+        doc.text("Método Analítico:", 18, 50);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text(folioId, 58, 38);
+        doc.text(emissionDate, 58, 44);
+        doc.text("Espectroscopía Infrarrojo Cercano NIR (Regresión PLS-1 Multivariante)", 58, 50);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(71, 85, 105);
+        doc.text("Total Muestras:", 125, 38);
+        doc.text("Parámetros Analizados:", 125, 44);
+        doc.text("Estado de Conformidad:", 125, 50);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`${predictions.length} muestra(s)`, 162, 38);
+        doc.text(`${models.length} parámetro(s)`, 162, 44);
+        doc.setTextColor(16, 185, 129);
+        doc.setFont('helvetica', 'bold');
+        doc.text("VALIDADO / LIBERADO", 162, 50);
+
+        // 3. Tabla Principal de Resultados Analíticos
+        const propertyNames = models.map(m => m.analyticalProperty);
+        const headers = ["N°", "ID Muestra", ...propertyNames, "Conformidad Espectral"];
+
+        const rows = predictions.map((p, idx) => {
+            let hasOutlier = false;
             const values = models.map(m => {
                 const rawVal = p.values[m.analyticalProperty];
                 if (rawVal === undefined) return "-";
                 const val = (rawVal * (m.slope ?? 1)) + (m.bias ?? 0);
-                return val.toFixed(4);
+                const gh = p.ghs[m.analyticalProperty];
+                if (gh !== undefined && gh > 3.0) hasOutlier = true;
+                return val.toFixed(2);
             });
-            return [p.id, ...values];
+            return [
+                `${idx + 1}`,
+                p.id, 
+                ...values,
+                hasOutlier ? "Revisar (GH > 3)" : "Conforme"
+            ];
         });
 
         autoTable(doc, {
             head: [headers],
             body: rows,
-            startY: 40,
+            startY: 61,
             theme: 'striped',
-            headStyles: { fillColor: [41, 128, 185] },
-            margin: { top: 40 }
+            headStyles: { 
+                fillColor: [10, 29, 74], 
+                textColor: [255, 255, 255], 
+                fontStyle: 'bold', 
+                fontSize: 8.5 
+            },
+            bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: 14, right: 14 },
+            didParseCell: function(data) {
+                if (data.section === 'body' && data.column.index === headers.length - 1) {
+                    if (data.cell.raw === 'Conforme') {
+                        data.cell.styles.textColor = [16, 185, 129];
+                        data.cell.styles.fontStyle = 'bold';
+                    } else if (String(data.cell.raw).includes('Revisar')) {
+                        data.cell.styles.textColor = [220, 38, 38];
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            }
         });
 
-        doc.save("reporte_analitico_resultados.pdf");
+        let currentY = (doc as any).lastAutoTable.finalY + 8;
+
+        // Salto de página si es necesario
+        if (currentY > pageHeight - 75) {
+            doc.addPage();
+            currentY = 20;
+        }
+
+        // 4. Resumen Estadístico del Lote
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Resumen Estadístico del Lote Analizado", 14, currentY);
+        currentY += 4;
+
+        const statRows = models.map(m => {
+            const vals = predictions
+                .map(p => {
+                    const rawVal = p.values[m.analyticalProperty];
+                    return rawVal !== undefined ? (rawVal * (m.slope ?? 1)) + (m.bias ?? 0) : null;
+                })
+                .filter((v): v is number => v !== null && !isNaN(v));
+
+            if (vals.length === 0) return [m.analyticalProperty, "-", "-", "-", "-"];
+            
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+            const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (vals.length > 1 ? vals.length - 1 : 1);
+            const sd = Math.sqrt(variance);
+
+            return [
+                m.analyticalProperty,
+                `${min.toFixed(2)}`,
+                `${max.toFixed(2)}`,
+                `${mean.toFixed(2)}`,
+                `± ${sd.toFixed(2)}`
+            ];
+        });
+
+        autoTable(doc, {
+            head: [["Parámetro Analítico", "Mínimo", "Máximo", "Promedio", "Desv. Estándar (SD)"]],
+            body: statRows,
+            startY: currentY,
+            theme: 'grid',
+            headStyles: { fillColor: [71, 85, 105], fontSize: 8 },
+            bodyStyles: { fontSize: 8 },
+            margin: { left: 14, right: 14 }
+        });
+
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+
+        if (currentY > pageHeight - 50) {
+            doc.addPage();
+            currentY = 25;
+        }
+
+        // 5. Nota de Aseguramiento de Calidad y Firmas
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.setFont('helvetica', 'normal');
+        doc.text("DECLARACIÓN: Los resultados de este informe corresponden a determinaciones cuantitativas obtenidas por espectroscopía de infrarrojo cercano.", 14, currentY);
+        doc.text("Las predicciones fueron calculadas con modelos quimiométricos calibrados contra química húmeda de referencia. Prohibida la reproducción parcial.", 14, currentY + 3.5);
+
+        currentY += 16;
+        doc.setDrawColor(148, 163, 184);
+        doc.setLineWidth(0.5);
+        doc.line(25, currentY + 10, 85, currentY + 10);
+        doc.line(125, currentY + 10, 185, currentY + 10);
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(51, 65, 85);
+        doc.text("Analista de Laboratorio NIR", 55, currentY + 14, { align: 'center' });
+        doc.text("Responsable de Control de Calidad", 155, currentY + 14, { align: 'center' });
+
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(148, 163, 184);
+        doc.text("Operador del Equipo NIR", 55, currentY + 18, { align: 'center' });
+        doc.text("Firma Autorizada / Certificación", 155, currentY + 18, { align: 'center' });
+
+        // Numeración de páginas
+        const totalPages = doc.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(7.5);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Página ${i} de ${totalPages} • Certificado de Resultados Analíticos NIR • Folio: ${folioId}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+        }
+
+        doc.save(`Certificado_Resultados_${folioId}.pdf`);
     };
 
     return (
@@ -462,14 +629,17 @@ const ModelPredictor: React.FC = () => {
                 {/* SECCIÓN 3: RESULTADOS */}
                 {predictions.length > 0 && (
                     <div className="animate-fade-in">
-                        <div className="flex justify-between items-end mb-3">
-                            <h3 className="text-sm font-bold text-slate-100">Resultados Consolidados</h3>
-                            <div className="flex gap-2">
-                                <Button size="sm" variant="secondary" onClick={downloadPdfResults} className="text-xs border-red-500/50 text-red-400 hover:bg-red-500 hover:text-white">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                                    Reporte PDF
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-100">Resultados Analíticos Cuantitativos</h3>
+                                <p className="text-[11px] text-slate-400">Predicciones generadas para {predictions.length} muestra(s) y {models.length} parámetro(s) analítico(s)</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button size="sm" variant="secondary" onClick={downloadPdfResults} className="text-xs bg-red-600/10 border-red-500/50 text-red-300 hover:bg-red-600 hover:text-white font-bold flex items-center shadow-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                    Descargar Reporte PDF
                                 </Button>
-                                <Button size="sm" variant="secondary" onClick={downloadResults} className="text-xs">
+                                <Button size="sm" variant="secondary" onClick={downloadResults} className="text-xs text-slate-300 hover:text-white">
                                     Descargar CSV
                                 </Button>
                             </div>

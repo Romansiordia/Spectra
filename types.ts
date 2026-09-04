@@ -14,6 +14,33 @@ export interface PreprocessingStep {
     params: { [key: string]: any };
 }
 
+export interface PcaScorePoint {
+    id: string | number;
+    pc1: number;
+    pc2: number;
+    pc3?: number;
+    gh: number; // Distancia de Mahalanobis en espacio de scores (Global H)
+    hotellingT2: number; // T^2 de Hotelling
+    qResidual: number; // Residual espectral Q (distancia al modelo)
+    isOutlier: boolean; // GH > 3.0 o T^2 > 99%
+    outlierReason?: string;
+    active: boolean; // Si está incluida en la calibración
+    color: string;
+    analyticalValue?: number;
+}
+
+export interface PcaAnalysisModel {
+    scores: PcaScorePoint[];
+    varianceExplained: number[]; // % Varianza por PC (PC1, PC2, PC3...)
+    cumulativeVariance: number[];
+    t2Limit95: number;
+    t2Limit99: number;
+    qLimit95: number;
+    qLimit99: number;
+    outlierCount: number;
+    totalCount: number;
+}
+
 export interface PcaResult {
     id: string | number;
     x: number;

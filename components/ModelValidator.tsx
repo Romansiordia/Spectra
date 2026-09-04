@@ -15,7 +15,12 @@ import {
   Gauge,
   Table as TableIcon,
   Download,
-  ChevronDown
+  ChevronDown,
+  ShieldCheck,
+  CheckCircle2,
+  Award,
+  Info,
+  Sliders
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -37,7 +42,7 @@ interface ParameterData {
 
 // --- Funciones Estadísticas ---
 
-const calculateStatistics = (data: SampleData[]) => {
+const calculateStatistics = (data: SampleData[], customRmsecv?: number) => {
   const n = data.length;
   if (n < 2) return null;
 
@@ -79,6 +84,68 @@ const calculateStatistics = (data: SampleData[]) => {
   const sdRef = Math.sqrt(Math.max(0, denRX / (n - 1)));
   const rpd = sep > 0.000001 ? sdRef / sep : 0;
 
+  const minX = Math.min(...data.map(d => d.quimico));
+  const maxX = Math.max(...data.map(d => d.quimico));
+  const rangeX = maxX - minX;
+
+  // --- CÁLCULO DE RMSECV (Root Mean Square Error of Cross-Validation) MEDIANTE LOOCV ---
+  let sumSqCv = 0;
+  const nLOO = n - 1;
+  if (n >= 3 && denRX > 0.000001) {
+    for (let i = 0; i < n; i++) {
+      const xi = data[i].quimico;
+      const yi = data[i].nir;
+
+      // Descontar muestra i para obtener el submodelo de calibración sin ella (Leave-One-Out)
+      const meanX_i = (sumX - xi) / nLOO;
+      const meanY_i = (sumY - yi) / nLOO;
+
+      const numR_i = numR - ((n / nLOO) * (xi - meanX) * (yi - meanY));
+      const denRX_i = denRX - ((n / nLOO) * Math.pow(xi - meanX, 2));
+
+      const slope_i = denRX_i > 0.000001 ? numR_i / denRX_i : slope;
+      const intercept_i = meanY_i - (slope_i * meanX_i);
+
+      // Predicción del modelo cruzado para la muestra excluida i
+      const predNir_i = slope_i * xi + intercept_i;
+      const cvResidual = yi - predNir_i;
+      sumSqCv += Math.pow(cvResidual, 2);
+    }
+  } else {
+    sumSqCv = sumSqDiff;
+  }
+
+  const calcRmsecv = Math.sqrt(Math.max(0, sumSqCv / n));
+  const rmsecv = customRmsecv !== undefined && customRmsecv > 0 ? customRmsecv : calcRmsecv;
+  const isCustomRmsecv = customRmsecv !== undefined && customRmsecv > 0;
+  
+  const rpdCv = rmsecv > 0.000001 ? sdRef / rmsecv : 0;
+  const rer = rmsecv > 0.000001 ? rangeX / rmsecv : 0;
+  const rmsecvOverfitRatio = sep > 0.000001 ? rmsecv / sep : 1.0;
+
+  // Evaluación de calidad del modelo basada en RMSECV, RPD_CV y ratio de generalización
+  let rmsecvQualityStatus: 'excellent' | 'good' | 'warning' | 'poor' = 'good';
+  let rmsecvQualityLabel = 'Buena Calidad';
+  let rmsecvQualityDesc = 'El modelo presenta una dispersión de validación cruzada controlada y apta para monitoreo continuo de procesos.';
+
+  if (rpdCv >= 3.0 && rer >= 10 && rmsecvOverfitRatio <= 1.20) {
+    rmsecvQualityStatus = 'excellent';
+    rmsecvQualityLabel = 'Excelente Calidad';
+    rmsecvQualityDesc = 'El modelo demuestra alta robustez predictiva, bajo error en validación cruzada (RMSECV) y ausencia de sobreajuste (overfitting). Apto para reemplazo de laboratorio.';
+  } else if (rpdCv >= 2.0 && rer >= 6 && rmsecvOverfitRatio <= 1.35) {
+    rmsecvQualityStatus = 'good';
+    rmsecvQualityLabel = 'Buena Calidad';
+    rmsecvQualityDesc = 'Validación cruzada consistente. El modelo generaliza adecuadamente para recepción de materias primas y control de calidad.';
+  } else if (rpdCv >= 1.5 || rmsecvOverfitRatio <= 1.50) {
+    rmsecvQualityStatus = 'warning';
+    rmsecvQualityLabel = 'Calidad Moderada';
+    rmsecvQualityDesc = 'El RMSECV muestra cierta variabilidad residual o posible dispersión respecto al SEP. Se recomienda incorporar muestras representativas adicionales.';
+  } else {
+    rmsecvQualityStatus = 'poor';
+    rmsecvQualityLabel = 'Requiere Revisión';
+    rmsecvQualityDesc = 'RMSECV elevado en relación a la variabilidad de referencia (RPD_CV < 1.5). Posible presencia de muestras anómalas o necesidad de re-calibrar.';
+  }
+
   const diffs = data.map(d => d.nir - d.quimico);
   const meanDiff = sumDiff / n;
   
@@ -97,8 +164,6 @@ const calculateStatistics = (data: SampleData[]) => {
   if (pValue > 1) pValue = 1.0;
 
   // Generar puntos para la línea de tendencia y límites de control (+/- 1 SEP)
-  const minX = Math.min(...data.map(d => d.quimico));
-  const maxX = Math.max(...data.map(d => d.quimico));
   const trendLine = [
     { 
       quimico: minX, 
@@ -114,7 +179,12 @@ const calculateStatistics = (data: SampleData[]) => {
     }
   ];
 
-  return { r2, sep, bias, pValue, n, meanX, meanY, rpd, slope, intercept, trendLine };
+  return { 
+    r2, sep, bias, pValue, n, meanX, meanY, rpd, slope, intercept, trendLine,
+    rmsecv, calcRmsecv, isCustomRmsecv, rpdCv, rer, rmsecvOverfitRatio,
+    rmsecvQualityStatus, rmsecvQualityLabel, rmsecvQualityDesc,
+    minX, maxX, rangeX, sdRef
+  };
 };
 
 function normalCDF(x: number) {
@@ -373,6 +443,11 @@ const ModelValidator: React.FC = () => {
   const [excludedSamples, setExcludedSamples] = useState<{ [key: string]: string[] }>({});
   const [selectedSample, setSelectedSample] = useState<SampleData | null>(null);
 
+  // Estado para RMSECV objetivo de calibración personalizado (opcional, p.ej. certificado FOSS/Bruker)
+  const [customRmsecvMap, setCustomRmsecvMap] = useState<{ [key: string]: number }>({});
+  const [showTargetInput, setShowTargetInput] = useState(false);
+  const [tempTargetValue, setTempTargetValue] = useState('');
+
   useEffect(() => {
     setMaterials(generateDefaultMaterials());
     setExcludedSamples({});
@@ -392,6 +467,15 @@ const ModelValidator: React.FC = () => {
     return `${materials[selectedMaterialIndex].name}_${activeParameter.name}`;
   }, [materials, selectedMaterialIndex, activeParameter]);
 
+  // Sincronizar campo temporal de RMSECV target al cambiar de analito
+  useEffect(() => {
+    if (activeKey && customRmsecvMap[activeKey]) {
+      setTempTargetValue(String(customRmsecvMap[activeKey]));
+    } else {
+      setTempTargetValue('');
+    }
+  }, [activeKey, customRmsecvMap]);
+
   // Set de muestras deseleccionadas / excluidas de forma activa para este analito de este material
   const activeExcludedSet = useMemo(() => {
     if (!activeKey) return new Set<string>();
@@ -404,7 +488,8 @@ const ModelValidator: React.FC = () => {
     return activeParameter.samples.filter(s => !activeExcludedSet.has(String(s.id)));
   }, [activeParameter, activeExcludedSet]);
 
-  const stats = useMemo(() => calculateStatistics(data), [data]);
+  const activeCustomRmsecv = activeKey ? customRmsecvMap[activeKey] : undefined;
+  const stats = useMemo(() => calculateStatistics(data, activeCustomRmsecv), [data, activeCustomRmsecv]);
 
   const histogramData = useMemo(() => {
     if (data.length === 0) return [];
@@ -521,7 +606,9 @@ const ModelValidator: React.FC = () => {
 
       // Generar filas para todos los parámetros cargados
       const overviewRows = parameters.map((param) => {
-        const paramStats = calculateStatistics(param.samples);
+        const key = `${materials[selectedMaterialIndex]?.name || 'default'}_${param.name}`;
+        const targetCv = customRmsecvMap[key];
+        const paramStats = calculateStatistics(param.samples, targetCv);
         const rpd = paramStats?.rpd || 0;
         
         let desemp = "Insuficiente (<2.0)";
@@ -532,6 +619,7 @@ const ModelValidator: React.FC = () => {
           param.name,
           `${param.samples.length}`,
           `${paramStats?.r2.toFixed(3) || '0.000'}`,
+          `${paramStats?.rmsecv !== undefined ? paramStats.rmsecv.toFixed(3) : '0.000'}%`,
           `${paramStats?.sep.toFixed(3) || '0.000'}%`,
           `${paramStats?.bias.toFixed(3) || '0.000'}%`,
           `${rpd.toFixed(2)}`,
@@ -542,14 +630,14 @@ const ModelValidator: React.FC = () => {
 
       autoTable(doc, {
         startY: 87,
-        head: [['Analito / Componente', 'Muestras', 'R²', 'SEP', 'Bias (Sesgo)', 'RPD', 'Pendiente', 'Diagnóstico NIR']],
+        head: [['Analito / Componente', 'Muestras', 'R²', 'RMSECV', 'SEP', 'Bias (Sesgo)', 'RPD', 'Pendiente', 'Diagnóstico NIR']],
         body: overviewRows,
         theme: 'striped',
         headStyles: { fillColor: [14, 165, 233] },
-        bodyStyles: { fontSize: 8.5 },
+        bodyStyles: { fontSize: 8 },
         columnStyles: {
           0: { fontStyle: 'bold' },
-          7: { fontStyle: 'bold' }
+          8: { fontStyle: 'bold' }
         },
         margin: { left: 14, right: 14 }
       });
@@ -565,6 +653,8 @@ const ModelValidator: React.FC = () => {
       doc.setTextColor(71, 85, 105);
       doc.setFont('helvetica', 'normal');
       const introText = [
+        "• RMSECV (Root Mean Square Error of Cross-Validation): Métrica crítica de calidad de calibración. Evalúa la capacidad",
+        "  de predicción sobre muestras no vistas durante las rotaciones cruzadas; un RMSECV cercano al SEP confirma ausencia de sobreajuste.",
         "• Coeficiente de Determinación (R²): Medida del ajuste funcional de la recta. El valor ideal es 1.000; valores por encima de 0.90",
         "  demuestran que el modelo predice con alta precisión los cambios en las concentraciones de laboratorio.",
         "• SEP (Standard Error of Prediction): Mide la desviación promedio en las mismas unidades de concentración. Representa la",
@@ -590,7 +680,9 @@ const ModelValidator: React.FC = () => {
       
       for (let i = 0; i < parameters.length; i++) {
         const param = parameters[i];
-        const paramStats = calculateStatistics(param.samples);
+        const key = `${materials[selectedMaterialIndex]?.name || 'default'}_${param.name}`;
+        const targetCv = customRmsecvMap[key];
+        const paramStats = calculateStatistics(param.samples, targetCv);
         const diffs = param.samples.map(d => d.nir - d.quimico);
         const maxDiff = diffs.length > 0 ? Math.max(...diffs) : 0;
         const minDiff = diffs.length > 0 ? Math.min(...diffs) : 0;
@@ -623,10 +715,11 @@ const ModelValidator: React.FC = () => {
         // Tabla detallada para este analito
         const paramRows = [
           ['Muestras Registradas (n)', `${param.samples.length}`, 'Coeficiente R²', `${paramStats?.r2.toFixed(4) || '0.0000'}`],
+          ['RMSECV (Val. Cruzada)', `${paramStats?.rmsecv !== undefined ? paramStats.rmsecv.toFixed(4) : '0.0000'}%`, 'RPD Val. Cruzada', `${paramStats?.rpdCv !== undefined ? paramStats.rpdCv.toFixed(2) : '0.00'}`],
           ['Pendiente (Slope)', `${paramStats?.slope.toFixed(4) || '0.0000'}`, 'Intercepto', `${paramStats?.intercept.toFixed(4) || '0.0000'}`],
           ['Error de Predicción SEP', `${paramStats?.sep.toFixed(4) || '0.0000'}%`, 'Media del Error (Bias)', `${paramStats?.bias.toFixed(4) || '0.0000'}%`],
-          ['RPD (Desviación Relativa)', `${paramStats?.rpd.toFixed(2) || '0.00'}`, 'Residuo Máx Positivo', `+${maxDiff.toFixed(3)}%`],
-          ['Residuo Máx Negativo', `${minDiff.toFixed(3)}%`, 'Error Absoluto MAE', `${mae.toFixed(3)}%`]
+          ['RPD (Desviación Relativa)', `${paramStats?.rpd.toFixed(2) || '0.00'}`, 'RER (Rango / RMSECV)', `${paramStats?.rer !== undefined ? paramStats.rer.toFixed(2) : '0.00'}`],
+          ['Residuo Máx Positivo', `+${maxDiff.toFixed(3)}%`, 'Error Absoluto MAE', `${mae.toFixed(3)}%`]
         ];
 
         autoTable(doc, {
@@ -1083,17 +1176,30 @@ const ModelValidator: React.FC = () => {
     return "bg-rose-500";
   };
 
-  const StatCard = ({ title, value, unit, icon: Icon, description, color }: { title: string; value: any; unit?: string; icon: any; description: string; color: string }) => (
+  const getRmsecvColor = (rpdCv: number | undefined) => {
+    if (!rpdCv) return "bg-slate-400";
+    if (rpdCv >= 3.0) return "bg-emerald-600";
+    if (rpdCv >= 2.0) return "bg-teal-600";
+    if (rpdCv >= 1.5) return "bg-amber-500";
+    return "bg-rose-500";
+  };
+
+  const StatCard = ({ title, value, unit, icon: Icon, description, color, badge }: { title: string; value: any; unit?: string; icon: any; description: string; color: string; badge?: string }) => (
     <div className="bg-ui-card p-5 rounded-xl shadow-sm border border-ui-border flex flex-col justify-between h-full hover:shadow-md transition-shadow">
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">{title}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</span>
+            {badge && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">{badge}</span>
+            )}
+          </div>
           <div className={`p-2 rounded-lg ${color}`}>
             <Icon size={16} className="text-white" />
           </div>
         </div>
         <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-bold text-slate-100">{typeof value === 'number' ? value.toFixed(2) : (value || '0.00')}</span>
+          <span className="text-2xl font-bold text-slate-100">{typeof value === 'number' ? value.toFixed(value < 0.1 && value > -0.1 && value !== 0 ? 3 : 2) : (value || '0.00')}</span>
           <span className="text-slate-400 text-xs font-medium">{unit}</span>
         </div>
       </div>
@@ -1215,9 +1321,14 @@ const ModelValidator: React.FC = () => {
                       {param.samples.length}
                     </span>
                     {paramStats && (
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${isActive ? 'bg-white/20 text-[#0a1d4a] border-white/30' : rpdBadgeBg}`}>
-                        RPD {rpd.toFixed(1)}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${isActive ? 'bg-white/20 text-[#0a1d4a] border-white/30' : rpdBadgeBg}`}>
+                          RPD {rpd.toFixed(1)}
+                        </span>
+                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold font-mono border ${isActive ? 'bg-white/20 text-[#0a1d4a] border-white/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`} title="RMSECV (Validación Cruzada LOOCV)">
+                          CV {paramStats.rmsecv.toFixed(2)}%
+                        </span>
+                      </div>
                     )}
                   </button>
                 );
@@ -1226,11 +1337,20 @@ const ModelValidator: React.FC = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <StatCard title="Muestras" value={stats?.n || data.length} icon={ClipboardList} color="bg-indigo-600" description="Total de muestras analizadas." />
+          <StatCard 
+            title="RMSECV" 
+            value={stats?.rmsecv} 
+            unit="%" 
+            icon={ShieldCheck} 
+            color={getRmsecvColor(stats?.rpdCv)} 
+            description={stats?.isCustomRmsecv ? "RMSECV de calibración objetivo." : "Error de validación cruzada (LOOCV)."} 
+            badge={stats?.rmsecvQualityStatus === 'excellent' ? 'Óptimo' : (stats?.isCustomRmsecv ? 'Target' : undefined)}
+          />
           <StatCard title="RPD" value={stats?.rpd} icon={Gauge} color={getRpdColor(stats?.rpd)} description="Capacidad predictiva del modelo." />
-          <StatCard title="Pendiente" value={stats?.slope} icon={TrendingUp} color="bg-ui-accent" description="Inclinación de la recta (ideal 1.0)." />
           <StatCard title="SEP" value={stats?.sep} unit="%" icon={AlertCircle} color="bg-slate-700" description="Error total de predicción." />
+          <StatCard title="Pendiente" value={stats?.slope} icon={TrendingUp} color="bg-ui-accent" description="Inclinación de la recta (ideal 1.0)." />
           <StatCard title="Bias" value={stats?.bias} unit="%" icon={BarChart3} color="bg-blue-500" description="Desviación sistemática promedio." />
         </div>
 
@@ -1418,6 +1538,156 @@ const ModelValidator: React.FC = () => {
               </div>
             )}
 
+            {/* 1. Evaluación de Calidad del Modelo Mediante RMSECV */}
+            <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2 text-slate-100">
+                  <ShieldCheck size={20} className="text-emerald-400" />
+                  Calidad del Modelo (RMSECV)
+                </h2>
+                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full text-white ${getRmsecvColor(stats?.rpdCv)}`}>
+                  {stats?.rmsecvQualityLabel || 'En Evaluación'}
+                </span>
+              </div>
+
+              {/* Grid de métricas clave de RMSECV */}
+              <div className="grid grid-cols-2 gap-2.5 mb-4">
+                <div className="p-3 bg-ui-darkest rounded-xl border border-ui-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    RMSECV {stats?.isCustomRmsecv ? '(Target)' : '(LOOCV)'}
+                  </span>
+                  <span className="text-xl font-bold font-mono text-emerald-400 block mt-0.5">
+                    {stats?.rmsecv !== undefined ? `${stats.rmsecv.toFixed(3)}%` : '0.000%'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block mt-0.5">
+                    {stats?.isCustomRmsecv ? `Auto LOOCV: ${stats.calcRmsecv.toFixed(3)}%` : 'Error val. cruzada'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-ui-darkest rounded-xl border border-ui-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">RPD Val. Cruzada</span>
+                  <span className="text-xl font-bold font-mono text-teal-400 block mt-0.5">
+                    {stats?.rpdCv !== undefined ? stats.rpdCv.toFixed(2) : '0.00'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block mt-0.5">SD Ref / RMSECV</span>
+                </div>
+
+                <div className="p-3 bg-ui-darkest rounded-xl border border-ui-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">RER (Rango/Error)</span>
+                  <span className="text-xl font-bold font-mono text-sky-400 block mt-0.5">
+                    {stats?.rer !== undefined ? stats.rer.toFixed(1) : '0.0'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block mt-0.5">Ideal &gt; 10.0</span>
+                </div>
+
+                <div className="p-3 bg-ui-darkest rounded-xl border border-ui-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Overfitting Ratio</span>
+                  <span className={`text-xl font-bold font-mono block mt-0.5 ${stats && stats.rmsecvOverfitRatio > 1.3 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {stats?.rmsecvOverfitRatio !== undefined ? stats.rmsecvOverfitRatio.toFixed(2) : '1.00'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block mt-0.5">RMSECV / SEP</span>
+                </div>
+              </div>
+
+              {/* Diagnóstico interpretativo de robustez */}
+              <div className="p-3.5 bg-ui-darkest/70 rounded-xl border border-ui-border text-xs space-y-2 mb-3">
+                <div className="flex items-start gap-2">
+                  <Info size={14} className="text-ui-accent shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-relaxed text-slate-300">
+                    {stats?.rmsecvQualityDesc || "Evaluando robustez quimiométrica mediante validación cruzada..."}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-ui-border flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Robustez de Generalización:</span>
+                  <span className="font-bold text-slate-200">
+                    {stats && stats.rmsecvOverfitRatio <= 1.15 
+                      ? '✓ Alta Estabilidad (Sin Overfitting)' 
+                      : (stats && stats.rmsecvOverfitRatio <= 1.35 ? 'Estabilidad Normal' : '⚠ Revisar Sobreajuste')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Ajuste o comparación con RMSECV de fábrica/certificado (FOSS/Bruker) */}
+              <div className="border-t border-ui-border pt-3">
+                {!showTargetInput ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] text-slate-400">
+                      {activeKey && customRmsecvMap[activeKey] 
+                        ? `Target FOSS/Bruker: ${customRmsecvMap[activeKey].toFixed(3)}%` 
+                        : '¿Tienes el RMSECV de calibración original?'}
+                    </span>
+                    <button
+                      onClick={() => setShowTargetInput(true)}
+                      className="text-[10px] font-bold text-ui-accent hover:text-[#38bdf8] flex items-center gap-1 transition-colors px-2 py-1 rounded bg-ui-darkest hover:bg-slate-800 border border-ui-border"
+                    >
+                      <Sliders size={12} />
+                      {activeKey && customRmsecvMap[activeKey] ? 'Modificar' : 'Ingresar Target'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-ui-darkest rounded-xl border border-ui-accent/30 space-y-2.5 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10.5px] font-bold text-slate-200 flex items-center gap-1.5">
+                        <Sliders size={12} className="text-ui-accent" />
+                        RMSECV Certificado (FOSS/Bruker):
+                      </span>
+                      <button 
+                        onClick={() => setShowTargetInput(false)}
+                        className="text-[10px] text-slate-400 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.001"
+                        placeholder="Ej: 0.185"
+                        value={tempTargetValue}
+                        onChange={(e) => setTempTargetValue(e.target.value)}
+                        className="w-full bg-slate-900 border border-ui-border text-slate-100 text-xs px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-ui-accent font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          const val = parseFloat(tempTargetValue.replace(',', '.'));
+                          if (!isNaN(val) && val > 0 && activeKey) {
+                            setCustomRmsecvMap(prev => ({ ...prev, [activeKey]: val }));
+                          }
+                          setShowTargetInput(false);
+                        }}
+                        className="bg-ui-accent text-[#0a1d4a] px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-[#38bdf8] transition-colors whitespace-nowrap"
+                      >
+                        Guardar
+                      </button>
+                      {activeKey && customRmsecvMap[activeKey] && (
+                        <button
+                          onClick={() => {
+                            if (activeKey) {
+                              setCustomRmsecvMap(prev => {
+                                const next = { ...prev };
+                                delete next[activeKey];
+                                return next;
+                              });
+                            }
+                            setTempTargetValue('');
+                            setShowTargetInput(false);
+                          }}
+                          className="bg-slate-800 text-slate-300 px-2 py-1.5 rounded-lg text-xs hover:bg-slate-700 transition-colors whitespace-nowrap"
+                          title="Restablecer a cálculo LOOCV automático"
+                        >
+                          Auto
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[9.5px] text-slate-500">
+                      Permite contrastar el error del equipo de calibración contra el SEP obtenido en la validación externa.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Estadísticos de Regresión */}
             <div className="bg-ui-card p-6 rounded-xl shadow-card border border-ui-border">
               <h2 className="text-lg font-bold flex items-center gap-2 mb-4 text-slate-100">
                 <ClipboardList size={20} className="text-ui-accent" />
@@ -1451,6 +1721,21 @@ const ModelValidator: React.FC = () => {
                         <td className="px-3 py-2 font-medium">Muestras Analizadas (n)</td>
                         <td className="px-3 py-2 font-bold text-slate-200">{stats?.n || data.length}</td>
                         <td className="px-3 py-2 text-right text-slate-400">-</td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-medium">RMSECV (Val. Cruzada)</td>
+                        <td className="px-3 py-2 font-bold text-emerald-400">{stats?.rmsecv !== undefined ? stats.rmsecv.toFixed(4) : '0.0000'}%</td>
+                        <td className="px-3 py-2 text-right text-slate-400">Mínimo (≈ SEP)</td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-medium">RPD (Validación Cruzada)</td>
+                        <td className="px-3 py-2 font-bold text-teal-400">{stats?.rpdCv !== undefined ? stats.rpdCv.toFixed(2) : '0.00'}</td>
+                        <td className="px-3 py-2 text-right text-slate-400">{"> 3.0"}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-3 py-2 font-medium">RER (Rango / RMSECV)</td>
+                        <td className="px-3 py-2 font-bold text-sky-400">{stats?.rer !== undefined ? stats.rer.toFixed(2) : '0.00'}</td>
+                        <td className="px-3 py-2 text-right text-slate-400">{"> 10.0"}</td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-medium">Pendiente (Slope)</td>
@@ -1794,29 +2079,30 @@ const ModelValidator: React.FC = () => {
                     <th className="px-4 py-3 rounded-tl-lg">Parámetro</th>
                     <th className="px-4 py-3">Muestras</th>
                     <th className="px-4 py-3 text-right">R²</th>
+                    <th className="px-4 py-3 text-right">RMSECV (%)</th>
                     <th className="px-4 py-3 text-right">SEP (%)</th>
                     <th className="px-4 py-3 text-right">Bias (%)</th>
                     <th className="px-4 py-3 text-right">RPD</th>
-                    <th className="px-4 py-3 rounded-tr-lg">Desempeño</th>
+                    <th className="px-4 py-3 text-right">RPD (CV)</th>
+                    <th className="px-4 py-3 rounded-tr-lg">Calidad Modelo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {parameters.map((param, index) => {
                     const keyForM = `${materials[selectedMaterialIndex]?.name || 'default'}_${param.name}`;
+                    const targetCv = customRmsecvMap[keyForM];
                     const activeExcl = new Set((excludedSamples[keyForM] || []).map(id => String(id)));
                     const filteredData = param.samples.filter(s => !activeExcl.has(String(s.id)));
-                    const st = calculateStatistics(filteredData);
+                    const st = calculateStatistics(filteredData, targetCv);
                     
                     if (!st) return null;
                     
-                    let performance = "Excelente";
+                    let performance = st.rmsecvQualityLabel;
                     let perfColor = "text-emerald-400";
-                    if (st.rpd < 2) {
-                       performance = "Revisar";
-                       perfColor = "text-red-400";
-                    } else if (st.rpd < 3) {
-                       performance = "Aceptable";
-                       perfColor = "text-yellow-400";
+                    if (st.rmsecvQualityStatus === 'poor') {
+                       perfColor = "text-rose-400";
+                    } else if (st.rmsecvQualityStatus === 'warning') {
+                       perfColor = "text-amber-400";
                     }
 
                     return (
@@ -1826,9 +2112,14 @@ const ModelValidator: React.FC = () => {
                         <td className={`px-4 py-4 text-right font-mono font-medium ${st.r2 >= 0.9 ? 'text-emerald-400' : 'text-slate-200'}`}>
                           {st.r2.toFixed(3)}
                         </td>
+                        <td className="px-4 py-4 text-right font-mono font-bold text-emerald-400">
+                          {st.rmsecv.toFixed(3)}
+                          {st.isCustomRmsecv && <span className="text-[9px] text-slate-400 block font-normal">Target</span>}
+                        </td>
                         <td className="px-4 py-4 text-right font-mono text-slate-200">{st.sep.toFixed(3)}</td>
                         <td className="px-4 py-4 text-right font-mono text-slate-200">{st.bias.toFixed(3)}</td>
                         <td className="px-4 py-4 text-right font-mono text-slate-200">{st.rpd.toFixed(2)}</td>
+                        <td className="px-4 py-4 text-right font-mono text-teal-400 font-bold">{st.rpdCv.toFixed(2)}</td>
                         <td className={`px-4 py-4 font-bold ${perfColor}`}>{performance}</td>
                       </tr>
                     );

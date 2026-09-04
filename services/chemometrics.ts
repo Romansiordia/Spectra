@@ -1,5 +1,5 @@
 
-import { PreprocessingStep, Sample, ModelResults, OptimizationResult } from '../types';
+import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel } from '../types';
 import { Matrix, inverse, solve } from 'ml-matrix';
 
 // ===============================================
@@ -453,7 +453,7 @@ export function runPlsAnalysis(
 }
 
 // ===============================================
-// MÓDULO DE ANÁLISIS EXPLORATORIO (PCA)
+// MÓDULO DE ANÁLISIS EXPLORATORIO (PCA) Y DETECCIÓN DE OUTLIERS
 // ===============================================
 
 export interface PcaScore {
@@ -464,12 +464,250 @@ export interface PcaScore {
     label: string;
 }
 
+export function runComprehensivePca(
+    samples: Sample[],
+    preprocessingSteps: PreprocessingStep[] = [],
+    nComponents: number = 3
+): PcaAnalysisModel | null {
+    if (samples.length < 3) return null;
+
+    // 1. Preprocesamiento opcional sobre los espectros para el análisis
+    let referenceSpectrum: number[] | undefined = undefined;
+    const hasMsc = preprocessingSteps.some(s => s.method === 'msc');
+    if (hasMsc) {
+        const nPoints = samples[0].values.length;
+        referenceSpectrum = new Array(nPoints).fill(0);
+        samples.forEach(s => {
+            s.values.forEach((v, i) => referenceSpectrum![i] += v);
+        });
+        referenceSpectrum = referenceSpectrum.map(v => v / samples.length);
+    }
+
+    const minLength = Math.min(...samples.map(s => s.values.length));
+    if (minLength === 0) return null;
+
+    const X_processed = samples.map(s => {
+        const spec = s.values.slice(0, minLength);
+        return preprocessingSteps.length > 0
+            ? applyPreprocessingLogic(spec, preprocessingSteps, referenceSpectrum)
+            : spec;
+    });
+
+    const N = X_processed.length;
+    const M = X_processed[0].length;
+    const A = Math.min(nComponents, N - 1, M, 5); // Hasta 5 componentes principales
+
+    const X = new Matrix(X_processed);
+
+    // 2. Centrado por columnas (Media = 0)
+    const meanVec = X.mean('column');
+    const X_centered = X.clone();
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < M; j++) {
+            X_centered.set(i, j, X_centered.get(i, j) - meanVec[j]);
+        }
+    }
+
+    // Varianza total inicial
+    let totalVariance = 0;
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < M; j++) {
+            const val = X_centered.get(i, j);
+            totalVariance += val * val;
+        }
+    }
+    if (totalVariance <= 1e-12) totalVariance = 1;
+
+    // 3. Algoritmo NIPALS para obtener Scores (T), Loadings (P) y Varianza Explicada
+    let X_res = X_centered.clone();
+    const T: number[][] = Array.from({ length: N }, () => new Array(A).fill(0));
+    const P: number[][] = Array.from({ length: M }, () => new Array(A).fill(0));
+    const varianceExplained: number[] = [];
+    const varianceValues: number[] = [];
+
+    for (let a = 0; a < A; a++) {
+        // Inicializar t con la columna de mayor varianza
+        let maxColIdx = 0;
+        let maxVar = -1;
+        for (let j = 0; j < Math.min(M, 10); j++) {
+            let colSum = 0;
+            for (let i = 0; i < N; i++) colSum += Math.abs(X_res.get(i, j));
+            if (colSum > maxVar) {
+                maxVar = colSum;
+                maxColIdx = j;
+            }
+        }
+
+        let t = X_res.getColumnVector(maxColIdx);
+        let p = new Matrix(M, 1);
+        let t_norm_sq = 0;
+
+        for (let iter = 0; iter < 50; iter++) {
+            t_norm_sq = t.transpose().mmul(t).get(0, 0);
+            if (t_norm_sq < 1e-12) break;
+
+            // p = (X_res^T * t) / (t^T * t)
+            p = X_res.transpose().mmul(t).div(t_norm_sq);
+            // Normalizar p a longitud unitaria
+            const p_norm = p.norm('frobenius');
+            if (p_norm < 1e-12) break;
+            p.div(p_norm);
+
+            // Actualizar t = (X_res * p) / (p^T * p)  [con p unitario, denominador = 1]
+            const t_new = X_res.mmul(p);
+            
+            // Criterio de convergencia
+            let diff = 0;
+            for (let i = 0; i < N; i++) {
+                const d = t_new.get(i, 0) - t.get(i, 0);
+                diff += d * d;
+            }
+            t = t_new;
+            if (diff < 1e-9) break;
+        }
+
+        t_norm_sq = t.transpose().mmul(t).get(0, 0);
+        
+        // Guardar scores y loadings
+        for (let i = 0; i < N; i++) T[i][a] = t.get(i, 0);
+        for (let j = 0; j < M; j++) P[j][a] = p.get(j, 0);
+
+        // Varianza explicada por este componente
+        const compVariance = t_norm_sq;
+        varianceValues.push(compVariance);
+        const percentVar = (compVariance / totalVariance) * 100;
+        varianceExplained.push(isFinite(percentVar) ? percentVar : 0);
+
+        // Deflación: X_res = X_res - (t * p^T)
+        const outer = t.mmul(p.transpose());
+        X_res = X_res.sub(outer);
+    }
+
+    // Varianza acumulada
+    const cumulativeVariance: number[] = [];
+    let acc = 0;
+    for (const v of varianceExplained) {
+        acc += v;
+        cumulativeVariance.push(Math.min(100, acc));
+    }
+
+    // 4. Cálculo de Varianza de cada Score (lambda_a)
+    const lambda: number[] = [];
+    for (let a = 0; a < A; a++) {
+        let sumSq = 0;
+        for (let i = 0; i < N; i++) sumSq += T[i][a] * T[i][a];
+        const s2 = sumSq / (N - 1);
+        lambda.push(s2 > 1e-9 ? s2 : 1e-9);
+    }
+
+    // 5. Cálculo de Hotelling T^2 y Mahalanobis GH por muestra
+    // T^2 = sum_a (t_ia^2 / lambda_a)
+    const hotellingT2: number[] = new Array(N).fill(0);
+    const ghDistances: number[] = new Array(N).fill(0);
+
+    for (let i = 0; i < N; i++) {
+        let t2 = 0;
+        for (let a = 0; a < A; a++) {
+            t2 += (T[i][a] * T[i][a]) / lambda[a];
+        }
+        hotellingT2[i] = t2;
+        // Global H (distancia normalizada al centroide multivariante)
+        ghDistances[i] = Math.sqrt(t2 / A);
+    }
+
+    // 6. Cálculo de Residual Espectral Q (Distancia al Modelo)
+    // Q_i = sum_j (X_res(i, j)^2)
+    const qResiduals: number[] = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) {
+        let q = 0;
+        for (let j = 0; j < M; j++) {
+            const r = X_res.get(i, j);
+            q += r * r;
+        }
+        qResiduals[i] = q;
+    }
+
+    // 7. Límites estadísticos teóricos de detección
+    // Límite de Hotelling T^2 mediante aproximación F-Snedecor:
+    // T^2_lim = (A * (N^2 - 1) / (N * (N - A))) * F_alpha(A, N - A)
+    // Para simplificar sin librería pesada de distribución F, usamos aproximación Chi-cuadrado estándar
+    // Chi-cuadrado para A=2: 95% = 5.991, 99% = 9.210; para A=3: 95% = 7.815, 99% = 11.345
+    let chi2_95 = 5.991;
+    let chi2_99 = 9.210;
+    if (A === 1) { chi2_95 = 3.841; chi2_99 = 6.635; }
+    else if (A === 3) { chi2_95 = 7.815; chi2_99 = 11.345; }
+    else if (A >= 4) { chi2_95 = 9.488; chi2_99 = 13.277; }
+
+    const t2Limit95 = ((A * (N - 1)) / (N - A > 0 ? N - A : 1)) * (chi2_95 / A);
+    const t2Limit99 = ((A * (N - 1)) / (N - A > 0 ? N - A : 1)) * (chi2_99 / A);
+
+    // Límite de Q (Residuales espectrales): usando media + 2*SD (95%) y media + 3*SD (99%)
+    const qMean = qResiduals.reduce((a, b) => a + b, 0) / N;
+    const qVar = qResiduals.reduce((a, b) => a + Math.pow(b - qMean, 2), 0) / (N > 1 ? N - 1 : 1);
+    const qSd = Math.sqrt(qVar);
+    const qLimit95 = qMean + 2 * qSd;
+    const qLimit99 = qMean + 3 * qSd;
+
+    // 8. Empaquetar puntos de score con diagnóstico de anomalías
+    let outlierCount = 0;
+    const scorePoints: PcaScorePoint[] = samples.map((s, idx) => {
+        const gh = ghDistances[idx];
+        const t2 = hotellingT2[idx];
+        const q = qResiduals[idx];
+
+        // Criterio de outlier robusto: GH > 3.0 (Estándar quimiométrico FOSS/Bruker) o T2 > límite 99% o Q > límite 99%
+        const isGhOutlier = gh > 3.0;
+        const isT2Outlier = t2 > t2Limit99;
+        const isQOutlier = q > qLimit99;
+        const isOutlier = isGhOutlier || isT2Outlier || isQOutlier;
+
+        let outlierReason = '';
+        if (isGhOutlier && isQOutlier) {
+            outlierReason = 'Outlier Extremo (GH > 3.0 y Residual Q muy alto)';
+        } else if (isGhOutlier) {
+            outlierReason = `Mahalanobis Alto (GH ${gh.toFixed(2)} > 3.0)`;
+        } else if (isT2Outlier) {
+            outlierReason = `Dispersión Extrema (Hotelling T² > 99%)`;
+        } else if (isQOutlier) {
+            outlierReason = `Residual Espectral Atípico (Q > 99%)`;
+        }
+
+        if (isOutlier) outlierCount++;
+
+        return {
+            id: s.id,
+            pc1: T[idx][0],
+            pc2: A > 1 ? T[idx][1] : 0,
+            pc3: A > 2 ? T[idx][2] : 0,
+            gh,
+            hotellingT2: t2,
+            qResidual: q,
+            isOutlier,
+            outlierReason: isOutlier ? outlierReason : undefined,
+            active: s.active,
+            color: s.color || (isOutlier ? '#f43f5e' : '#38bdf8'),
+            analyticalValue: s.analyticalValue
+        };
+    });
+
+    return {
+        scores: scorePoints,
+        varianceExplained,
+        cumulativeVariance,
+        t2Limit95,
+        t2Limit99,
+        qLimit95,
+        qLimit99,
+        outlierCount,
+        totalCount: N
+    };
+}
+
 export function runPcaAnalysis(
     samples: { id: string | number; values: number[]; color?: string; label?: string }[]
 ): PcaScore[] {
     if (samples.length < 2) return [];
 
-    // Ensure all arrays have the same length to prevent ml-matrix from crashing
     const minLength = Math.min(...samples.map(s => s.values.length));
     if (minLength === 0) return [];
     
@@ -478,7 +716,6 @@ export function runPcaAnalysis(
     const N = X.rows;
     const M = X.columns;
 
-    // Centrar datos
     const mean = X.mean('column');
     const X_centered = X.clone();
     for (let i = 0; i < N; i++) {
@@ -487,10 +724,6 @@ export function runPcaAnalysis(
         }
     }
 
-    // SVD para obtener componentes principales
-    // Nota: ml-matrix no tiene SVD nativo de alto rendimiento para matrices grandes en JS puro de forma simple sin extensiones,
-    // pero podemos usar NIPALS simplificado para los primeros 2 componentes.
-    
     const scores = new Array(N).fill(0).map((_, i) => ({
         id: samples[i].id,
         pc1: 0,
