@@ -1735,8 +1735,8 @@ const ModelValidator: React.FC = () => {
                         <td className="px-3 py-2 text-right text-slate-400">Mínimo (≈ SEP)</td>
                       </tr>
                       <tr>
-                        <td className="px-3 py-2 font-medium">RPD (Validación Cruzada)</td>
-                        <td className="px-3 py-2 font-bold text-teal-400">{stats?.rpdCv !== undefined ? stats.rpdCv.toFixed(2) : '0.00'}</td>
+                        <td className="px-3 py-2 font-medium">RPD (Desempeño)</td>
+                        <td className="px-3 py-2 font-bold text-teal-400">{stats?.rpd !== undefined ? stats.rpd.toFixed(2) : '0.00'}</td>
                         <td className="px-3 py-2 text-right text-slate-400">{"> 3.0"}</td>
                       </tr>
                       <tr>
