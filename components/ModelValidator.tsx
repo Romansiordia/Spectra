@@ -79,7 +79,14 @@ const calculateStatistics = (data: SampleData[], customRmsecv?: number) => {
   if (isNaN(r2) || r2 < 0) r2 = 0.0;
 
   const bias = sumDiff / n;
-  const sep = Math.sqrt(Math.max(0, sumSqDiff / (n - 1)));
+  
+  // ISO 12099 SEP (Standard Error of Prediction) - corrected for bias
+  let sumSqDiffCorrected = 0;
+  data.forEach(d => {
+    const diff = d.nir - d.quimico;
+    sumSqDiffCorrected += Math.pow(diff - bias, 2);
+  });
+  const sep = Math.sqrt(Math.max(0, sumSqDiffCorrected / (n - 1)));
   
   const sdRef = Math.sqrt(Math.max(0, denRX / (n - 1)));
   const rpd = sep > 0.000001 ? sdRef / sep : 0;
