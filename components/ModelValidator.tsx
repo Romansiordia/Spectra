@@ -67,10 +67,10 @@ const calculateStatistics = (data: SampleData[], customRmsecv?: number) => {
     sumDiff += diff;
   });
 
-  // Cálculo de Pendiente (Slope): b = sum((x-meanX)(y-meanY)) / sum((x-meanX)^2)
-  const slope = denRX > 0.000001 ? numR / denRX : 0;
-  // Intercepto: a = meanY - slope * meanX
-  const intercept = meanY - (slope * meanX);
+  // Cálculo de Pendiente (Slope) ISO 12099 (Regresión Inversa): b = cov(Quimico, NIR) / var(NIR)
+  const slope = denRY > 0.000001 ? numR / denRY : 0;
+  // Intercepto ISO 12099: a = meanQuimico - slope * meanNIR
+  const intercept = meanX - (slope * meanY);
 
   const denomR = Math.sqrt(denRX * denRY);
   const r = denomR > 0.000001 ? numR / denomR : 0;
