@@ -162,14 +162,41 @@ function processCSVText(
             const header = data[0];
             const numCols = header.length;
             const analyticalProperty = hasAnalyticalProperty ? String(header[numCols - 1]) : "Unknown";
-            const wavelengths = hasAnalyticalProperty ? header.slice(1, numCols - 1).map(Number) : header.slice(1).map(Number);
+            let wavelengths = hasAnalyticalProperty ? header.slice(1, numCols - 1).map(Number) : header.slice(1).map(Number);
+            let dataSliceStart = 1;
             
             if (wavelengths.some(isNaN)) {
-                alert("Cabecera de longitudes de onda contiene valores no numéricos.");
-                return;
+                const dataPointsCount = hasAnalyticalProperty ? numCols - 2 : numCols - 1;
+                if (dataPointsCount === 3300) {
+                    wavelengths = Array.from({ length: 3300 }, (_, i) => 850 + i * 0.5);
+                } else if (dataPointsCount === 3301) {
+                    wavelengths = Array.from({ length: 3301 }, (_, i) => 850 + i * 0.5);
+                } else if (dataPointsCount === 3401) {
+                    wavelengths = Array.from({ length: 3401 }, (_, i) => 800 + i * 0.5);
+                } else if (dataPointsCount === 3400) {
+                    wavelengths = Array.from({ length: 3400 }, (_, i) => 800 + i * 0.5);
+                } else if (dataPointsCount === 825) {
+                    wavelengths = Array.from({ length: 825 }, (_, i) => 850 + i * 2);
+                } else if (dataPointsCount === 826) {
+                    wavelengths = Array.from({ length: 826 }, (_, i) => 850 + i * 2);
+                } else if (dataPointsCount === 700 || dataPointsCount === 701) {
+                    wavelengths = Array.from({ length: dataPointsCount }, (_, i) => 1100 + i * 2);
+                } else {
+                    alert("Cabecera de longitudes de onda contiene valores no numéricos.");
+                    return;
+                }
+            } else if (wavelengths.length >= 10 && wavelengths[0] < 100) {
+                // Si la primera fila eran lecturas espectrales (absorbancia < 100) y no longitudes de onda
+                if (wavelengths.length === 3300) {
+                    wavelengths = Array.from({ length: 3300 }, (_, i) => 850 + i * 0.5);
+                    dataSliceStart = 0; // La fila 0 es también una muestra
+                } else if (wavelengths.length === 3301) {
+                    wavelengths = Array.from({ length: 3301 }, (_, i) => 850 + i * 0.5);
+                    dataSliceStart = 0;
+                }
             }
 
-            const samplesData: Sample[] = data.slice(1).map((row, index): Sample | null => {
+            const samplesData: Sample[] = data.slice(dataSliceStart).map((row, index): Sample | null => {
                 const id = String(row[0]);
                 
                 let analyticalValue = 0;

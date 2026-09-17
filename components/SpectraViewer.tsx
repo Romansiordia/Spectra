@@ -78,9 +78,15 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
     }, [samples, samplingLimit]);
 
     useEffect(() => {
-        if (hasData) {
-            setStartWl(wavelengths[0].toString());
-            setEndWl(wavelengths[wavelengths.length - 1].toString());
+        if (hasData && wavelengths.length > 0) {
+            const firstWl = wavelengths[0];
+            const lastWl = wavelengths[wavelengths.length - 1];
+            setStartWl(firstWl.toString());
+            setEndWl(lastWl.toString());
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.options.scales.x.min = firstWl;
+                chartInstanceRef.current.options.scales.x.max = lastWl;
+            }
         } else {
             setStartWl('');
             setEndWl('');
@@ -234,13 +240,15 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
         const chart = chartInstanceRef.current;
         if (chart && hasData) {
             chart.data.labels = wavelengths;
+            const useZeroTension = wavelengths.length > 1500;
             chart.data.datasets = displayedSamples.map(sample => ({
                 label: sample.id,
                 data: sample.values,
                 borderColor: sample.color,
                 borderWidth: 1.5,
                 pointRadius: 0,
-                tension: 0.1
+                tension: useZeroTension ? 0 : 0.1,
+                normalized: true
             }));
             
             if (isProcessed) {

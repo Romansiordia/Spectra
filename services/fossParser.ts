@@ -4,6 +4,13 @@ export const parseFossNirText = (text: string): { wavelengths: number[], samples
     
     // Posibles configuraciones de espectro FOSS (Longitud de onda inicial, cantidad de puntos, step)
     const commonSpecs = [
+        // FOSS 2 Segmentos: 850-1099.5 nm (500 pts Si) + 1100-2499.5 nm (2800 pts InGaAs) = 3300 pts a 0.5 nm
+        { points: 3300, start: 850, step: 0.5 },
+        { points: 3301, start: 850, step: 0.5 }, // 850 - 2500 nm (0.5 nm step)
+        { points: 3401, start: 800, step: 0.5 }, // 800 - 2500 nm (0.5 nm step)
+        { points: 3400, start: 800, step: 0.5 }, // 800 - 2499.5 nm (0.5 nm step)
+        { points: 851, start: 800, step: 2 },    // 800 - 2500 nm (2nm step)
+        { points: 850, start: 800, step: 2 },    // 800 - 2498 nm (2nm step)
         { points: 825, start: 850, step: 2 },
         { points: 826, start: 850, step: 2 },
         { points: 700, start: 1100, step: 2 },
@@ -61,9 +68,28 @@ export const parseFossNirText = (text: string): { wavelengths: number[], samples
                     wavelengths: Array.from({length: spec.points}, (_, i) => spec.start + i * spec.step),
                     samples: samples
                 };
+            } else if (uniformLength === 3300) {
+                // Dual-Segment FOSS: 850 - 2499.5 nm (res 0.5 nm)
+                return {
+                    wavelengths: Array.from({length: 3300}, (_, i) => 850 + i * 0.5),
+                    samples: samples
+                };
+            } else if (uniformLength === 3301) {
+                // Dual-Segment FOSS: 850 - 2500 nm (res 0.5 nm)
+                return {
+                    wavelengths: Array.from({length: 3301}, (_, i) => 850 + i * 0.5),
+                    samples: samples
+                };
             } else if (uniformLength > 100 && uniformLength < 5000) {
                 let start = 400;
                 let end = 2500;
+                if (uniformLength >= 3290 && uniformLength <= 3310) {
+                    start = 850;
+                    end = 2499.5;
+                } else if (uniformLength >= 3390 && uniformLength <= 3415) {
+                    start = 800;
+                    end = 2500;
+                }
                 let step = (end - start) / (uniformLength - 1);
                 return {
                     wavelengths: Array.from({length: uniformLength}, (_, i) => start + i * step),
@@ -81,9 +107,13 @@ export const parseFossNirBinary = (buffer: ArrayBuffer): { wavelengths: number[]
   
   // Posibles configuraciones de espectro FOSS (Longitud de onda inicial, cantidad de puntos, step)
   const commonSpecs = [
+    // FOSS 2 Segmentos: 850-1099.5 nm (500 pts Si) + 1100-2499.5 nm (2800 pts InGaAs) = 3300 pts a 0.5 nm
+    { points: 3300, start: 850, step: 0.5 },
+    { points: 3301, start: 850, step: 0.5 }, // 850 - 2500 nm (0.5 nm step)
+    { points: 3401, start: 800, step: 0.5 }, // 800 - 2500 nm (0.5nm step)
+    { points: 3400, start: 800, step: 0.5 }, // 800 - 2499.5 nm (0.5nm step)
     { points: 851, start: 800, step: 2 },    // 800 - 2500 nm (2nm step)
     { points: 850, start: 800, step: 2 },    // 800 - 2498 nm (2nm step)
-    { points: 3401, start: 800, step: 0.5 }, // 800 - 2500 nm (0.5nm step)
     { points: 1701, start: 800, step: 1 },   // 800 - 2500 nm (1nm step)
     { points: 825, start: 850, step: 2 },    // 850 - 2498 nm (FOSS NIRS DS3 F / Optimo)
     { points: 826, start: 850, step: 2 },    // 850 - 2500 nm 
@@ -219,9 +249,12 @@ export const parseFossNirBinary = (buffer: ArrayBuffer): { wavelengths: number[]
       if (maxSeq.length > 200 && maxSeq.length < 5000) {
           let start = 400;
           let end = 2500;
-          if (maxSeq.length === 851) { start = 800; end = 2500; }
-          else if (maxSeq.length === 850) { start = 800; end = 2498; }
+          if (maxSeq.length === 3300) { start = 850; end = 2499.5; }
+          else if (maxSeq.length === 3301) { start = 850; end = 2500; }
           else if (maxSeq.length === 3401) { start = 800; end = 2500; }
+          else if (maxSeq.length === 3400) { start = 800; end = 2499.5; }
+          else if (maxSeq.length === 851) { start = 800; end = 2500; }
+          else if (maxSeq.length === 850) { start = 800; end = 2498; }
           else if (maxSeq.length === 1701) { start = 800; end = 2500; }
           else if (maxSeq.length === 826) { start = 850; end = 2500; }
           else if (maxSeq.length === 825) { start = 850; end = 2498; }
@@ -229,6 +262,8 @@ export const parseFossNirBinary = (buffer: ArrayBuffer): { wavelengths: number[]
           else if (maxSeq.length === 700) { start = 1100; end = 2498; }
           else if (maxSeq.length === 1051) { start = 400; end = 2500; }
           else if (maxSeq.length === 1026) { start = 450; end = 2500; }
+          else if (maxSeq.length >= 3290 && maxSeq.length <= 3310) { start = 850; end = 2499.5; }
+          else if (maxSeq.length >= 3390 && maxSeq.length <= 3415) { start = 800; end = 2500; }
           
           let step = (end - start) / (maxSeq.length - 1);
           return {
@@ -251,8 +286,13 @@ export const parseFOSS = (
   const text = textDecoder.decode(buffer);
   
   let result = null;
-  // Check if it's an ASCII export (like from Mosaic)
-  if (text.includes('File Name:') || text.includes('Position') || text.includes('Sample Number')) {
+  // Check if it's an ASCII export (like from Mosaic, WinISI or FOSS text export)
+  if (text.includes('File Name:') || text.includes('Position') || text.includes('Sample Number') || text.includes('Segment') || text.includes('FOSS') || text.includes('foss')) {
+      result = parseFossNirText(text);
+  }
+
+  if (!result && !text.includes('\0\0\0')) {
+      // If it looks like plain text with multiple lines and numbers, try text parsing
       result = parseFossNirText(text);
   }
   
