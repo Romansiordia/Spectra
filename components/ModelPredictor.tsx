@@ -457,8 +457,12 @@ const ModelPredictor: React.FC = () => {
 
             if (vals.length === 0) return [m.analyticalProperty, "-", "-", "-", "-"];
             
-            const min = Math.min(...vals);
-            const max = Math.max(...vals);
+            let min = vals[0];
+            let max = vals[0];
+            for (let i = 1; i < vals.length; i++) {
+                if (vals[i] < min) min = vals[i];
+                if (vals[i] > max) max = vals[i];
+            }
             const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
             const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (vals.length > 1 ? vals.length - 1 : 1);
             const sd = Math.sqrt(variance);

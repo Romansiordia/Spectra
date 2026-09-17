@@ -120,10 +120,17 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
                 const inliersData = allDataPoints.filter(p => !p.isOutlier);
                 const outliersData = allDataPoints.filter(p => p.isOutlier);
 
-                const xValues = allDataPoints.map(p => p.x);
-                const yValues = allDataPoints.map(p => p.y);
-                const minVal = Math.min(...xValues, ...yValues);
-                const maxVal = Math.max(...xValues, ...yValues);
+                let minVal = Infinity;
+                let maxVal = -Infinity;
+                for (let i = 0; i < allDataPoints.length; i++) {
+                    const p = allDataPoints[i];
+                    if (p.x < minVal) minVal = p.x;
+                    if (p.y < minVal) minVal = p.y;
+                    if (p.x > maxVal) maxVal = p.x;
+                    if (p.y > maxVal) maxVal = p.y;
+                }
+                if (!isFinite(minVal)) minVal = 0;
+                if (!isFinite(maxVal)) maxVal = 1;
                 const padding = (maxVal - minVal) * 0.1 || 1;
 
                 chartInstance.data.datasets = [

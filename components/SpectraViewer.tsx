@@ -217,7 +217,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                             }
                         },
                         interaction: {
-                            mode: 'index',
+                            mode: 'nearest',
                             axis: 'x',
                             intersect: false
                         }
@@ -241,21 +241,44 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
         if (chart && hasData) {
             chart.data.labels = wavelengths;
             const useZeroTension = wavelengths.length > 1500;
-            chart.data.datasets = displayedSamples.map(sample => ({
-                label: sample.id,
-                data: sample.values,
-                borderColor: sample.color,
-                borderWidth: 1.5,
-                pointRadius: 0,
-                tension: useZeroTension ? 0 : 0.1,
-                normalized: true
-            }));
+            
+            // Si el eje x es numérico (linear), los puntos {x: wl, y: val} con parsing: false
+            // garantizan el mayor rendimiento posible y previenen cualquier desbordamiento de recursión en Chart.js
+            chart.data.datasets = displayedSamples.map(sample => {
+                const points = new Array(wavelengths.length);
+                for (let j = 0; j < wavelengths.length; j++) {
+                    points[j] = { x: wavelengths[j], y: sample.values[j] };
+                }
+                return {
+                    label: sample.id,
+                    data: points,
+                    borderColor: sample.color,
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: useZeroTension ? 0 : 0.1,
+                    normalized: true,
+                    parsing: false
+                };
+            });
             
             if (isProcessed) {
-                const allValues = displayedSamples.flatMap(s => s.values).filter(v => typeof v === 'number' && isFinite(v));
-                if (allValues.length > 0) {
-                    const min = Math.min(...allValues);
-                    const max = Math.max(...allValues);
+                let min = Infinity;
+                let max = -Infinity;
+                let hasValid = false;
+
+                for (let i = 0; i < displayedSamples.length; i++) {
+                    const vals = displayedSamples[i].values;
+                    for (let j = 0; j < vals.length; j++) {
+                        const v = vals[j];
+                        if (typeof v === 'number' && isFinite(v)) {
+                            if (v < min) min = v;
+                            if (v > max) max = v;
+                            hasValid = true;
+                        }
+                    }
+                }
+
+                if (hasValid) {
                     const padding = (max - min) * 0.1 || 0.1;
                     chart.options.scales.y.min = min - padding;
                     chart.options.scales.y.max = max + padding;

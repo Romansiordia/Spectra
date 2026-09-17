@@ -483,8 +483,8 @@ export function runComprehensivePca(
         referenceSpectrum = referenceSpectrum.map(v => v / samples.length);
     }
 
-    const minLength = Math.min(...samples.map(s => s.values.length));
-    if (minLength === 0) return null;
+    const minLength = samples.reduce((min, s) => Math.min(min, s.values.length), Infinity);
+    if (minLength === 0 || !isFinite(minLength)) return null;
 
     const X_processed = samples.map(s => {
         const spec = s.values.slice(0, minLength);
@@ -708,8 +708,8 @@ export function runPcaAnalysis(
 ): PcaScore[] {
     if (samples.length < 2) return [];
 
-    const minLength = Math.min(...samples.map(s => s.values.length));
-    if (minLength === 0) return [];
+    const minLength = samples.reduce((min, s) => Math.min(min, s.values.length), Infinity);
+    if (minLength === 0 || !isFinite(minLength)) return [];
     
     const X_raw = samples.map(s => s.values.slice(0, minLength));
     const X = new Matrix(X_raw);
