@@ -1,5 +1,5 @@
 
-import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel } from '../types';
+import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel, RobpcaSampleType } from '../types';
 import { Matrix, inverse, solve } from 'ml-matrix';
 
 // ===============================================
@@ -453,6 +453,254 @@ export function runPlsAnalysis(
 }
 
 // ===============================================
+// ALGORITMOS AVANZADOS: ROBPCA (HUBERT) & LOCAL OUTLIER FACTOR (LOF)
+// ===============================================
+
+function calculateMedian(arr: number[]): number {
+    if (arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function calculateMad(arr: number[], med?: number): number {
+    const m = med !== undefined ? med : calculateMedian(arr);
+    const deviations = arr.map(x => Math.abs(x - m));
+    return calculateMedian(deviations) * 1.4826;
+}
+
+/**
+ * Local Outlier Factor (LOF) sobre el espacio de Scores de PCA.
+ * Compara la densidad local de un espectro respecto a sus vecinos k más cercanos.
+ */
+export function computeLocalOutlierFactor(
+    scores: number[][],
+    kNeighbors?: number
+): { lofScores: number[]; threshold: number; isOutlier: boolean[] } {
+    const N = scores.length;
+    if (N < 4) {
+        return {
+            lofScores: new Array(N).fill(1.0),
+            threshold: 1.4,
+            isOutlier: new Array(N).fill(false)
+        };
+    }
+
+    const A = scores[0].length;
+    // k adaptativo: entre 3 y 20, típicamente ~N/4
+    const k = Math.min(20, Math.max(3, kNeighbors || Math.floor(N / 4)));
+
+    // 1. Matriz de distancias euclidianas entre todos los pares de scores
+    const distMatrix: number[][] = Array.from({ length: N }, () => new Array(N).fill(0));
+    for (let i = 0; i < N; i++) {
+        for (let j = i + 1; j < N; j++) {
+            let sumSq = 0;
+            for (let a = 0; a < A; a++) {
+                const diff = scores[i][a] - scores[j][a];
+                sumSq += diff * diff;
+            }
+            const dist = Math.sqrt(sumSq);
+            distMatrix[i][j] = dist;
+            distMatrix[j][i] = dist;
+        }
+    }
+
+    // 2. k-distancia de cada punto p y su vecindario N_k(p)
+    const kDistances = new Array(N).fill(0);
+    const neighborhoods: number[][] = [];
+
+    for (let i = 0; i < N; i++) {
+        const neighborsWithDist: { idx: number; dist: number }[] = [];
+        for (let j = 0; j < N; j++) {
+            if (i !== j) {
+                neighborsWithDist.push({ idx: j, dist: distMatrix[i][j] });
+            }
+        }
+        neighborsWithDist.sort((a, b) => a.dist - b.dist);
+
+        const kIndex = Math.min(k - 1, neighborsWithDist.length - 1);
+        const kDist = neighborsWithDist[kIndex]?.dist || 1e-6;
+        kDistances[i] = kDist;
+
+        // Todos los vecinos cuya distancia <= k-distancia
+        const nbrs = neighborsWithDist
+            .filter(n => n.dist <= kDist + 1e-9)
+            .map(n => n.idx);
+        neighborhoods.push(nbrs.length > 0 ? nbrs : [neighborsWithDist[0]?.idx || 0]);
+    }
+
+    // 3. Local Reachability Density (lrd) de cada punto
+    const lrd = new Array(N).fill(0);
+    for (let i = 0; i < N; i++) {
+        const nbrs = neighborhoods[i];
+        let sumReachDist = 0;
+        for (const o of nbrs) {
+            const reachDist = Math.max(kDistances[o], distMatrix[i][o]);
+            sumReachDist += reachDist;
+        }
+        lrd[i] = nbrs.length / (sumReachDist > 1e-9 ? sumReachDist : 1e-9);
+    }
+
+    // 4. Local Outlier Factor (LOF)
+    const lofScores = new Array(N).fill(1.0);
+    for (let i = 0; i < N; i++) {
+        const nbrs = neighborhoods[i];
+        let sumRatio = 0;
+        for (const o of nbrs) {
+            sumRatio += lrd[o] / (lrd[i] > 1e-9 ? lrd[i] : 1e-9);
+        }
+        const val = sumRatio / (nbrs.length > 0 ? nbrs.length : 1);
+        lofScores[i] = isFinite(val) ? Math.max(0, val) : 1.0;
+    }
+
+    // 5. Umbral de corte de LOF adaptativo (típicamente > 1.35 - 1.5)
+    const medianLof = calculateMedian(lofScores);
+    const madLof = calculateMad(lofScores, medianLof);
+    const adaptiveThreshold = Math.max(1.35, medianLof + 2.5 * madLof);
+    const threshold = Number(Math.min(adaptiveThreshold, 2.0).toFixed(2));
+
+    const isOutlier = lofScores.map(score => score > threshold);
+
+    return { lofScores, threshold, isOutlier };
+}
+
+/**
+ * ROBPCA (Robust PCA - Hubert & Verboven Diagnostic).
+ * Separa anomalías de apalancamiento (Score Distance - SD) de errores físicos (Orthogonal Distance - OD).
+ */
+export function computeRobpcaMetrics(
+    scores: number[][],
+    orthogonalDistances: number[]
+): {
+    sdValues: number[];
+    odValues: number[];
+    cutoffSD: number;
+    cutoffOD: number;
+    types: RobpcaSampleType[];
+    isOutlier: boolean[];
+} {
+    const N = scores.length;
+    const A = scores[0]?.length || 1;
+
+    // Chi-cuadrado para cutoff SD al 97.5%
+    const chi2_975_table: { [key: number]: number } = {
+        1: 5.024,
+        2: 7.378,
+        3: 9.348,
+        4: 11.143,
+        5: 12.833
+    };
+    const chi2Val = chi2_975_table[A] || (A + 2.5 * Math.sqrt(2 * A));
+    const cutoffSD = Math.sqrt(chi2Val);
+
+    // 1. Estimación Robusta de Centro y Dispersión (Inmune a atípicos mediante FastMCD / pesos robustos)
+    const medians: number[] = [];
+    const mads: number[] = [];
+    for (let a = 0; a < A; a++) {
+        const col = scores.map(row => row[a]);
+        const med = calculateMedian(col);
+        const md = Math.max(1e-6, calculateMad(col, med));
+        medians.push(med);
+        mads.push(md);
+    }
+
+    // Distancias preliminares robustas por coordenada
+    const initialDistances = scores.map(row => {
+        let sumSq = 0;
+        for (let a = 0; a < A; a++) {
+            const z = (row[a] - medians[a]) / mads[a];
+            sumSq += z * z;
+        }
+        return Math.sqrt(sumSq);
+    });
+
+    // Ponderación: 75% más central retiene peso 1, extremos 0
+    const sortedDists = [...initialDistances].sort((a, b) => a - b);
+    const h = Math.max(3, Math.floor(0.75 * N));
+    const rawCutoff = sortedDists[h - 1] || cutoffSD;
+
+    // Centroide robusto ponderado
+    const robustWeights = initialDistances.map(d => (d <= rawCutoff ? 1 : 0));
+    const sumW = robustWeights.reduce((a, b) => a + b, 0) || 1;
+
+    const robustMean = new Array(A).fill(0);
+    for (let i = 0; i < N; i++) {
+        if (robustWeights[i]) {
+            for (let a = 0; a < A; a++) {
+                robustMean[a] += scores[i][a];
+            }
+        }
+    }
+    for (let a = 0; a < A; a++) robustMean[a] /= sumW;
+
+    // Varianza robusta de cada componente
+    const robustVar = new Array(A).fill(0);
+    for (let i = 0; i < N; i++) {
+        if (robustWeights[i]) {
+            for (let a = 0; a < A; a++) {
+                const diff = scores[i][a] - robustMean[a];
+                robustVar[a] += diff * diff;
+            }
+        }
+    }
+    for (let a = 0; a < A; a++) {
+        robustVar[a] = Math.max(1e-6, robustVar[a] / (sumW > 1 ? sumW - 1 : 1));
+    }
+
+    // 2. Score Distance Robusta (SD)
+    const sdValues = scores.map(row => {
+        let sumSq = 0;
+        for (let a = 0; a < A; a++) {
+            const diff = row[a] - robustMean[a];
+            sumSq += (diff * diff) / robustVar[a];
+        }
+        return Math.sqrt(sumSq);
+    });
+
+    // 3. Cutoff para Orthogonal Distance (OD) usando transformación Wilson-Hilferty
+    const odValues = [...orthogonalDistances];
+    const odPowered = odValues.map(od => Math.pow(Math.max(1e-9, od), 2 / 3));
+    const odMed = calculateMedian(odPowered);
+    const odMad = Math.max(1e-6, calculateMad(odPowered, odMed));
+
+    const z975 = 1.96;
+    const cutoffPower = odMed + z975 * odMad;
+    const cutoffOD = cutoffPower > 0 ? Math.pow(cutoffPower, 1.5) : Math.max(1e-4, calculateMedian(odValues) * 2.5);
+
+    // 4. Clasificación en los 4 Cuadrantes de Hubert
+    const types: RobpcaSampleType[] = [];
+    const isOutlier: boolean[] = [];
+
+    for (let i = 0; i < N; i++) {
+        const isHighSD = sdValues[i] > cutoffSD;
+        const isHighOD = odValues[i] > cutoffOD;
+
+        let type: RobpcaSampleType = 'regular';
+        if (!isHighSD && !isHighOD) {
+            type = 'regular';
+        } else if (isHighSD && !isHighOD) {
+            type = 'good_leverage'; // Extremo químico válido. ¡NO eliminar!
+        } else if (!isHighSD && isHighOD) {
+            type = 'orthogonal'; // Outlier ortogonal (falla espectral física)
+        } else {
+            type = 'bad_leverage'; // Apalancamiento malo (química y físicamente anómalo)
+        }
+
+        types.push(type);
+        isOutlier.push(type === 'bad_leverage' || type === 'orthogonal');
+    }
+
+    return {
+        sdValues,
+        odValues,
+        cutoffSD,
+        cutoffOD,
+        types,
+        isOutlier
+    };
+}
+
+// ===============================================
 // MÓDULO DE ANÁLISIS EXPLORATORIO (PCA) Y DETECCIÓN DE OUTLIERS
 // ===============================================
 
@@ -526,7 +774,6 @@ export function runComprehensivePca(
     const varianceValues: number[] = [];
 
     for (let a = 0; a < A; a++) {
-        // Inicializar t con la columna de mayor varianza
         let maxColIdx = 0;
         let maxVar = -1;
         for (let j = 0; j < Math.min(M, 10); j++) {
@@ -546,17 +793,13 @@ export function runComprehensivePca(
             t_norm_sq = t.transpose().mmul(t).get(0, 0);
             if (t_norm_sq < 1e-12) break;
 
-            // p = (X_res^T * t) / (t^T * t)
             p = X_res.transpose().mmul(t).div(t_norm_sq);
-            // Normalizar p a longitud unitaria
             const p_norm = p.norm('frobenius');
             if (p_norm < 1e-12) break;
             p.div(p_norm);
 
-            // Actualizar t = (X_res * p) / (p^T * p)  [con p unitario, denominador = 1]
             const t_new = X_res.mmul(p);
             
-            // Criterio de convergencia
             let diff = 0;
             for (let i = 0; i < N; i++) {
                 const d = t_new.get(i, 0) - t.get(i, 0);
@@ -568,17 +811,14 @@ export function runComprehensivePca(
 
         t_norm_sq = t.transpose().mmul(t).get(0, 0);
         
-        // Guardar scores y loadings
         for (let i = 0; i < N; i++) T[i][a] = t.get(i, 0);
         for (let j = 0; j < M; j++) P[j][a] = p.get(j, 0);
 
-        // Varianza explicada por este componente
         const compVariance = t_norm_sq;
         varianceValues.push(compVariance);
         const percentVar = (compVariance / totalVariance) * 100;
         varianceExplained.push(isFinite(percentVar) ? percentVar : 0);
 
-        // Deflación: X_res = X_res - (t * p^T)
         const outer = t.mmul(p.transpose());
         X_res = X_res.sub(outer);
     }
@@ -601,7 +841,6 @@ export function runComprehensivePca(
     }
 
     // 5. Cálculo de Hotelling T^2 y Mahalanobis GH por muestra
-    // T^2 = sum_a (t_ia^2 / lambda_a)
     const hotellingT2: number[] = new Array(N).fill(0);
     const ghDistances: number[] = new Array(N).fill(0);
 
@@ -611,13 +850,12 @@ export function runComprehensivePca(
             t2 += (T[i][a] * T[i][a]) / lambda[a];
         }
         hotellingT2[i] = t2;
-        // Global H (distancia normalizada al centroide multivariante)
         ghDistances[i] = Math.sqrt(t2 / A);
     }
 
-    // 6. Cálculo de Residual Espectral Q (Distancia al Modelo)
-    // Q_i = sum_j (X_res(i, j)^2)
+    // 6. Cálculo de Residual Espectral Q (Distancia al Modelo) y Orthogonal Distance (OD)
     const qResiduals: number[] = new Array(N).fill(0);
+    const odDistances: number[] = new Array(N).fill(0);
     for (let i = 0; i < N; i++) {
         let q = 0;
         for (let j = 0; j < M; j++) {
@@ -625,13 +863,10 @@ export function runComprehensivePca(
             q += r * r;
         }
         qResiduals[i] = q;
+        odDistances[i] = Math.sqrt(Math.max(0, q));
     }
 
-    // 7. Límites estadísticos teóricos de detección
-    // Límite de Hotelling T^2 mediante aproximación F-Snedecor:
-    // T^2_lim = (A * (N^2 - 1) / (N * (N - A))) * F_alpha(A, N - A)
-    // Para simplificar sin librería pesada de distribución F, usamos aproximación Chi-cuadrado estándar
-    // Chi-cuadrado para A=2: 95% = 5.991, 99% = 9.210; para A=3: 95% = 7.815, 99% = 11.345
+    // 7. Límites estadísticos teóricos clásicos de Hotelling T^2 y Q
     let chi2_95 = 5.991;
     let chi2_99 = 9.210;
     if (A === 1) { chi2_95 = 3.841; chi2_99 = 6.635; }
@@ -641,28 +876,48 @@ export function runComprehensivePca(
     const t2Limit95 = ((A * (N - 1)) / (N - A > 0 ? N - A : 1)) * (chi2_95 / A);
     const t2Limit99 = ((A * (N - 1)) / (N - A > 0 ? N - A : 1)) * (chi2_99 / A);
 
-    // Límite de Q (Residuales espectrales): usando media + 2*SD (95%) y media + 3*SD (99%)
     const qMean = qResiduals.reduce((a, b) => a + b, 0) / N;
     const qVar = qResiduals.reduce((a, b) => a + Math.pow(b - qMean, 2), 0) / (N > 1 ? N - 1 : 1);
     const qSd = Math.sqrt(qVar);
     const qLimit95 = qMean + 2 * qSd;
     const qLimit99 = qMean + 3 * qSd;
 
-    // 8. Empaquetar puntos de score con diagnóstico de anomalías
+    // 8. Cálculo de Modelos Avanzados: ROBPCA y Local Outlier Factor (LOF)
+    const robpca = computeRobpcaMetrics(T, odDistances);
+    const lof = computeLocalOutlierFactor(T);
+
+    // 9. Empaquetar puntos de score con diagnóstico de anomalías multi-método
     let outlierCount = 0;
     const scorePoints: PcaScorePoint[] = samples.map((s, idx) => {
         const gh = ghDistances[idx];
         const t2 = hotellingT2[idx];
         const q = qResiduals[idx];
+        const sd = robpca.sdValues[idx];
+        const od = robpca.odValues[idx];
+        const robpcaType = robpca.types[idx];
+        const isRobpcaOutlier = robpca.isOutlier[idx];
+        const lofScore = lof.lofScores[idx];
+        const isLofOutlier = lof.isOutlier[idx];
 
-        // Criterio de outlier robusto: GH > 3.0 (Estándar quimiométrico FOSS/Bruker) o T2 > límite 99% o Q > límite 99%
         const isGhOutlier = gh > 3.0;
         const isT2Outlier = t2 > t2Limit99;
         const isQOutlier = q > qLimit99;
-        const isOutlier = isGhOutlier || isT2Outlier || isQOutlier;
+
+        // Criterio Quimiométrico:
+        // Si ROBPCA lo identifica como 'good_leverage' (extremo químico limpio), NO lo eliminamos (es clave para calibración)
+        // Se considera outlier si es bad_leverage, orthogonal, LOF anómalo, o excede los límites clásicos
+        const isOutlier = (isRobpcaOutlier || isLofOutlier || isGhOutlier || isT2Outlier || isQOutlier) && robpcaType !== 'good_leverage';
 
         let outlierReason = '';
-        if (isGhOutlier && isQOutlier) {
+        if (robpcaType === 'bad_leverage') {
+            outlierReason = `ROBPCA: Apalancamiento Dañino (SD=${sd.toFixed(2)} > ${robpca.cutoffSD.toFixed(2)}, OD=${od.toFixed(3)} > ${robpca.cutoffOD.toFixed(3)})`;
+        } else if (robpcaType === 'orthogonal') {
+            outlierReason = `ROBPCA: Outlier Ortogonal / Falla Física (OD=${od.toFixed(3)} > ${robpca.cutoffOD.toFixed(3)})`;
+        } else if (robpcaType === 'good_leverage') {
+            outlierReason = `ROBPCA: Apalancamiento Bueno (Extremo químico válido, conservar)`;
+        } else if (isLofOutlier) {
+            outlierReason = `LOF: Densidad Local Anómala (Factor ${lofScore.toFixed(2)} > ${lof.threshold.toFixed(2)})`;
+        } else if (isGhOutlier && isQOutlier) {
             outlierReason = 'Outlier Extremo (GH > 3.0 y Residual Q muy alto)';
         } else if (isGhOutlier) {
             outlierReason = `Mahalanobis Alto (GH ${gh.toFixed(2)} > 3.0)`;
@@ -683,12 +938,25 @@ export function runComprehensivePca(
             hotellingT2: t2,
             qResidual: q,
             isOutlier,
-            outlierReason: isOutlier ? outlierReason : undefined,
+            outlierReason: isOutlier || robpcaType === 'good_leverage' ? outlierReason : undefined,
             active: s.active,
-            color: s.color || (isOutlier ? '#f43f5e' : '#38bdf8'),
-            analyticalValue: s.analyticalValue
+            color: s.color || (isOutlier ? '#f43f5e' : (robpcaType === 'good_leverage' ? '#38bdf8' : (gh > 2.0 ? '#fbbf24' : '#10b981'))),
+            analyticalValue: s.analyticalValue,
+            robpcaSD: Number(sd.toFixed(3)),
+            robpcaOD: Number(od.toFixed(4)),
+            robpcaType,
+            isRobpcaOutlier,
+            lofScore: Number(lofScore.toFixed(3)),
+            isLofOutlier
         };
     });
+
+    const robpcaSummary = {
+        regular: robpca.types.filter(t => t === 'regular').length,
+        goodLeverage: robpca.types.filter(t => t === 'good_leverage').length,
+        badLeverage: robpca.types.filter(t => t === 'bad_leverage').length,
+        orthogonal: robpca.types.filter(t => t === 'orthogonal').length,
+    };
 
     return {
         scores: scorePoints,
@@ -699,7 +967,12 @@ export function runComprehensivePca(
         qLimit95,
         qLimit99,
         outlierCount,
-        totalCount: N
+        totalCount: N,
+        robpcaCutoffSD: Number(robpca.cutoffSD.toFixed(3)),
+        robpcaCutoffOD: Number(robpca.cutoffOD.toFixed(4)),
+        robpcaSummary,
+        lofThreshold: lof.threshold,
+        lofOutlierCount: lof.isOutlier.filter(Boolean).length
     };
 }
 

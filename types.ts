@@ -14,6 +14,8 @@ export interface PreprocessingStep {
     params: { [key: string]: any };
 }
 
+export type RobpcaSampleType = 'regular' | 'good_leverage' | 'bad_leverage' | 'orthogonal';
+
 export interface PcaScorePoint {
     id: string | number;
     pc1: number;
@@ -27,6 +29,14 @@ export interface PcaScorePoint {
     active: boolean; // Si está incluida en la calibración
     color: string;
     analyticalValue?: number;
+    // Diagnóstico ROBPCA (Hubert Diagnostic)
+    robpcaSD: number; // Score Distance Robusta
+    robpcaOD: number; // Orthogonal Distance Robusta
+    robpcaType: RobpcaSampleType;
+    isRobpcaOutlier: boolean; // Bad leverage u Orthogonal outlier
+    // Diagnóstico LOF (Local Outlier Factor)
+    lofScore: number;
+    isLofOutlier: boolean;
 }
 
 export interface PcaAnalysisModel {
@@ -39,6 +49,18 @@ export interface PcaAnalysisModel {
     qLimit99: number;
     outlierCount: number;
     totalCount: number;
+    // Metadatos ROBPCA
+    robpcaCutoffSD: number;
+    robpcaCutoffOD: number;
+    robpcaSummary: {
+        regular: number;
+        goodLeverage: number;
+        badLeverage: number;
+        orthogonal: number;
+    };
+    // Metadatos LOF
+    lofThreshold: number;
+    lofOutlierCount: number;
 }
 
 export interface PcaResult {
