@@ -13,13 +13,22 @@ interface PreprocessingEditorProps {
 
 const PREPROCESSING_METHODS = {
     'none': { name: 'Ninguno', params: [] },
-    'savgolsmooth': {
-        name: 'Suavizado (Savitzky-Golay)',
+    'winisi2441': { name: 'WinISI 2,4,4,1 (2ª Derivada FOSS Estándar)', params: [] },
+    'winisi1441': { name: 'WinISI 1,4,4,1 (1ª Derivada FOSS Granos)', params: [] },
+    'winisi1881': { name: 'WinISI 1,8,8,1 (1ª Derivada Alta Res 0.5nm)', params: [] },
+    'winisi2861': { name: 'WinISI 2,8,6,1 (2ª Derivada Compleja)', params: [] },
+    'winisi_custom': {
+        name: 'WinISI Personalizado (D, G, S1, S2)',
         params: [
-            { id: 'windowSize', name: 'Ventana (impar)', type: 'number', default: 11 },
-            { id: 'polynomialOrder', name: 'Polinomio', type: 'number', default: 2 },
+            { id: 'derivative', name: 'D (Derivada)', type: 'number', default: 2 },
+            { id: 'gap', name: 'G (Gap)', type: 'number', default: 4 },
+            { id: 'smooth1', name: 'S1 (Suav. 1)', type: 'number', default: 4 },
+            { id: 'smooth2', name: 'S2 (Suav. 2)', type: 'number', default: 1 },
         ],
     },
+    'snv': { name: 'SNV (Standard Normal Variate)', params: [] },
+    'detrend': { name: 'Detrend', params: [] },
+    'msc': { name: 'MSC (Multiplicative Scatter Correction)', params: [] },
     'savgol1': {
         name: '1ª Derivada (Savitzky-Golay)',
         params: [
@@ -34,9 +43,13 @@ const PREPROCESSING_METHODS = {
             { id: 'polynomialOrder', name: 'Polinomio', type: 'number', default: 2 },
         ],
     },
-    'snv': { name: 'SNV (Standard Normal Variate)', params: [] },
-    'msc': { name: 'MSC (Multiplicative Scatter Correction)', params: [] },
-    'detrend': { name: 'Detrend', params: [] },
+    'savgolsmooth': {
+        name: 'Suavizado (Savitzky-Golay)',
+        params: [
+            { id: 'windowSize', name: 'Ventana (impar)', type: 'number', default: 11 },
+            { id: 'polynomialOrder', name: 'Polinomio', type: 'number', default: 2 },
+        ],
+    },
 };
 
 const VisualizeIcon: React.FC = () => (
@@ -112,16 +125,16 @@ const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSte
                                     </button>
                                 </div>
                                  {methodInfo.params.length > 0 && (
-                                    <div className="grid grid-cols-3 gap-3 mt-3">
+                                    <div className={`grid gap-2 mt-3 ${methodInfo.params.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
                                         {(methodInfo.params as any[]).map(param => (
                                             <div key={param.id} className="text-xs">
-                                                <label htmlFor={`${param.id}-${index}`} className="text-slate-400 font-medium mb-1 block">{param.name}</label>
+                                                <label htmlFor={`${param.id}-${index}`} className="text-slate-400 font-medium mb-1 block truncate" title={param.name}>{param.name}</label>
                                                 <input
                                                     type={param.type}
                                                     id={`${param.id}-${index}`}
-                                                    value={step.params[param.id] || ''}
+                                                    value={step.params[param.id] ?? ''}
                                                     onChange={(e) => handleParamChange(index, param.id, e.target.value)}
-                                                    className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                                    className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono text-center"
                                                 />
                                             </div>
                                         ))}

@@ -54,6 +54,82 @@ function savitzkyGolay(data: number[], options: { windowSize: number; polynomial
     }
 }
 
+/**
+ * Tratamiento Matemático de Derivada y Suavizado WinISI (Shenk & Westerhaus, 1991)
+ * Notación clásica: (D, G, S1, S2)
+ * - D: Orden de la derivada (1 = 1ª derivada, 2 = 2ª derivada, 0 = sin derivada)
+ * - G: Gap o intervalo de salto en puntos
+ * - S1: Ancho de ventana del 1er suavizado móvil (boxcar smooth)
+ * - S2: Ancho de ventana del 2º suavizado móvil (1 = sin suavizado secundario)
+ */
+export function winisiDerivative(
+    data: number[],
+    params: {
+        derivative?: number;
+        gap?: number;
+        smooth1?: number;
+        smooth2?: number;
+    }
+): number[] {
+    const n = data.length;
+    if (n < 5) return [...data];
+
+    const D = Math.max(0, Math.min(2, Math.round(params.derivative ?? 1)));
+    const G = Math.max(1, Math.round(params.gap ?? 4));
+    const S1 = Math.max(1, Math.round(params.smooth1 ?? 4));
+    const S2 = Math.max(1, Math.round(params.smooth2 ?? 1));
+
+    // Función auxiliar para promedio móvil con extensión de bordes
+    const movingAverage = (arr: number[], windowSize: number): number[] => {
+        if (windowSize <= 1) return [...arr];
+        const half = Math.floor(windowSize / 2);
+        const isEven = windowSize % 2 === 0;
+        const res = new Array(n);
+
+        for (let i = 0; i < n; i++) {
+            let sum = 0;
+            for (let k = -half; k < half + (isEven ? 0 : 1); k++) {
+                const idx = Math.max(0, Math.min(n - 1, i + k));
+                sum += arr[idx];
+            }
+            res[i] = sum / windowSize;
+        }
+        return res;
+    };
+
+    // Paso 1: Primer suavizado (S1)
+    const s1Spectrum = movingAverage(data, S1);
+
+    // Paso 2: Derivada por Gap (D, G)
+    let derivSpectrum = new Array(n);
+    if (D === 1) {
+        // 1ª Derivada: Diferencia de salto G (centrada)
+        const halfG = Math.max(1, Math.floor(G / 2));
+        for (let i = 0; i < n; i++) {
+            const rightIdx = Math.min(n - 1, i + halfG);
+            const leftIdx = Math.max(0, i - halfG);
+            derivSpectrum[i] = s1Spectrum[rightIdx] - s1Spectrum[leftIdx];
+        }
+    } else if (D === 2) {
+        // 2ª Derivada: Diferencia de diferencias con salto G
+        // d2 = (y[i+G] - y[i]) - (y[i] - y[i-G]) = y[i+G] - 2*y[i] + y[i-G]
+        for (let i = 0; i < n; i++) {
+            const rightIdx = Math.min(n - 1, i + G);
+            const leftIdx = Math.max(0, i - G);
+            derivSpectrum[i] = s1Spectrum[rightIdx] - 2 * s1Spectrum[i] + s1Spectrum[leftIdx];
+        }
+    } else {
+        // D === 0: Sin derivada
+        derivSpectrum = s1Spectrum;
+    }
+
+    // Paso 3: Segundo suavizado (S2)
+    if (S2 > 1) {
+        return movingAverage(derivSpectrum, S2);
+    }
+    return derivSpectrum;
+}
+
 export function applyPreprocessingLogic(inputSpectrum: number[], steps: PreprocessingStep[], referenceSpectrum?: number[]): number[] {
     let processedSpectrum = [...inputSpectrum];
     
@@ -106,6 +182,32 @@ export function applyPreprocessingLogic(inputSpectrum: number[], steps: Preproce
             case 'savgolsmooth': {
                 const { windowSize = 11, polynomialOrder = 2 } = step.params;
                 processedSpectrum = savitzkyGolay(processedSpectrum, { windowSize: parseInt(String(windowSize)), polynomial: parseInt(String(polynomialOrder)), derivative: 0 });
+                break;
+            }
+            case 'winisi2441': {
+                processedSpectrum = winisiDerivative(processedSpectrum, { derivative: 2, gap: 4, smooth1: 4, smooth2: 1 });
+                break;
+            }
+            case 'winisi1441': {
+                processedSpectrum = winisiDerivative(processedSpectrum, { derivative: 1, gap: 4, smooth1: 4, smooth2: 1 });
+                break;
+            }
+            case 'winisi1881': {
+                processedSpectrum = winisiDerivative(processedSpectrum, { derivative: 1, gap: 8, smooth1: 8, smooth2: 1 });
+                break;
+            }
+            case 'winisi2861': {
+                processedSpectrum = winisiDerivative(processedSpectrum, { derivative: 2, gap: 8, smooth1: 6, smooth2: 1 });
+                break;
+            }
+            case 'winisi_custom': {
+                const { derivative = 2, gap = 4, smooth1 = 4, smooth2 = 1 } = step.params || {};
+                processedSpectrum = winisiDerivative(processedSpectrum, {
+                    derivative: parseInt(String(derivative)),
+                    gap: parseInt(String(gap)),
+                    smooth1: parseInt(String(smooth1)),
+                    smooth2: parseInt(String(smooth2)),
+                });
                 break;
             }
             case 'detrend': {

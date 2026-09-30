@@ -10,7 +10,7 @@ export interface Sample {
 }
 
 export interface PreprocessingStep {
-    method: 'none' | 'savgol' | 'savgol1' | 'savgol2' | 'savgolsmooth' | 'snv' | 'msc' | 'detrend';
+    method: 'none' | 'savgol' | 'savgol1' | 'savgol2' | 'savgolsmooth' | 'snv' | 'msc' | 'detrend' | 'winisi1441' | 'winisi2441' | 'winisi1881' | 'winisi2861' | 'winisi_custom';
     params: { [key: string]: any };
 }
 
