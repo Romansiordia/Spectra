@@ -19,6 +19,7 @@ type AppView = 'calibration' | 'prediction' | 'validation' | 'quality';
 const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<AppView>('calibration');
     const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+    const [rawWavelengths, setRawWavelengths] = useState<number[]>([]);
     const [wavelengths, setWavelengths] = useState<number[]>([]);
     const [samples, setSamples] = useState<Sample[]>([]);
     const [analyticalProperty, setAnalyticalProperty] = useState<string>('Propiedad');
@@ -27,8 +28,13 @@ const App: React.FC = () => {
     const [processedSpectra, setProcessedSpectra] = useState<{ id: string | number; values: number[] }[] | null>(null);
 
     const handleDataLoaded = (data: { wavelengths: number[]; samples: Sample[]; analyticalProperty: string }) => {
+        const samplesWithRaw = data.samples.map(s => ({
+            ...s,
+            rawValues: s.rawValues ? [...s.rawValues] : [...s.values]
+        }));
+        setRawWavelengths([...data.wavelengths]);
         setWavelengths(data.wavelengths);
-        setSamples(data.samples);
+        setSamples(samplesWithRaw);
         setAnalyticalProperty(data.analyticalProperty);
         setModelResults(null);
         setProcessedSpectra(null);
@@ -238,6 +244,53 @@ const App: React.FC = () => {
         setProcessedSpectra(null);
     };
 
+    const handleApplyWavelengthRange = useCallback((startWl: number, endWl: number) => {
+        if (rawWavelengths.length === 0) return;
+        
+        const minWl = Math.min(startWl, endWl);
+        const maxWl = Math.max(startWl, endWl);
+
+        const startIdx = rawWavelengths.findIndex(w => w >= minWl - 0.001);
+        let endIdx = -1;
+        for (let i = rawWavelengths.length - 1; i >= 0; i--) {
+            if (rawWavelengths[i] <= maxWl + 0.001) {
+                endIdx = i;
+                break;
+            }
+        }
+
+        if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) {
+            alert(`Rango no válido. Seleccione valores dentro de ${rawWavelengths[0].toFixed(1)} y ${rawWavelengths[rawWavelengths.length - 1].toFixed(1)} nm.`);
+            return;
+        }
+
+        const trimmedWls = rawWavelengths.slice(startIdx, endIdx + 1);
+        setWavelengths(trimmedWls);
+
+        setSamples(prev => prev.map(s => {
+            const baseValues = s.rawValues || s.values;
+            return {
+                ...s,
+                rawValues: s.rawValues || [...s.values],
+                values: baseValues.slice(startIdx, endIdx + 1)
+            };
+        }));
+
+        setProcessedSpectra(null);
+        setModelResults(null);
+    }, [rawWavelengths]);
+
+    const handleResetWavelengthRange = useCallback(() => {
+        if (rawWavelengths.length === 0) return;
+        setWavelengths([...rawWavelengths]);
+        setSamples(prev => prev.map(s => ({
+            ...s,
+            values: s.rawValues ? [...s.rawValues] : s.values
+        })));
+        setProcessedSpectra(null);
+        setModelResults(null);
+    }, [rawWavelengths]);
+
     const handleExportCleanDataset = () => {
         const activeSamples = samples.filter(s => s.active);
         if (activeSamples.length === 0) return;
@@ -321,6 +374,10 @@ const App: React.FC = () => {
                                 onDeactivateOutliers={handleDeactivateOutliers}
                                 onIncludeAllSamples={handleIncludeAllSamples}
                                 onExportCleanDataset={handleExportCleanDataset}
+                                onApplyWavelengthRange={handleApplyWavelengthRange}
+                                onResetWavelengthRange={handleResetWavelengthRange}
+                                isRangeTrimmed={rawWavelengths.length > 0 && wavelengths.length < rawWavelengths.length}
+                                fullWavelengthRange={rawWavelengths.length > 0 ? { min: rawWavelengths[0], max: rawWavelengths[rawWavelengths.length - 1], count: rawWavelengths.length } : undefined}
                             />
                         </ErrorBoundary>
                     )}

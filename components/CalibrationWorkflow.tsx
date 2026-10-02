@@ -46,6 +46,10 @@ interface CalibrationWorkflowProps {
     onDeactivateOutliers: (outlierIds: (string | number)[]) => void;
     onIncludeAllSamples: () => void;
     onExportCleanDataset: () => void;
+    onApplyWavelengthRange?: (startWl: number, endWl: number) => void;
+    onResetWavelengthRange?: () => void;
+    isRangeTrimmed?: boolean;
+    fullWavelengthRange?: { min: number; max: number; count: number };
 }
 
 export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
@@ -66,7 +70,11 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
     onRunModel,
     onDeactivateOutliers,
     onIncludeAllSamples,
-    onExportCleanDataset
+    onExportCleanDataset,
+    onApplyWavelengthRange,
+    onResetWavelengthRange,
+    isRangeTrimmed,
+    fullWavelengthRange
 }) => {
     const [activeTab, setActiveTab] = useState<CalibrationTab>('data');
 
@@ -275,8 +283,30 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                     </div>
                                     <div className="flex justify-between py-1">
                                         <span className="text-slate-400">Puntos Espectrales (λ):</span>
-                                        <span className="font-mono font-bold text-white">{wavelengths.length} pts</span>
+                                        <div className="flex flex-col items-end">
+                                            <span className={`font-mono font-bold ${isRangeTrimmed ? 'text-amber-400' : 'text-white'}`}>
+                                                {wavelengths.length} pts
+                                            </span>
+                                            {wavelengths.length > 0 && (
+                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                    {wavelengths[0].toFixed(1)} - {wavelengths[wavelengths.length - 1].toFixed(1)} nm
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
+                                    {isRangeTrimmed && (
+                                        <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-[11px] text-amber-300 flex items-center justify-between">
+                                            <span>Recorte espectral activo (sin ruido exterior)</span>
+                                            {onResetWavelengthRange && (
+                                                <button
+                                                    onClick={onResetWavelengthRange}
+                                                    className="underline hover:text-white ml-2 font-semibold"
+                                                >
+                                                    Restablecer
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-4 pt-3 border-t border-ui-border flex flex-col gap-2">
@@ -307,6 +337,10 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 isProcessed={false}
                                 onReset={onResetVisualization}
                                 analyticalProperty={analyticalProperty}
+                                onApplyWavelengthRange={onApplyWavelengthRange}
+                                onResetWavelengthRange={onResetWavelengthRange}
+                                isRangeTrimmed={isRangeTrimmed}
+                                fullWavelengthRange={fullWavelengthRange}
                             />
                         </div>
                     </div>
@@ -382,6 +416,10 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 isProcessed={!!processedSpectra}
                                 onReset={onResetVisualization}
                                 analyticalProperty={analyticalProperty}
+                                onApplyWavelengthRange={onApplyWavelengthRange}
+                                onResetWavelengthRange={onResetWavelengthRange}
+                                isRangeTrimmed={isRangeTrimmed}
+                                fullWavelengthRange={fullWavelengthRange}
                             />
                         </div>
                     </div>

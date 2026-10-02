@@ -1,6 +1,7 @@
 export interface Sample {
     id: string | number;
     values: number[];
+    rawValues?: number[]; // Puntos espectrales originales para permitir restablecer recortes de rango
     color: string;
     active: boolean;
     analyticalValue: number;

@@ -12,6 +12,10 @@ interface SpectraViewerProps {
     isProcessed: boolean;
     onReset: () => void;
     analyticalProperty?: string;
+    onApplyWavelengthRange?: (startWl: number, endWl: number) => void;
+    onResetWavelengthRange?: () => void;
+    isRangeTrimmed?: boolean;
+    fullWavelengthRange?: { min: number; max: number; count: number };
 }
 
 // --- TABLA DE REFERENCIA DE BANDAS NIR ---
@@ -43,7 +47,17 @@ const DownloadIcon: React.FC = () => (
     </svg>
 );
 
-const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isProcessed, onReset, analyticalProperty }) => {
+const SpectraViewer: React.FC<SpectraViewerProps> = ({
+    wavelengths,
+    samples,
+    isProcessed,
+    onReset,
+    analyticalProperty,
+    onApplyWavelengthRange,
+    onResetWavelengthRange,
+    isRangeTrimmed,
+    fullWavelengthRange
+}) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
     const [startWl, setStartWl] = useState('');
@@ -81,11 +95,12 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
         if (hasData && wavelengths.length > 0) {
             const firstWl = wavelengths[0];
             const lastWl = wavelengths[wavelengths.length - 1];
-            setStartWl(firstWl.toString());
-            setEndWl(lastWl.toString());
+            setStartWl(firstWl.toFixed(1));
+            setEndWl(lastWl.toFixed(1));
             if (chartInstanceRef.current) {
-                chartInstanceRef.current.options.scales.x.min = firstWl;
-                chartInstanceRef.current.options.scales.x.max = lastWl;
+                // Al cambiar las longitudes de onda (ej. por recorte), permitimos que Chart.js ajuste el eje a los nuevos datos
+                chartInstanceRef.current.options.scales.x.min = undefined;
+                chartInstanceRef.current.options.scales.x.max = undefined;
             }
         } else {
             setStartWl('');
@@ -309,23 +324,34 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
     };
 
     const handleApplyRange = () => {
-        const chart = chartInstanceRef.current;
-        if (!chart || !hasData) return;
+        if (!hasData) return;
         
-        const start = parseFloat(startWl), end = parseFloat(endWl);
-        const minWl = wavelengths[0], maxWl = wavelengths[wavelengths.length - 1];
+        const start = parseFloat(startWl);
+        const end = parseFloat(endWl);
+        const minWl = fullWavelengthRange ? fullWavelengthRange.min : wavelengths[0];
+        const maxWl = fullWavelengthRange ? fullWavelengthRange.max : wavelengths[wavelengths.length - 1];
 
-        if (isNaN(start) || isNaN(end) || start >= end || start < minWl || end > maxWl) {
-            alert(`Rango espectral inválido.`);
-            setStartWl(minWl.toFixed(2));
-            setEndWl(maxWl.toFixed(2));
-            chart.options.scales.x.min = undefined;
-            chart.options.scales.x.max = undefined;
-        } else {
-            chart.options.scales.x.min = start;
-            chart.options.scales.x.max = end;
+        if (isNaN(start) || isNaN(end) || start >= end || start < minWl - 0.01 || end > maxWl + 0.01) {
+            alert(`Rango espectral inválido. Seleccione valores entre ${minWl.toFixed(1)} y ${maxWl.toFixed(1)} nm.`);
+            if (wavelengths.length > 0) {
+                setStartWl(wavelengths[0].toFixed(1));
+                setEndWl(wavelengths[wavelengths.length - 1].toFixed(1));
+            }
+            return;
         }
-        chart.update();
+
+        if (onApplyWavelengthRange) {
+            // Recorte espectral global para PCA, Preprocesamiento y PLS
+            onApplyWavelengthRange(start, end);
+        } else {
+            // Zoom visual del canvas si no se pasó handler global
+            const chart = chartInstanceRef.current;
+            if (chart) {
+                chart.options.scales.x.min = start;
+                chart.options.scales.x.max = end;
+                chart.update();
+            }
+        }
     };
 
     const handleExportCSV = () => {
@@ -432,17 +458,83 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({ wavelengths, samples, isP
                 ))}
             </div>
 
-            <div className={`grid grid-cols-1 md:grid-cols-12 gap-4 items-end mb-4 bg-ui-dark p-3 rounded-lg border border-ui-border transition-opacity ${!hasData ? 'opacity-50' : ''}`}>
-                <div className="md:col-span-5">
-                    <label htmlFor="startWavelength" className="block text-xs font-semibold text-slate-400 mb-1">Longitud de onda inicial (nm)</label>
-                    <input type="number" id="startWavelength" value={startWl} onChange={e => setStartWl(e.target.value)} disabled={!hasData} className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-shadow shadow-sm disabled:bg-ui-darkest" />
+            {/* --- PANEL DE RECORTE ESPECTRAL (SELECCIÓN DE RANGO) --- */}
+            <div className={`flex flex-col gap-3 mb-4 bg-ui-dark p-3.5 rounded-xl border ${isRangeTrimmed ? 'border-amber-500/40 bg-amber-500/5' : 'border-ui-border'} transition-all ${!hasData ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-ui-border/60 pb-2">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                            Recorte Espectral & Selección de Rango
+                        </span>
+                        {isRangeTrimmed ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                Recorte Activo: {wavelengths.length} pts ({wavelengths[0]?.toFixed(1)} - {wavelengths[wavelengths.length - 1]?.toFixed(1)} nm)
+                            </span>
+                        ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-ui-border">
+                                Espectro Completo ({wavelengths.length} pts)
+                            </span>
+                        )}
+                    </div>
+                    {fullWavelengthRange && isRangeTrimmed && (
+                        <span className="text-[11px] text-slate-400 font-mono">
+                            Total original: {fullWavelengthRange.min.toFixed(1)} – {fullWavelengthRange.max.toFixed(1)} nm ({fullWavelengthRange.count} pts)
+                        </span>
+                    )}
                 </div>
-                <div className="md:col-span-5">
-                    <label htmlFor="endWavelength" className="block text-xs font-semibold text-slate-400 mb-1">Longitud de onda final (nm)</label>
-                    <input type="number" id="endWavelength" value={endWl} onChange={e => setEndWl(e.target.value)} disabled={!hasData} className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-shadow shadow-sm disabled:bg-ui-darkest" />
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-4">
+                        <label htmlFor="startWavelength" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                            Longitud de onda inicial (nm)
+                        </label>
+                        <input
+                            type="number"
+                            id="startWavelength"
+                            value={startWl}
+                            onChange={e => setStartWl(e.target.value)}
+                            disabled={!hasData}
+                            placeholder={wavelengths[0]?.toFixed(1) || ''}
+                            className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ui-accent transition-shadow shadow-sm disabled:bg-ui-darkest"
+                        />
+                    </div>
+                    <div className="md:col-span-4">
+                        <label htmlFor="endWavelength" className="block text-[11px] font-semibold text-slate-400 mb-1">
+                            Longitud de onda final (nm)
+                        </label>
+                        <input
+                            type="number"
+                            id="endWavelength"
+                            value={endWl}
+                            onChange={e => setEndWl(e.target.value)}
+                            disabled={!hasData}
+                            placeholder={wavelengths[wavelengths.length - 1]?.toFixed(1) || ''}
+                            className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ui-accent transition-shadow shadow-sm disabled:bg-ui-darkest"
+                        />
+                    </div>
+                    <div className="md:col-span-4 flex items-center gap-2">
+                        <Button
+                            onClick={handleApplyRange}
+                            className="flex-1 text-xs py-2 font-bold shadow-md bg-ui-accent text-ui-darkest hover:bg-sky-300"
+                            disabled={!hasData}
+                        >
+                            Aplicar Recorte
+                        </Button>
+                        {isRangeTrimmed && onResetWavelengthRange && (
+                            <Button
+                                variant="secondary"
+                                onClick={onResetWavelengthRange}
+                                className="text-xs py-2 px-3 border-amber-500/30 text-amber-300 hover:text-white hover:border-amber-400 shrink-0 font-medium"
+                                title="Restablecer al espectro completo original"
+                            >
+                                Restaurar Completo
+                            </Button>
+                        )}
+                    </div>
                 </div>
-                <div className="md:col-span-2">
-                    <Button onClick={handleApplyRange} className="w-full text-sm py-1.5" disabled={!hasData}>Aplicar</Button>
+
+                <div className="text-[11px] text-slate-400 leading-tight">
+                    <span className="text-slate-300 font-semibold">Nota técnica:</span> Al pulsar <strong className="text-slate-200">«Aplicar Recorte»</strong>, las regiones excluidas se eliminan físicamente de los espectros. Tanto el <strong className="text-slate-200">PCA</strong> como la <strong className="text-slate-200">Calibración PLS</strong> calcularán exclusivamente sobre este intervalo sin arrastrar ruido.
                 </div>
             </div>
 
