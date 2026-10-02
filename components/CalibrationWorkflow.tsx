@@ -86,16 +86,16 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             if (p.method === 'savgolsmooth') return 'SG Suav.';
             if (p.method === 'savgol1') return '1ª Deriv. SG';
             if (p.method === 'savgol2') return '2ª Deriv. SG';
-            if (p.method === 'winisi2441') return 'WinISI 2,4,4,1';
-            if (p.method === 'winisi1441') return 'WinISI 1,4,4,1';
-            if (p.method === 'winisi1881') return 'WinISI 1,8,8,1';
-            if (p.method === 'winisi2861') return 'WinISI 2,8,6,1';
+            if (p.method === 'winisi2441') return '2,4,4,1';
+            if (p.method === 'winisi1441') return '1,4,4,1';
+            if (p.method === 'winisi1881') return '1,8,8,1';
+            if (p.method === 'winisi2861') return '2,8,6,1';
             if (p.method === 'winisi_custom') {
                 const d = p.params?.derivative ?? 2;
                 const g = p.params?.gap ?? 4;
                 const s1 = p.params?.smooth1 ?? 4;
                 const s2 = p.params?.smooth2 ?? 1;
-                return `WinISI ${d},${g},${s1},${s2}`;
+                return `${d},${g},${s1},${s2}`;
             }
             return p.method;
         }).join(' + ')
@@ -348,7 +348,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                     </h4>
                                 </div>
                                 <p className="text-xs text-slate-400 leading-relaxed">
-                                    Aplicar <strong className="text-slate-200">SNV & WinISI 2,4,4,1</strong> o <strong className="text-slate-200">Savitzky-Golay</strong> elimina el desplazamiento de la línea base causado por tamaño de partícula y resalta las bandas químicas antes de pasar al PCA.
+                                    Aplicar <strong className="text-slate-200">SNV & 2,4,4,1</strong> o <strong className="text-slate-200">Savitzky-Golay</strong> elimina el desplazamiento de la línea base causado por tamaño de partícula y resalta las bandas químicas antes de pasar al PCA.
                                 </p>
 
                                 <div className="mt-4 pt-3 border-t border-ui-border flex flex-col gap-2">

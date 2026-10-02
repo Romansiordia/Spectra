@@ -13,12 +13,12 @@ interface PreprocessingEditorProps {
 
 const PREPROCESSING_METHODS = {
     'none': { name: 'Ninguno', params: [] },
-    'winisi2441': { name: 'WinISI 2,4,4,1 (2ª Derivada FOSS Estándar)', params: [] },
-    'winisi1441': { name: 'WinISI 1,4,4,1 (1ª Derivada FOSS Granos)', params: [] },
-    'winisi1881': { name: 'WinISI 1,8,8,1 (1ª Derivada Alta Res 0.5nm)', params: [] },
-    'winisi2861': { name: 'WinISI 2,8,6,1 (2ª Derivada Compleja)', params: [] },
+    'winisi2441': { name: '2,4,4,1 (2ª Derivada FOSS Estándar)', params: [] },
+    'winisi1441': { name: '1,4,4,1 (1ª Derivada FOSS Granos)', params: [] },
+    'winisi1881': { name: '1,8,8,1 (1ª Derivada Alta Res 0.5nm)', params: [] },
+    'winisi2861': { name: '2,8,6,1 (2ª Derivada Compleja)', params: [] },
     'winisi_custom': {
-        name: 'WinISI Personalizado (D, G, S1, S2)',
+        name: 'Personalizado (D, G, S1, S2)',
         params: [
             { id: 'derivative', name: 'D (Derivada)', type: 'number', default: 2 },
             { id: 'gap', name: 'G (Gap)', type: 'number', default: 4 },
