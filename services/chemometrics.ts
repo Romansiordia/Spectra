@@ -102,20 +102,21 @@ export function winisiDerivative(
 
     // Paso 2: Derivada por Gap (D, G)
     let derivSpectrum = new Array(n);
+    const halfG = Math.max(1, Math.floor(G / 2));
+
     if (D === 1) {
-        // 1ª Derivada: Diferencia de salto G (centrada)
-        const halfG = Math.max(1, Math.floor(G / 2));
+        // 1ª Derivada: Diferencia de salto G balanceado (centrada con semiancho halfG)
         for (let i = 0; i < n; i++) {
             const rightIdx = Math.min(n - 1, i + halfG);
             const leftIdx = Math.max(0, i - halfG);
             derivSpectrum[i] = s1Spectrum[rightIdx] - s1Spectrum[leftIdx];
         }
     } else if (D === 2) {
-        // 2ª Derivada: Diferencia de diferencias con salto G
-        // d2 = (y[i+G] - y[i]) - (y[i] - y[i-G]) = y[i+G] - 2*y[i] + y[i-G]
+        // 2ª Derivada: Diferencia balanceada con el mismo semiancho simétrico halfG
+        // d2 = (y[i+halfG] - y[i]) - (y[i] - y[i-halfG]) = y[i+halfG] - 2*y[i] + y[i-halfG]
         for (let i = 0; i < n; i++) {
-            const rightIdx = Math.min(n - 1, i + G);
-            const leftIdx = Math.max(0, i - G);
+            const rightIdx = Math.min(n - 1, i + halfG);
+            const leftIdx = Math.max(0, i - halfG);
             derivSpectrum[i] = s1Spectrum[rightIdx] - 2 * s1Spectrum[i] + s1Spectrum[leftIdx];
         }
     } else {
