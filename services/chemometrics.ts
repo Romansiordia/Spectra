@@ -36,16 +36,24 @@ function savitzkyGolay(data: number[], options: { windowSize: number; polynomial
         const reversedCoeffs = sgCoefficients.slice().reverse();
         
         const result = new Array(data.length);
-        for (let i = 0; i < data.length; i++) {
-            if (i < halfWindow || i >= data.length - halfWindow) {
-                result[i] = data[i]; 
-            } else {
-                let convSum = 0;
-                for (let j = 0; j < windowSize; j++) {
-                    convSum += data[i - halfWindow + j] * reversedCoeffs[j];
-                }
-                result[i] = convSum;
+        // Calcular puntos interiores con convolución S-G
+        for (let i = halfWindow; i < data.length - halfWindow; i++) {
+            let convSum = 0;
+            for (let j = 0; j < windowSize; j++) {
+                convSum += data[i - halfWindow + j] * reversedCoeffs[j];
             }
+            result[i] = convSum;
+        }
+        // Extensión de bordes limpia:
+        // Para derivadas (derivative > 0), extender el valor de derivada del borde para no inyectar
+        // la absorbancia cruda (1000x más grande) que arruinaría la escala vertical.
+        const firstValid = result[halfWindow];
+        const lastValid = result[data.length - halfWindow - 1];
+        for (let i = 0; i < halfWindow; i++) {
+            result[i] = derivative === 0 ? data[i] : firstValid;
+        }
+        for (let i = data.length - halfWindow; i < data.length; i++) {
+            result[i] = derivative === 0 ? data[i] : lastValid;
         }
         return result;
     } catch (e) {

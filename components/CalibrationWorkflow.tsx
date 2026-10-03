@@ -420,6 +420,15 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 onResetWavelengthRange={onResetWavelengthRange}
                                 isRangeTrimmed={isRangeTrimmed}
                                 fullWavelengthRange={fullWavelengthRange}
+                                preprocessingSummary={prepSummary}
+                                canToggleProcessed={preprocessingSteps.length > 0}
+                                onToggleProcessed={() => {
+                                    if (processedSpectra) {
+                                        onResetVisualization();
+                                    } else {
+                                        onVisualizePreprocessing();
+                                    }
+                                }}
                             />
                         </div>
                     </div>

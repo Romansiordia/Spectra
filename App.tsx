@@ -267,29 +267,78 @@ const App: React.FC = () => {
         const trimmedWls = rawWavelengths.slice(startIdx, endIdx + 1);
         setWavelengths(trimmedWls);
 
-        setSamples(prev => prev.map(s => {
-            const baseValues = s.rawValues || s.values;
-            return {
-                ...s,
-                rawValues: s.rawValues || [...s.values],
-                values: baseValues.slice(startIdx, endIdx + 1)
-            };
-        }));
+        setSamples(prev => {
+            const nextSamples = prev.map(s => {
+                const baseValues = s.rawValues || s.values;
+                return {
+                    ...s,
+                    rawValues: s.rawValues || [...s.values],
+                    values: baseValues.slice(startIdx, endIdx + 1)
+                };
+            });
 
-        setProcessedSpectra(null);
+            // Si se estaba visualizando preprocesamiento, recalcular sobre el nuevo rango inmediatamente
+            setProcessedSpectra(prevProcessed => {
+                if (prevProcessed !== null && preprocessingSteps.length > 0) {
+                    const active = nextSamples.filter(s => s.active);
+                    let referenceSpectrum: number[] | undefined = undefined;
+                    const hasMsc = preprocessingSteps.some(step => step.method === 'msc');
+                    if (hasMsc && active.length > 0) {
+                        const nPoints = active[0].values.length;
+                        referenceSpectrum = new Array(nPoints).fill(0);
+                        active.forEach(s => {
+                            s.values.forEach((v, i) => referenceSpectrum![i] += v);
+                        });
+                        referenceSpectrum = referenceSpectrum.map(v => v / active.length);
+                    }
+                    return active.map(s => ({
+                        ...s,
+                        values: applyPreprocessingLogic(s.values, preprocessingSteps, referenceSpectrum)
+                    }));
+                }
+                return null;
+            });
+
+            return nextSamples;
+        });
+
         setModelResults(null);
-    }, [rawWavelengths]);
+    }, [rawWavelengths, preprocessingSteps]);
 
     const handleResetWavelengthRange = useCallback(() => {
         if (rawWavelengths.length === 0) return;
         setWavelengths([...rawWavelengths]);
-        setSamples(prev => prev.map(s => ({
-            ...s,
-            values: s.rawValues ? [...s.rawValues] : s.values
-        })));
-        setProcessedSpectra(null);
+        setSamples(prev => {
+            const restored = prev.map(s => ({
+                ...s,
+                values: s.rawValues ? [...s.rawValues] : s.values
+            }));
+
+            setProcessedSpectra(prevProcessed => {
+                if (prevProcessed !== null && preprocessingSteps.length > 0) {
+                    const active = restored.filter(s => s.active);
+                    let referenceSpectrum: number[] | undefined = undefined;
+                    const hasMsc = preprocessingSteps.some(step => step.method === 'msc');
+                    if (hasMsc && active.length > 0) {
+                        const nPoints = active[0].values.length;
+                        referenceSpectrum = new Array(nPoints).fill(0);
+                        active.forEach(s => {
+                            s.values.forEach((v, i) => referenceSpectrum![i] += v);
+                        });
+                        referenceSpectrum = referenceSpectrum.map(v => v / active.length);
+                    }
+                    return active.map(s => ({
+                        ...s,
+                        values: applyPreprocessingLogic(s.values, preprocessingSteps, referenceSpectrum)
+                    }));
+                }
+                return null;
+            });
+
+            return restored;
+        });
         setModelResults(null);
-    }, [rawWavelengths]);
+    }, [rawWavelengths, preprocessingSteps]);
 
     const handleExportCleanDataset = () => {
         const activeSamples = samples.filter(s => s.active);

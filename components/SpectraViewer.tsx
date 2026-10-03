@@ -16,6 +16,9 @@ interface SpectraViewerProps {
     onResetWavelengthRange?: () => void;
     isRangeTrimmed?: boolean;
     fullWavelengthRange?: { min: number; max: number; count: number };
+    preprocessingSummary?: string;
+    canToggleProcessed?: boolean;
+    onToggleProcessed?: () => void;
 }
 
 // --- TABLA DE REFERENCIA DE BANDAS NIR ---
@@ -56,7 +59,10 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({
     onApplyWavelengthRange,
     onResetWavelengthRange,
     isRangeTrimmed,
-    fullWavelengthRange
+    fullWavelengthRange,
+    preprocessingSummary,
+    canToggleProcessed,
+    onToggleProcessed
 }) => {
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
@@ -392,19 +398,49 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({
 
     return (
         <Card>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                 <div>
                     <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-ui-darkest text-ui-accent rounded-lg flex items-center justify-center">
+                        <div className="h-9 w-9 bg-ui-darkest text-ui-accent rounded-lg flex items-center justify-center shrink-0">
                             <ChartIcon />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-100">Diagnóstico Químico NIR</h2>
-                            <p className="text-sm text-slate-400">Seleccione los parámetros para resaltar sus regiones de absorción.</p>
+                            <div className="flex items-center gap-2.5">
+                                <h2 className="text-lg font-bold text-slate-100">Visor Espectral NIR</h2>
+                                {canToggleProcessed && (
+                                    <div className="inline-flex p-0.5 bg-ui-darkest rounded-lg border border-ui-border shadow-inner">
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (isProcessed && onToggleProcessed) onToggleProcessed(); }}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                !isProcessed
+                                                    ? 'bg-slate-700 text-white shadow font-bold'
+                                                    : 'text-slate-400 hover:text-slate-200'
+                                            }`}
+                                        >
+                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                            Crudo
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (!isProcessed && onToggleProcessed) onToggleProcessed(); }}
+                                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                                                isProcessed
+                                                    ? 'bg-emerald-600 text-white shadow font-bold ring-1 ring-emerald-400/50'
+                                                    : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                                            }`}
+                                        >
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isProcessed ? 'bg-white animate-pulse' : 'bg-emerald-500'}`}></span>
+                                            Pre-procesado
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-400">Seleccione parámetros para resaltar absorciones o inspeccionar tratamientos.</p>
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
                     {hasData && (
                         <button
                             onClick={handleExportCSV}
@@ -429,7 +465,7 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({
                         </button>
                     )}
                     <Button variant="secondary" onClick={handleResetZoom} className="text-xs" size="sm" disabled={!hasData}>
-                        {isProcessed ? 'Resetear Pre-proc.' : 'Resetear Zoom'}
+                        {isProcessed ? 'Ver Espectro Crudo' : 'Resetear Zoom'}
                     </Button>
                 </div>
             </div>
@@ -559,6 +595,47 @@ const SpectraViewer: React.FC<SpectraViewerProps> = ({
                             <option value={200}>200 espectros (Denso)</option>
                             <option value={0}>Todos (Saturar)</option>
                         </select>
+                    </div>
+                </div>
+            )}
+            
+            {/* --- BADGE / BANNER INFORMATIVO DE ESTADO DINÁMICO --- */}
+            {hasData && (
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 px-3.5 mb-3 rounded-xl border transition-all ${
+                    isProcessed 
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 shadow-sm'
+                        : 'bg-ui-dark border-ui-border text-slate-300'
+                }`}>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isProcessed ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
+                        <span className="font-bold uppercase tracking-wider text-[11px]">
+                            {isProcessed ? 'Modo Pre-procesado Activo:' : 'Modo Espectro Crudo:'}
+                        </span>
+                        {isProcessed ? (
+                            <span className="font-mono font-bold text-xs bg-emerald-950/80 text-emerald-200 border border-emerald-500/40 px-2 py-0.5 rounded-md shadow-sm">
+                                {preprocessingSummary || 'Tratamiento Quimiométrico'}
+                            </span>
+                        ) : (
+                            <span className="text-xs text-slate-400">
+                                Absorbancia original sin transformar
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] self-end sm:self-auto">
+                        <span className="text-slate-400">
+                            Rango: <strong className="text-slate-200 font-mono">{wavelengths[0]?.toFixed(1)} – {wavelengths[wavelengths.length - 1]?.toFixed(1)} nm</strong> ({wavelengths.length} pts)
+                        </span>
+                        {canToggleProcessed && (
+                            <button
+                                type="button"
+                                onClick={onToggleProcessed}
+                                className={`text-xs font-semibold underline underline-offset-2 transition-colors cursor-pointer ${
+                                    isProcessed ? 'text-slate-400 hover:text-slate-200' : 'text-emerald-400 hover:text-emerald-300 font-bold'
+                                }`}
+                            >
+                                {isProcessed ? 'Ver en Crudo' : 'Ver Pre-procesado →'}
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
