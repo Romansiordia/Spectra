@@ -24,6 +24,7 @@ import PcaAnalyzer from './PcaAnalyzer';
 import Card from './Card';
 import Button from './Button';
 import ErrorBoundary from './ErrorBoundary';
+import AnalyticalRecommendationCard from './AnalyticalRecommendationCard';
 
 export type CalibrationTab = 'data' | 'preprocessing' | 'pca' | 'model';
 
@@ -36,7 +37,7 @@ interface CalibrationWorkflowProps {
     processedSpectra: { id: string | number; values: number[] }[] | null;
     onFileSelected: (file: File) => void;
     setPreprocessingSteps: React.Dispatch<React.SetStateAction<PreprocessingStep[]>>;
-    onVisualizePreprocessing: () => void;
+    onVisualizePreprocessing: (stepsOverride?: PreprocessingStep[]) => void;
     onResetVisualization: () => void;
     onToggleSample: (index: number) => void;
     onToggleAllSamples: (active: boolean) => void;
@@ -123,6 +124,11 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         const originalSample = samples.find(s => s.id === p.id);
         return { ...p, color: originalSample?.color || '#000000' };
     }) : activeSamples;
+
+    const handleApplyRecommendation = (recommendedSteps: PreprocessingStep[]) => {
+        setPreprocessingSteps(recommendedSteps);
+        onVisualizePreprocessing(recommendedSteps);
+    };
 
     // Lista de tarjetas del flujo
     const flowTabs: {
@@ -374,38 +380,15 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 disabled={activeSamples.length === 0}
                             />
 
-                            <Card>
-                                <div className="flex items-center gap-2 mb-2 text-ui-accent">
-                                    <Sparkles className="w-4 h-4" />
-                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                                        Recomendación Analítica
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-slate-400 leading-relaxed">
-                                    Aplicar <strong className="text-slate-200">SNV & 2,4,4,1</strong> o <strong className="text-slate-200">Savitzky-Golay</strong> elimina el desplazamiento de la línea base causado por tamaño de partícula y resalta las bandas químicas antes de pasar al PCA.
-                                </p>
-
-                                <div className="mt-4 pt-3 border-t border-ui-border flex flex-col gap-2">
-                                    <Button
-                                        variant="primary"
-                                        size="md"
-                                        disabled={activeSamples.length < 3}
-                                        onClick={() => setActiveTab('pca')}
-                                        className="w-full flex items-center justify-center gap-2 font-bold shadow-md"
-                                    >
-                                        Continuar a Análisis PCA
-                                        <ArrowRight className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => setActiveTab('data')}
-                                        className="w-full text-xs text-slate-400 hover:text-white border-ui-border"
-                                    >
-                                        ← Volver a Datos & Espectros
-                                    </Button>
-                                </div>
-                            </Card>
+                            <AnalyticalRecommendationCard
+                                wavelengths={wavelengths}
+                                samples={samples}
+                                currentSteps={preprocessingSteps}
+                                onApplyRecommendation={handleApplyRecommendation}
+                                onContinueToPca={() => setActiveTab('pca')}
+                                onBackToData={() => setActiveTab('data')}
+                                disabled={activeSamples.length === 0}
+                            />
                         </div>
 
                         {/* Lado Derecho: Visor Espectral Comparativo Amplio */}

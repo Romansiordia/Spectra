@@ -143,3 +143,17 @@ export interface ClassificationResult {
         threshold: number;
     };
 }
+
+export interface SpectralDiagnostic {
+    deltaLambda: number;
+    pointsCount: number;
+    scatterLevel: 'high' | 'moderate' | 'low';
+    scatterRatio: number;
+    noiseLevel: 'low' | 'moderate' | 'high';
+    noiseRatio: number;
+    baselineCurvature: boolean;
+    recommendedSteps: PreprocessingStep[];
+    title: string;
+    description: string;
+    rationale: string;
+}

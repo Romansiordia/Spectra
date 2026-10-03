@@ -1,5 +1,5 @@
 
-import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel, RobpcaSampleType } from '../types';
+import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel, RobpcaSampleType, SpectralDiagnostic } from '../types';
 import { Matrix, inverse, solve } from 'ml-matrix';
 
 // ===============================================
@@ -1290,5 +1290,189 @@ export function classifySpectrum(spectrum: number[], libraries: IngredientLibrar
             meanDistance: minDistance,
             threshold: match.threshold
         }
+    };
+}
+
+// ===============================================
+// MOTOR DE RECOMENDACIÓN ANALÍTICA DINÁMICA
+// ===============================================
+
+export function arePreprocessingStepsEqual(a: PreprocessingStep[], b: PreprocessingStep[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i].method !== b[i].method) return false;
+        const paramsA = a[i].params || {};
+        const paramsB = b[i].params || {};
+        const keysA = Object.keys(paramsA);
+        const keysB = Object.keys(paramsB);
+        if (keysA.length !== keysB.length) return false;
+        for (const k of keysA) {
+            if (paramsA[k] !== paramsB[k]) return false;
+        }
+    }
+    return true;
+}
+
+export function diagnoseSpectralData(wavelengths: number[], samples: Sample[]): SpectralDiagnostic {
+    const activeSamples = samples.filter(s => s.active && s.values && s.values.length > 0);
+    const nWl = wavelengths.length;
+
+    // Valores por defecto seguros si no hay datos suficientes
+    if (nWl < 5 || activeSamples.length === 0) {
+        return {
+            deltaLambda: 2.0,
+            pointsCount: nWl,
+            scatterLevel: 'moderate',
+            scatterRatio: 0.25,
+            noiseLevel: 'low',
+            noiseRatio: 0.001,
+            baselineCurvature: false,
+            recommendedSteps: [
+                { method: 'snv', params: {} },
+                { method: 'winisi2441', params: {} }
+            ],
+            title: 'SNV + 2ª Derivada FOSS (2,4,4,1)',
+            description: 'Tratamiento estándar para NIR en muestras sólidas y polvos.',
+            rationale: 'Corrige la dispersión de partículas y separa bandas solapadas.',
+        };
+    }
+
+    // 1. Espaciado espectral medio (Resolución Δλ)
+    const span = Math.abs(wavelengths[nWl - 1] - wavelengths[0]);
+    const deltaLambda = span / Math.max(1, nWl - 1);
+
+    // 2. Dispersión por tamaño de partícula (Scatter / Baseline Offset)
+    // Medias de cada muestra
+    const sampleMeans = activeSamples.map(s => {
+        const sum = s.values.reduce((acc, v) => acc + v, 0);
+        return sum / s.values.length;
+    });
+
+    const overallMean = sampleMeans.reduce((acc, m) => acc + m, 0) / sampleMeans.length;
+    const offsetVariance = sampleMeans.reduce((acc, m) => acc + Math.pow(m - overallMean, 2), 0) / sampleMeans.length;
+    const offsetStd = Math.sqrt(offsetVariance);
+
+    // Desviación promedio dentro de las muestras (forma espectral intrínseca)
+    const withinSampleStds = activeSamples.map(s => {
+        const m = s.values.reduce((acc, v) => acc + v, 0) / s.values.length;
+        const variance = s.values.reduce((acc, v) => acc + Math.pow(v - m, 2), 0) / s.values.length;
+        return Math.sqrt(variance);
+    });
+    const avgShapeStd = withinSampleStds.reduce((acc, v) => acc + v, 0) / withinSampleStds.length;
+    const scatterRatio = avgShapeStd > 1e-6 ? (offsetStd / avgShapeStd) : 0;
+
+    let scatterLevel: 'high' | 'moderate' | 'low' = 'low';
+    if (scatterRatio > 0.35) {
+        scatterLevel = 'high';
+    } else if (scatterRatio > 0.12) {
+        scatterLevel = 'moderate';
+    }
+
+    // 3. Ruido de alta frecuencia (Roughness / 2ª diferencia)
+    // Espectro promedio
+    const meanSpectrum = new Array(nWl).fill(0);
+    for (const s of activeSamples) {
+        for (let i = 0; i < nWl; i++) {
+            meanSpectrum[i] += s.values[i];
+        }
+    }
+    for (let i = 0; i < nWl; i++) {
+        meanSpectrum[i] /= activeSamples.length;
+    }
+
+    let minVal = meanSpectrum[0];
+    let maxVal = meanSpectrum[0];
+    for (let i = 1; i < nWl; i++) {
+        if (meanSpectrum[i] < minVal) minVal = meanSpectrum[i];
+        if (meanSpectrum[i] > maxVal) maxVal = meanSpectrum[i];
+    }
+    const valRange = Math.max(1e-6, maxVal - minVal);
+
+    let sumDiff2 = 0;
+    for (let i = 1; i < nWl - 1; i++) {
+        const d2 = Math.abs(meanSpectrum[i + 1] - 2 * meanSpectrum[i] + meanSpectrum[i - 1]);
+        sumDiff2 += d2;
+    }
+    const avgDiff2 = sumDiff2 / Math.max(1, nWl - 2);
+    const noiseRatio = avgDiff2 / valRange;
+
+    let noiseLevel: 'low' | 'moderate' | 'high' = 'low';
+    if (noiseRatio > 0.008) {
+        noiseLevel = 'high';
+    } else if (noiseRatio > 0.002) {
+        noiseLevel = 'moderate';
+    }
+
+    // 4. Tendencia o curvatura de línea base (Detrend check)
+    let baselineCurvature = false;
+    if (nWl >= 10) {
+        const midIdx = Math.floor(nWl / 2);
+        const linearExpected = (meanSpectrum[0] + meanSpectrum[nWl - 1]) / 2;
+        const actualMid = meanSpectrum[midIdx];
+        if (Math.abs(actualMid - linearExpected) / valRange > 0.25) {
+            baselineCurvature = true;
+        }
+    }
+
+    // 5. Generación de recomendación quimiométrica
+    const recommendedSteps: PreprocessingStep[] = [];
+    let title = '';
+    let description = '';
+    let rationale = '';
+
+    // A) Corrección de dispersión física / línea base
+    if (baselineCurvature && scatterLevel === 'high') {
+        recommendedSteps.push({ method: 'snv', params: {} });
+        recommendedSteps.push({ method: 'detrend', params: {} });
+    } else if (scatterLevel === 'high' || scatterLevel === 'moderate') {
+        recommendedSteps.push({ method: 'snv', params: {} });
+    }
+
+    // B) Derivada y suavizado según resolución (Δλ) y ruido
+    if (deltaLambda <= 1.0) {
+        // Alta resolución espectral (ej. 0.5 nm o 1.0 nm)
+        if (noiseLevel === 'high') {
+            recommendedSteps.push({
+                method: 'savgol2',
+                params: { windowSize: 17, polynomialOrder: 2 }
+            });
+            title = 'SNV + Savitzky-Golay 2ª Deriv. (Ventana 17)';
+            description = `Espectro de alta densidad (Δλ = ${deltaLambda.toFixed(1)} nm) con ruido detectable.`;
+            rationale = 'La ventana de convolución de 17 puntos amortigua el ruido instrumental de alta frecuencia sin distorsionar las bandas analíticas.';
+        } else {
+            recommendedSteps.push({ method: 'winisi1881', params: {} });
+            title = 'SNV + Derivada Norris 1,8,8,1';
+            description = `Espectro de alta resolución (Δλ = ${deltaLambda.toFixed(1)} nm, ${nWl} canales).`;
+            rationale = 'Para resolución de 1 nm o menor, la formulación 1,8,8,1 (Gap 8) previene la sobre-amplificación de ruido y resalta hombros químicos.';
+        }
+    } else if (deltaLambda <= 3.5) {
+        // Resolución estándar NIR (ej. 2 nm en FOSS Infratec / NIRS)
+        recommendedSteps.push({ method: 'winisi2441', params: {} });
+        title = 'SNV + 2ª Derivada FOSS (2,4,4,1)';
+        description = `Resolución estándar NIR (Δλ = ${deltaLambda.toFixed(1)} nm).`;
+        rationale = 'La fórmula estándar en quimiometría: SNV neutraliza diferencias de empaque/partícula y 2,4,4,1 elimina la línea base separando picos C-H, N-H y O-H.';
+    } else {
+        // Cuadrícula amplia o pocos canales (Δλ > 3.5 nm)
+        recommendedSteps.push({
+            method: 'savgol1',
+            params: { windowSize: 7, polynomialOrder: 2 }
+        });
+        title = 'SNV + 1ª Derivada Savitzky-Golay (Ventana 7)';
+        description = `Espaciado amplio entre canales espectrales (Δλ = ${deltaLambda.toFixed(1)} nm).`;
+        rationale = 'Una ventana compacta de 7 puntos preserva la información en los extremos de la cuadrícula espectral sin pérdida excesiva de bordes.';
+    }
+
+    return {
+        deltaLambda,
+        pointsCount: nWl,
+        scatterLevel,
+        scatterRatio,
+        noiseLevel,
+        noiseRatio,
+        baselineCurvature,
+        recommendedSteps,
+        title,
+        description,
+        rationale
     };
 }

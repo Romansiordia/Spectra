@@ -168,13 +168,15 @@ const App: React.FC = () => {
         setModelResults(null);
     };
 
-    const handleVisualizePreprocessing = () => {
+    const handleVisualizePreprocessing = (stepsOverride?: PreprocessingStep[]) => {
         const activeSamples = samples.filter(s => s.active);
         if (activeSamples.length === 0) return;
 
+        const stepsToUse = stepsOverride ?? preprocessingSteps;
+
         // Calcular espectro de referencia (media) para MSC si es necesario
         let referenceSpectrum: number[] | undefined = undefined;
-        const hasMsc = preprocessingSteps.some(s => s.method === 'msc');
+        const hasMsc = stepsToUse.some(s => s.method === 'msc');
         if (hasMsc) {
             const nPoints = activeSamples[0].values.length;
             referenceSpectrum = new Array(nPoints).fill(0);
@@ -186,7 +188,7 @@ const App: React.FC = () => {
 
         const processed = activeSamples.map(sample => ({
             ...sample,
-            values: applyPreprocessingLogic(sample.values, preprocessingSteps, referenceSpectrum)
+            values: applyPreprocessingLogic(sample.values, stepsToUse, referenceSpectrum)
         }));
         setProcessedSpectra(processed);
     };
