@@ -346,10 +346,20 @@ const App: React.FC = () => {
         const activeSamples = samples.filter(s => s.active);
         if (activeSamples.length === 0) return;
 
-        let csvContent = "Sample_ID," + wavelengths.join(",") + "," + analyticalProperty + "\n";
+        // Usar las longitudes de onda originales completas del instrumento para preservar la biblioteca íntegra
+        const exportWavelengths = (rawWavelengths && rawWavelengths.length > 0)
+            ? rawWavelengths
+            : wavelengths;
+
+        let csvContent = "Sample_ID," + exportWavelengths.join(",") + "," + analyticalProperty + "\n";
         
         activeSamples.forEach(sample => {
-            const row = [sample.id, ...sample.values, sample.analyticalValue];
+            // Usar los valores de absorbancia crudos originales completos (sin recortes y sin preprocesamientos destructivos)
+            const exportValues = (sample.rawValues && sample.rawValues.length === exportWavelengths.length)
+                ? sample.rawValues
+                : sample.values;
+
+            const row = [sample.id, ...exportValues, sample.analyticalValue];
             csvContent += row.join(",") + "\n";
         });
 
