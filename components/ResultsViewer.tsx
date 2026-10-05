@@ -18,6 +18,8 @@ interface ResultsViewerProps {
     onDeactivateOutliers: (outlierIds: (string | number)[]) => void;
     wavelengths: number[];
     onExportCleanDataset: () => void;
+    isRangeTrimmed?: boolean;
+    fullWavelengthRange?: { min: number; max: number; count: number };
 }
 
 const StatCard = ({ label, value, subtext, colorClass }: { label: string, value: string | number, subtext?: string, colorClass: string }) => (
@@ -28,7 +30,18 @@ const StatCard = ({ label, value, subtext, colorClass }: { label: string, value:
     </div>
 );
 
-const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, preprocessingSteps, activeSamples, activeSamplesData, onDeactivateOutliers, wavelengths, onExportCleanDataset }) => {
+const ResultsViewer: React.FC<ResultsViewerProps> = ({ 
+    results, 
+    propertyName, 
+    preprocessingSteps, 
+    activeSamples, 
+    activeSamplesData, 
+    onDeactivateOutliers, 
+    wavelengths, 
+    onExportCleanDataset,
+    isRangeTrimmed,
+    fullWavelengthRange
+}) => {
     const [activeTab, setActiveTab] = useState('correlation');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
@@ -193,6 +206,26 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
         const stdDist = Math.sqrt(internalDistances.reduce((a, b) => a + Math.pow(b - meanDist, 2), 0) / (numSamples || 1));
         const resultThreshold = meanDist + (3 * stdDist) || 1.0;
 
+        const isTrimmed = Boolean(isRangeTrimmed || (fullWavelengthRange && wavelengths.length < fullWavelengthRange.count));
+        const spectralRange = {
+            isTrimmed,
+            trimmedRange: {
+                min: wavelengths[0],
+                max: wavelengths[wavelengths.length - 1],
+                points: wavelengths.length
+            },
+            fullRange: fullWavelengthRange ? {
+                min: fullWavelengthRange.min,
+                max: fullWavelengthRange.max,
+                points: fullWavelengthRange.count
+            } : {
+                min: wavelengths[0],
+                max: wavelengths[wavelengths.length - 1],
+                points: wavelengths.length
+            },
+            wavelengths: wavelengths
+        };
+
         const config = { 
             date: new Date().toISOString(), 
             modelType: results.modelType, 
@@ -200,6 +233,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({ results, propertyName, pr
             analyticalProperty: propertyName, 
             preprocessing: preprocessingSteps, 
             metrics: results.model,
+            spectralRange,
             referenceData: {
                 meanSpectrum,
                 stdSpectrum,

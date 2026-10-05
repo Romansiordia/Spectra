@@ -6,6 +6,8 @@ import { PreprocessingStep } from '../types';
 import { applyPreprocessingLogic, predictPLS } from '../services/chemometrics';
 import { parseDX } from '../services/dxParser';
 import { parseFOSS } from '../services/fossParser';
+import { parseOPUS } from '../services/opusParser';
+import { preprocessCSVText } from '../services/csvParser';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -25,6 +27,12 @@ interface SavedModel {
         T_inv_var?: number[];
     };
     preprocessing: PreprocessingStep[];
+    spectralRange?: {
+        isTrimmed?: boolean;
+        trimmedRange?: { min: number; max: number; points: number };
+        fullRange?: { min: number; max: number; points: number };
+        wavelengths?: number[];
+    };
     referenceData?: {
         wavelengths: number[];
     };
@@ -132,61 +140,84 @@ const ModelPredictor: React.FC = () => {
 
                 for (const model of models) {
                     const expectedLen = model.metrics.coefficients.length;
-                    let spectralValues = sample.values;
+                    let spectralValues = [...sample.values];
+                    const targetWavelengths = model.spectralRange?.wavelengths || model.referenceData?.wavelengths;
 
-                    // Interpolar si la estructura del archivo y la esperada difieren y tenemos vectores X
-                    if (sourceWavelengths && model.referenceData?.wavelengths && sourceWavelengths.length > 1 && spectralValues.length !== expectedLen) {
-                        const targetWavelengths = model.referenceData.wavelengths;
-                        if (targetWavelengths.length === expectedLen) {
-                             const isAscending = sourceWavelengths[0] < sourceWavelengths[sourceWavelengths.length - 1];
-                             
-                             spectralValues = targetWavelengths.map(tx => {
-                                // OOB clamp
-                                if (isAscending) {
-                                    if (tx <= sourceWavelengths[0]) return spectralValues[0];
-                                    if (tx >= sourceWavelengths[sourceWavelengths.length - 1]) return spectralValues[spectralValues.length - 1];
-                                } else {
-                                    if (tx >= sourceWavelengths[0]) return spectralValues[0];
-                                    if (tx <= sourceWavelengths[sourceWavelengths.length - 1]) return spectralValues[spectralValues.length - 1];
-                                }
-                                
-                                let idx = 0;
-                                if (isAscending) {
-                                    while(idx < sourceWavelengths.length - 1 && sourceWavelengths[idx + 1] < tx) idx++;
-                                } else {
-                                    while(idx < sourceWavelengths.length - 1 && sourceWavelengths[idx + 1] > tx) idx++;
-                                }
-                                
-                                const x1 = sourceWavelengths[idx];
-                                const x2 = sourceWavelengths[idx + 1];
-                                const y1 = spectralValues[idx];
-                                const y2 = spectralValues[idx + 1];
-                                
-                                if (x2 === x1) return y1;
-                                return y1 + (y2 - y1) * ((tx - x1) / (x2 - x1));
-                            });
-                            console.info(`Muestra ${id}: Espectro interpolado para modelo ${model.analyticalProperty}. Puntos de ${sourceWavelengths.length} a ${expectedLen}.`);
+                    // 1. Determinar el vector fuente de longitudes de onda (effectiveSourceWls)
+                    let effectiveSourceWls = sourceWavelengths;
+
+                    // Si no vino vector en el archivo, intentar inferirlo por metadata del modelo o estándares NIR:
+                    if (!effectiveSourceWls || effectiveSourceWls.length !== spectralValues.length) {
+                        if (model.spectralRange?.fullRange && spectralValues.length === model.spectralRange.fullRange.points) {
+                            const { min, max, points } = model.spectralRange.fullRange;
+                            effectiveSourceWls = Array.from({ length: points }, (_, i) => min + (i * (max - min)) / Math.max(1, points - 1));
+                        } else if (spectralValues.length === 1050 || spectralValues.length === 1051) {
+                            effectiveSourceWls = Array.from({ length: spectralValues.length }, (_, i) => 400 + i * 2);
+                        } else if (spectralValues.length === 2100 || spectralValues.length === 2101) {
+                            effectiveSourceWls = Array.from({ length: spectralValues.length }, (_, i) => 400 + i * 1);
+                        } else if (spectralValues.length === 3300 || spectralValues.length === 3301) {
+                            effectiveSourceWls = Array.from({ length: spectralValues.length }, (_, i) => 850 + i * 0.5);
+                        } else if (spectralValues.length === 825 || spectralValues.length === 826) {
+                            effectiveSourceWls = Array.from({ length: spectralValues.length }, (_, i) => 850 + i * 2);
+                        } else if (spectralValues.length === 700 || spectralValues.length === 701) {
+                            effectiveSourceWls = Array.from({ length: spectralValues.length }, (_, i) => 1100 + i * 2);
                         }
                     }
-                    
+
+                    // 2. Si la dimensión de la muestra difiere de la esperada por el modelo, alinear/recortar por longitud de onda
                     if (spectralValues.length !== expectedLen) {
-                        // Tolerar truncamiento si el archivo tiene un poco más de información o difiere
-                        if (spectralValues.length > expectedLen) {
-                            console.warn(`Muestra ${id}: Truncando de ${spectralValues.length} a ${expectedLen} puntos para coincidir con el modelo ${model.analyticalProperty}`);
-                            spectralValues = spectralValues.slice(0, expectedLen);
-                        } else {
-                            console.warn(`Muestra ${id}: Puntos insuficientes (${spectralValues.length}/${expectedLen}) para ${model.analyticalProperty}`);
-                            isValidRow = false;
-                            break; 
+                        if (effectiveSourceWls && targetWavelengths && targetWavelengths.length === expectedLen && effectiveSourceWls.length > 1) {
+                            const isAscending = effectiveSourceWls[0] < effectiveSourceWls[effectiveSourceWls.length - 1];
+                            const srcMin = Math.min(effectiveSourceWls[0], effectiveSourceWls[effectiveSourceWls.length - 1]);
+                            const srcMax = Math.max(effectiveSourceWls[0], effectiveSourceWls[effectiveSourceWls.length - 1]);
+                            const targetMin = Math.min(targetWavelengths[0], targetWavelengths[targetWavelengths.length - 1]);
+                            const targetMax = Math.max(targetWavelengths[0], targetWavelengths[targetWavelengths.length - 1]);
+
+                            // Verificar si el rango objetivo cae dentro de la cobertura del espectro cargado (con margen de 10 nm)
+                            if (targetMin >= srcMin - 10 && targetMax <= srcMax + 10) {
+                                spectralValues = targetWavelengths.map(tx => {
+                                    // Clamping en bordes
+                                    if (isAscending) {
+                                        if (tx <= effectiveSourceWls![0]) return spectralValues[0];
+                                        if (tx >= effectiveSourceWls![effectiveSourceWls!.length - 1]) return spectralValues[spectralValues.length - 1];
+                                    } else {
+                                        if (tx >= effectiveSourceWls![0]) return spectralValues[0];
+                                        if (tx <= effectiveSourceWls![effectiveSourceWls!.length - 1]) return spectralValues[spectralValues.length - 1];
+                                    }
+
+                                    let idx = 0;
+                                    if (isAscending) {
+                                        while (idx < effectiveSourceWls!.length - 1 && effectiveSourceWls![idx + 1] < tx) idx++;
+                                    } else {
+                                        while (idx < effectiveSourceWls!.length - 1 && effectiveSourceWls![idx + 1] > tx) idx++;
+                                    }
+
+                                    const x1 = effectiveSourceWls![idx];
+                                    const x2 = effectiveSourceWls![idx + 1];
+                                    const y1 = spectralValues[idx];
+                                    const y2 = spectralValues[idx + 1];
+
+                                    if (x2 === x1 || isNaN(y2) || isNaN(y1)) return y1;
+                                    return y1 + (y2 - y1) * ((tx - x1) / (x2 - x1));
+                                });
+                            }
                         }
                     }
-                    
+
+                    // 3. Validación estricta: NO truncar ciegamente desde el punto 0
+                    if (spectralValues.length !== expectedLen) {
+                        console.warn(`Muestra ${id}: Puntos incompatibles (${sample.values.length} vs ${expectedLen} requeridos por ${model.analyticalProperty}). No se puede predecir sin alinear longitudes de onda.`);
+                        isValidRow = false;
+                        break;
+                    }
+
                     if (spectralValues.some(v => isNaN(v))) {
                         console.warn(`Muestra ${id}: Valores no numéricos encontrados para ${model.analyticalProperty}`);
                         isValidRow = false;
                         break;
                     }
 
+                    // 4. Preprocesamiento matemático sobre la ventana espectral alineada exacta
                     const processed = applyPreprocessingLogic(spectralValues, model.preprocessing, model.metrics.referenceSpectrum);
                     const res = predictPLS(model.metrics as any, processed);
 
@@ -203,10 +234,20 @@ const ModelPredictor: React.FC = () => {
 
             if (newPredictions.length === 0 && samplesData.length > 0) {
                 const sampleLength = samplesData[0].values.length;
-                const expected = models[0]?.metrics.coefficients.length;
-                alert(`No se pudo procesar la muestra. Su archivo cargado contiene ${sampleLength} puntos espectrales (después de parseo), pero el modelo JSON espera al menos ${expected} puntos.`);
+                const modelInfo = models.map(m => {
+                    const range = m.spectralRange?.trimmedRange || (m.referenceData?.wavelengths ? {
+                        min: m.referenceData.wavelengths[0],
+                        max: m.referenceData.wavelengths[m.referenceData.wavelengths.length - 1],
+                        points: m.referenceData.wavelengths.length
+                    } : null);
+                    return range 
+                        ? `${m.analyticalProperty}: ${range.min.toFixed(0)}-${range.max.toFixed(0)} nm (${range.points} pts)`
+                        : `${m.analyticalProperty}: ${m.metrics.coefficients.length} pts`;
+                }).join('; ');
+
+                alert(`No se pudieron alinear los espectros con los modelos seleccionados.\n\nEl archivo cargado contiene ${sampleLength} puntos por muestra sin cabecera de longitudes de onda identificable.\n\nModelos configurados:\n${modelInfo}\n\nPara modelos con rango recortado, asegúrese de que el archivo CSV incluya en la primera fila los valores de longitud de onda (ej. 400, 402, ...) para permitir la extracción y calibración automática.`);
             } else if (skippedCount > 0) {
-                console.info(`Se omitieron ${skippedCount} muestras no válidas.`);
+                console.info(`Se omitieron ${skippedCount} muestras no compatibles.`);
             }
 
             setPredictions(newPredictions);
@@ -260,38 +301,111 @@ const ModelPredictor: React.FC = () => {
                     if (csvInputRef.current) csvInputRef.current.value = '';
                 }
             });
-        } else {
-            Papa.parse(file, {
-                header: false,
-                dynamicTyping: true,
-                skipEmptyLines: true,
-                complete: (results: { data: any[][] }) => {
-                    try {
-                        const data = results.data;
-                        if (data.length < 2) {
-                            alert("El archivo CSV debe tener al menos una fila de encabezados y una de datos.");
-                            if (csvInputRef.current) csvInputRef.current.value = '';
-                            return;
-                        }
-
-                        const samplesData = [];
-                        for (let i = 1; i < data.length; i++) {
-                            const row = data[i];
-                            if (!row || row.length < 2) continue;
-                            
-                            const id = String(row[0]);
-                            const values = row.slice(1).map(v => Number(v));
-                            samplesData.push({ id, values });
-                        }
-                        
-                        processSpectra(samplesData);
-                    } catch (error) {
-                        console.error("Error crítico procesando CSV:", error);
-                        alert("Ocurrió un error inesperado al procesar el archivo CSV.");
-                        if (csvInputRef.current) csvInputRef.current.value = '';
+        } else if (ext === 'opus' || /^\d+$/.test(ext || '')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const arrayBuffer = e.target?.result as ArrayBuffer;
+                    if (!arrayBuffer) {
+                        throw new Error("No se pudieron leer los datos del archivo.");
                     }
+                    parseOPUS(arrayBuffer, (results) => {
+                        if (results) {
+                            const samplesData = results.samples.map(s => ({
+                                id: String(s.id),
+                                values: s.values
+                            }));
+                            processSpectra(samplesData, results.wavelengths);
+                        } else {
+                            alert("No se pudo procesar el archivo OPUS.");
+                            if (csvInputRef.current) csvInputRef.current.value = '';
+                        }
+                    }, file.name);
+                } catch (error) {
+                    console.error("Error crítico procesando OPUS:", error);
+                    alert("Ocurrió un error inesperado al procesar el archivo OPUS.");
+                    if (csvInputRef.current) csvInputRef.current.value = '';
                 }
-            });
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = ev.target?.result as string;
+                if (!text) {
+                    alert("No se pudieron leer los datos del archivo.");
+                    if (csvInputRef.current) csvInputRef.current.value = '';
+                    return;
+                }
+
+                const { cleanText, delimiter } = preprocessCSVText(text);
+
+                Papa.parse(cleanText, {
+                    delimiter,
+                    header: false,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: (results: { data: any[][] }) => {
+                        try {
+                            const data = results.data;
+                            if (!data || data.length < 2) {
+                                alert("El archivo CSV debe tener al menos una fila de encabezados y una de datos.");
+                                if (csvInputRef.current) csvInputRef.current.value = '';
+                                return;
+                            }
+
+                            const headerRow = data[0];
+                            const numCols = headerRow.length;
+
+                            // Determinar si la última columna es una propiedad analítica de referencia
+                            let hasReferenceProperty = false;
+                            const lastColHeader = headerRow[numCols - 1];
+                            const lastColIsText = typeof lastColHeader === 'string' && isNaN(Number(lastColHeader));
+                            if (numCols > 3 && lastColIsText && !isNaN(Number(headerRow[numCols - 2]))) {
+                                hasReferenceProperty = true;
+                            }
+
+                            const dataEndCol = hasReferenceProperty ? numCols - 1 : numCols;
+
+                            // Extraer longitudes de onda del encabezado si son numéricas
+                            const rawWlHeader = headerRow.slice(1, dataEndCol);
+                            let extractedWavelengths: number[] | undefined = undefined;
+
+                            const numericWls = rawWlHeader.map((v: any) => {
+                                if (typeof v === 'number') return v;
+                                if (typeof v === 'string') {
+                                    const cleaned = v.replace(/[^0-9.]/g, '');
+                                    const num = Number(cleaned);
+                                    return isNaN(num) ? null : num;
+                                }
+                                return null;
+                            });
+
+                            if (numericWls.length > 1 && numericWls.every((v: number | null) => v !== null && !isNaN(v) && v > 0)) {
+                                extractedWavelengths = numericWls as number[];
+                            }
+
+                            const samplesData = [];
+                            for (let i = 1; i < data.length; i++) {
+                                const row = data[i];
+                                if (!row || row.length < 2) continue;
+                                const id = String(row[0]);
+                                const values = row.slice(1, dataEndCol).map(Number);
+                                if (values.length > 0 && !values.some(isNaN)) {
+                                    samplesData.push({ id, values });
+                                }
+                            }
+
+                            processSpectra(samplesData, extractedWavelengths);
+                        } catch (error) {
+                            console.error("Error crítico procesando CSV:", error);
+                            alert("Ocurrió un error inesperado al procesar el archivo CSV.");
+                            if (csvInputRef.current) csvInputRef.current.value = '';
+                        }
+                    }
+                });
+            };
+            reader.readAsText(file);
         }
     };
 
@@ -566,7 +680,20 @@ const ModelPredictor: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <span className="font-extrabold text-slate-100 block uppercase tracking-wide text-[10px]">{m.analyticalProperty}</span>
-                                                    <span className="text-[10px] text-slate-400 capitalize">{m.fileName} • {m.preprocessing.length ? 'Pre-proc' : 'Raw'}</span>
+                                                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                        <span className="text-[10px] text-slate-400 capitalize">{m.fileName} • {m.preprocessing.length ? 'Pre-proc' : 'Raw'}</span>
+                                                        {m.spectralRange?.isTrimmed ? (
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                                Rango: {m.spectralRange.trimmedRange?.min.toFixed(0)}-{m.spectralRange.trimmedRange?.max.toFixed(0)} nm ({m.metrics.coefficients.length} pts)
+                                                            </span>
+                                                        ) : m.referenceData?.wavelengths ? (
+                                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono text-slate-300 bg-ui-dark border border-ui-border">
+                                                                {m.referenceData.wavelengths[0]?.toFixed(0)}-{m.referenceData.wavelengths[m.referenceData.wavelengths.length - 1]?.toFixed(0)} nm ({m.metrics.coefficients.length} pts)
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-mono text-slate-400">({m.metrics.coefficients.length} pts)</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -609,12 +736,12 @@ const ModelPredictor: React.FC = () => {
                         
                         <div className="flex-1 flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-[10px] font-black text-ui-accent uppercase tracking-widest">Espectros Nuevos (.csv / .dx / .nir)</label>
+                                <label className="text-[10px] font-black text-ui-accent uppercase tracking-widest">Espectros Nuevos (.csv / .dx / .nir / .opus)</label>
                                 <div className="flex gap-2">
                                     <div className="flex-1 bg-ui-dark border border-ui-border rounded-lg flex items-center px-3 text-xs text-slate-400">
                                         Subir matriz de absorbancia o espectros...
                                     </div>
-                                    <input type="file" ref={csvInputRef} onChange={handleDataUpload} accept=".csv,.dx,.jdx,.nir" className="hidden" />
+                                    <input type="file" ref={csvInputRef} onChange={handleDataUpload} accept=".csv,.dx,.jdx,.nir,.opus" className="hidden" />
                                     <Button onClick={() => csvInputRef.current?.click()} size="sm" variant="primary" disabled={models.length === 0} className="rounded-lg shadow-none px-4">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                                     </Button>

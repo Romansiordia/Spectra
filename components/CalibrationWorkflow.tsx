@@ -530,6 +530,8 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                         onDeactivateOutliers={onDeactivateOutliers}
                                         wavelengths={wavelengths}
                                         onExportCleanDataset={onExportCleanDataset}
+                                        isRangeTrimmed={isRangeTrimmed}
+                                        fullWavelengthRange={fullWavelengthRange}
                                     />
                                 </ErrorBoundary>
                             ) : (
