@@ -167,7 +167,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         {
             id: 'minidiviner',
             number: 3,
-            title: 'Mini-Diviner IA',
+            title: 'Advicer',
             subtitle: modelResults ? 'Optimizado' : 'Búsqueda Global',
             icon: <Sparkles className="w-5 h-5" />,
             isComplete: modelResults !== null,
