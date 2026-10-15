@@ -1495,14 +1495,8 @@ export function runMiniDiviner(activeSamples: Sample[]): DivinerResultItem[] {
     const recipes: { name: string; steps: PreprocessingStep[] }[] = [
         { name: 'Crudo (Sin Preprocesamiento)', steps: [] },
         { name: 'SNV (Standard Normal Variate)', steps: [{ method: 'snv', params: {} }] },
-        { name: 'MSC (Multiplicative Scatter Corr.)', steps: [{ method: 'msc', params: {} }] },
-        { name: 'Detrend', steps: [{ method: 'detrend', params: {} }] },
         { name: '1ª Derivada FOSS (1,4,4,1)', steps: [{ method: 'winisi1441', params: {} }] },
-        { name: '2ª Derivada FOSS (2,4,4,1)', steps: [{ method: 'winisi2441', params: {} }] },
-        { name: 'SNV + 1ª Derivada (1,4,4,1)', steps: [{ method: 'snv', params: {} }, { method: 'winisi1441', params: {} }] },
-        { name: 'SNV + 2ª Derivada (2,4,4,1)', steps: [{ method: 'snv', params: {} }, { method: 'winisi2441', params: {} }] },
-        { name: 'MSC + 2ª Derivada (2,4,4,1)', steps: [{ method: 'msc', params: {} }, { method: 'winisi2441', params: {} }] },
-        { name: 'SNV + Detrend', steps: [{ method: 'snv', params: {} }, { method: 'detrend', params: {} }] }
+        { name: 'MSC (Multiplicative Scatter Corr.)', steps: [{ method: 'msc', params: {} }] }
     ];
 
     const N = activeSamples.length;
