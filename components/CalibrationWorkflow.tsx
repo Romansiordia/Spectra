@@ -25,8 +25,9 @@ import Card from './Card';
 import Button from './Button';
 import ErrorBoundary from './ErrorBoundary';
 import AnalyticalRecommendationCard from './AnalyticalRecommendationCard';
+import MiniDivinerOptimizer from './MiniDivinerOptimizer';
 
-export type CalibrationTab = 'data' | 'preprocessing' | 'pca' | 'model';
+export type CalibrationTab = 'data' | 'preprocessing' | 'minidiviner' | 'pca' | 'model';
 
 interface CalibrationWorkflowProps {
     wavelengths: number[];
@@ -130,6 +131,12 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         onVisualizePreprocessing(recommendedSteps);
     };
 
+    const handleLoadDivinerModel = (steps: PreprocessingStep[], results: ModelResults) => {
+        setPreprocessingSteps(steps);
+        onRunModel({ type: 'pls', nComponents: results.nComponents });
+        setActiveTab('model');
+    };
+
     // Lista de tarjetas del flujo
     const flowTabs: {
         id: CalibrationTab;
@@ -158,8 +165,16 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             isComplete: preprocessingSteps.length > 0,
         },
         {
-            id: 'pca',
+            id: 'minidiviner',
             number: 3,
+            title: 'Mini-Diviner IA',
+            subtitle: modelResults ? 'Optimizado' : 'Búsqueda Global',
+            icon: <Sparkles className="w-5 h-5" />,
+            isComplete: modelResults !== null,
+        },
+        {
+            id: 'pca',
+            number: 4,
             title: 'Análisis PCA & Outliers',
             subtitle: pcaSummary,
             icon: <ScatterChart className="w-5 h-5" />,
@@ -168,7 +183,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         },
         {
             id: 'model',
-            number: 4,
+            number: 5,
             title: 'Modelo PLS & Resultados',
             subtitle: modelSummary,
             icon: <Cpu className="w-5 h-5" />,
@@ -181,7 +196,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             {/* ========================================================================= */}
             {/* 1. BARRA SUPERIOR DE TARJETAS / PESTAÑAS DE FLUJO                         */}
             {/* ========================================================================= */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
                 {flowTabs.map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -419,7 +434,19 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             )}
 
             {/* ------------------------------------------------------------------------- */}
-            {/* PESTAÑA 3: Diagnóstico PCA & Detección de Outliers                         */}
+            {/* PESTAÑA 3: Optimizador Automático Mini-Diviner                              */}
+            {/* ------------------------------------------------------------------------- */}
+            {activeTab === 'minidiviner' && (
+                <div className="flex flex-col gap-6 animate-fade-in">
+                    <MiniDivinerOptimizer
+                        samples={samples}
+                        onLoadModelAndSteps={handleLoadDivinerModel}
+                    />
+                </div>
+            )}
+
+            {/* ------------------------------------------------------------------------- */}
+            {/* PESTAÑA 4: Diagnóstico PCA & Detección de Outliers                         */}
             {/* ------------------------------------------------------------------------- */}
             {activeTab === 'pca' && (
                 <div className="flex flex-col gap-6 animate-fade-in">

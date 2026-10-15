@@ -1476,3 +1476,66 @@ export function diagnoseSpectralData(wavelengths: number[], samples: Sample[]): 
         rationale
     };
 }
+
+export interface DivinerResultItem {
+    id: string;
+    recipeName: string;
+    preprocessingSteps: PreprocessingStep[];
+    components: number;
+    sec: number;
+    secv: number;
+    r2: number;
+    q2: number;
+    slope: number;
+    offset: number;
+    modelResults: ModelResults;
+}
+
+export function runMiniDiviner(activeSamples: Sample[]): DivinerResultItem[] {
+    const recipes: { name: string; steps: PreprocessingStep[] }[] = [
+        { name: 'Crudo (Sin Preprocesamiento)', steps: [] },
+        { name: 'SNV (Standard Normal Variate)', steps: [{ method: 'snv', params: {} }] },
+        { name: 'MSC (Multiplicative Scatter Corr.)', steps: [{ method: 'msc', params: {} }] },
+        { name: 'Detrend', steps: [{ method: 'detrend', params: {} }] },
+        { name: '1ª Derivada FOSS (1,4,4,1)', steps: [{ method: 'winisi1441', params: {} }] },
+        { name: '2ª Derivada FOSS (2,4,4,1)', steps: [{ method: 'winisi2441', params: {} }] },
+        { name: 'SNV + 1ª Derivada (1,4,4,1)', steps: [{ method: 'snv', params: {} }, { method: 'winisi1441', params: {} }] },
+        { name: 'SNV + 2ª Derivada (2,4,4,1)', steps: [{ method: 'snv', params: {} }, { method: 'winisi2441', params: {} }] },
+        { name: 'MSC + 2ª Derivada (2,4,4,1)', steps: [{ method: 'msc', params: {} }, { method: 'winisi2441', params: {} }] },
+        { name: 'SNV + Detrend', steps: [{ method: 'snv', params: {} }, { method: 'detrend', params: {} }] }
+    ];
+
+    const N = activeSamples.length;
+    const maxLVs = Math.min(8, Math.max(2, N - 3));
+    const minLVs = Math.min(2, maxLVs);
+
+    const allResults: DivinerResultItem[] = [];
+    let idCounter = 1;
+
+    recipes.forEach(recipe => {
+        for (let k = minLVs; k <= maxLVs; k++) {
+            try {
+                const res = runPlsAnalysis(activeSamples, recipe.steps, k);
+                allResults.push({
+                    id: `diviner-${idCounter++}`,
+                    recipeName: recipe.name,
+                    preprocessingSteps: recipe.steps,
+                    components: k,
+                    sec: res.model.sec,
+                    secv: res.model.secv,
+                    r2: res.model.r2,
+                    q2: res.model.q2,
+                    slope: res.model.slope,
+                    offset: res.model.offset,
+                    modelResults: res
+                });
+            } catch (e) {
+                // Omitir combinaciones incompatibles
+            }
+        }
+    });
+
+    // Ordenar de menor SECV (RMSECV) a mayor (mejor modelo primero)
+    allResults.sort((a, b) => a.secv - b.secv);
+    return allResults;
+}
