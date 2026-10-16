@@ -27,7 +27,7 @@ import ErrorBoundary from './ErrorBoundary';
 import AnalyticalRecommendationCard from './AnalyticalRecommendationCard';
 import MiniDivinerOptimizer from './MiniDivinerOptimizer';
 
-export type CalibrationTab = 'data' | 'preprocessing' | 'minidiviner' | 'pca' | 'model';
+export type CalibrationTab = 'data' | 'minidiviner' | 'preprocessing' | 'pca' | 'model';
 
 interface CalibrationWorkflowProps {
     wavelengths: number[];
@@ -111,6 +111,10 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         }).join(' + ')
         : 'Espectros Crudos';
 
+    const divinerSummary = modelResults
+        ? `Receta Lista | R²: ${modelResults.r2?.toFixed(3) || '—'}`
+        : 'Cribado y Optimización';
+
     const pcaSummary = inactiveCount > 0
         ? `${inactiveCount} muestra(s) excluida(s)`
         : activeSamples.length >= 3
@@ -133,11 +137,16 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
 
     const handleLoadDivinerModel = (steps: PreprocessingStep[], results: ModelResults) => {
         setPreprocessingSteps(steps);
+        onVisualizePreprocessing(steps);
+    };
+
+    const handleDirectToModel = (steps: PreprocessingStep[], results: ModelResults) => {
+        setPreprocessingSteps(steps);
         onRunModel({ type: 'pls', nComponents: results.nComponents });
         setActiveTab('model');
     };
 
-    // Lista de tarjetas del flujo
+    // Lista de tarjetas del flujo de calibración
     const flowTabs: {
         id: CalibrationTab;
         number: number;
@@ -157,20 +166,20 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             hasWarning: samples.length > 0 && activeSamples.length < 3
         },
         {
-            id: 'preprocessing',
+            id: 'minidiviner',
             number: 2,
+            title: 'Advisor',
+            subtitle: divinerSummary,
+            icon: <Sparkles className="w-5 h-5" />,
+            isComplete: modelResults !== null,
+        },
+        {
+            id: 'preprocessing',
+            number: 3,
             title: 'Preprocesamiento',
             subtitle: prepSummary,
             icon: <Sliders className="w-5 h-5" />,
             isComplete: preprocessingSteps.length > 0,
-        },
-        {
-            id: 'minidiviner',
-            number: 3,
-            title: 'Advicer',
-            subtitle: modelResults ? 'Optimizado' : 'Búsqueda Global',
-            icon: <Sparkles className="w-5 h-5" />,
-            isComplete: modelResults !== null,
         },
         {
             id: 'pca',
@@ -335,12 +344,19 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                         variant="primary"
                                         size="md"
                                         disabled={activeSamples.length < 3}
-                                        onClick={() => setActiveTab('preprocessing')}
-                                        className="w-full flex items-center justify-center gap-2 font-bold shadow-md"
+                                        onClick={() => setActiveTab('minidiviner')}
+                                        className="w-full flex items-center justify-center gap-2 font-bold shadow-md cursor-pointer"
                                     >
-                                        Continuar a Preprocesamiento
+                                        Continuar a Advisor (Paso 2)
                                         <ArrowRight className="w-4 h-4" />
                                     </Button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('preprocessing')}
+                                        className="text-[11px] text-slate-400 hover:text-white underline text-center pt-0.5 cursor-pointer"
+                                    >
+                                        o saltar directo a Preprocesamiento manual (Paso 3)
+                                    </button>
                                     {activeSamples.length < 3 && (
                                         <p className="text-[11px] text-amber-400/90 text-center">
                                             Cargue al menos 3 muestras para avanzar en la calibración.
@@ -381,7 +397,22 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             )}
 
             {/* ------------------------------------------------------------------------- */}
-            {/* PESTAÑA 2: Preprocesamiento Espectral                                     */}
+            {/* PESTAÑA 2: Advicer Industrial (Cribado Rápido para Planta / Laboratorio)   */}
+            {/* ------------------------------------------------------------------------- */}
+            {activeTab === 'minidiviner' && (
+                <div className="flex flex-col gap-6 animate-fade-in">
+                    <MiniDivinerOptimizer
+                        samples={samples}
+                        onLoadModelAndSteps={handleLoadDivinerModel}
+                        onContinueToPreprocessing={() => setActiveTab('preprocessing')}
+                        onBackToData={() => setActiveTab('data')}
+                        onDirectToModel={handleDirectToModel}
+                    />
+                </div>
+            )}
+
+            {/* ------------------------------------------------------------------------- */}
+            {/* PESTAÑA 3: Preprocesamiento Espectral (Inspección & Ajuste Fino)          */}
             {/* ------------------------------------------------------------------------- */}
             {activeTab === 'preprocessing' && (
                 <div className="flex flex-col gap-6 animate-fade-in">
@@ -401,7 +432,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 currentSteps={preprocessingSteps}
                                 onApplyRecommendation={handleApplyRecommendation}
                                 onContinueToPca={() => setActiveTab('pca')}
-                                onBackToData={() => setActiveTab('data')}
+                                onBackToData={() => setActiveTab('minidiviner')}
                                 disabled={activeSamples.length === 0}
                             />
                         </div>
@@ -430,18 +461,6 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                             />
                         </div>
                     </div>
-                </div>
-            )}
-
-            {/* ------------------------------------------------------------------------- */}
-            {/* PESTAÑA 3: Optimizador Automático Mini-Diviner                              */}
-            {/* ------------------------------------------------------------------------- */}
-            {activeTab === 'minidiviner' && (
-                <div className="flex flex-col gap-6 animate-fade-in">
-                    <MiniDivinerOptimizer
-                        samples={samples}
-                        onLoadModelAndSteps={handleLoadDivinerModel}
-                    />
                 </div>
             )}
 

@@ -180,7 +180,7 @@ export const AnalyticalRecommendationCard: React.FC<AnalyticalRecommendationCard
                         onClick={onBackToData}
                         className="w-full text-xs text-slate-400 hover:text-white border-ui-border"
                     >
-                        ← Volver a Datos & Espectros
+                        ← Volver a Advisor (Paso 2)
                     </Button>
                 </div>
             </div>

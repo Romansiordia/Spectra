@@ -6,6 +6,21 @@ import { ModelResults, PreprocessingStep, Sample } from '../types';
 import { applyPreprocessingLogic } from '../services/chemometrics';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { 
+    Activity, 
+    AlertTriangle, 
+    AlertCircle, 
+    CheckCircle2, 
+    Search, 
+    SlidersHorizontal,
+    Table as TableIcon,
+    BarChart3,
+    Check,
+    XCircle,
+    Eye,
+    EyeOff,
+    Sparkles
+} from 'lucide-react';
 
 declare var Chart: any;
 
@@ -45,6 +60,14 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
     const [activeTab, setActiveTab] = useState('correlation');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
+    
+    // Residuals chart & table states
+    const residualChartRef = useRef<HTMLCanvasElement>(null);
+    const residualChartInstanceRef = useRef<any>(null);
+    const [residualXAxis, setResidualXAxis] = useState<'actual' | 'predicted'>('actual');
+    const [residualFilter, setResidualFilter] = useState<'all' | 'alerts' | 'critical' | 'selected'>('all');
+    const [residualSearch, setResidualSearch] = useState('');
+    const [showResidualTable, setShowResidualTable] = useState(true);
     
     const residuals = results.model.residuals;
     const [selectedOutliers, setSelectedOutliers] = useState<Set<string|number>>(new Set());
@@ -160,6 +183,300 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
             }
         }
     }, [results, manualSelection, activeTab, propertyName]);
+
+    // Métricas y análisis estadístico de residuos
+    const sec = results.model.sec || 0.0001;
+    const sec2 = sec * 2;
+    const sec3 = sec * 3;
+    const meanBias = residuals.length > 0 ? residuals.reduce((sum, r) => sum + r.residual, 0) / residuals.length : 0;
+    const maxAbsResidual = residuals.length > 0 ? Math.max(...residuals.map(r => Math.abs(r.residual))) : 0;
+    const warningResiduals = residuals.filter(r => Math.abs(r.residual) > sec2 && Math.abs(r.residual) <= sec3);
+    const criticalResiduals = residuals.filter(r => Math.abs(r.residual) > sec3);
+    const alertCount = warningResiduals.length + criticalResiduals.length;
+
+    // Residuos filtrados para la tabla diagnóstica
+    const filteredResiduals = residuals.filter(r => {
+        if (residualSearch.trim()) {
+            const q = residualSearch.toLowerCase().trim();
+            if (!String(r.id).toLowerCase().includes(q)) return false;
+        }
+        const absRes = Math.abs(r.residual);
+        if (residualFilter === 'critical') return absRes > sec3;
+        if (residualFilter === 'alerts') return absRes > sec2;
+        if (residualFilter === 'selected') return manualSelection.has(r.id);
+        return true;
+    });
+
+    const handleSelectAllCritical = () => {
+        setManualSelection(prev => {
+            const next = new Set(prev);
+            criticalResiduals.forEach(c => next.add(c.id));
+            return next;
+        });
+    };
+
+    const handleSelectAllAlerts = () => {
+        setManualSelection(prev => {
+            const next = new Set(prev);
+            warningResiduals.forEach(w => next.add(w.id));
+            criticalResiduals.forEach(c => next.add(c.id));
+            return next;
+        });
+    };
+
+    const handleClearSelection = () => {
+        setManualSelection(new Set());
+    };
+
+    const toggleSampleSelection = (id: string | number) => {
+        setManualSelection(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    // Efecto para renderizar el gráfico interactivo de Residuos (Lab vs NIR / Error)
+    useEffect(() => {
+        if (activeTab !== 'residuals' || typeof Chart === 'undefined') return;
+
+        let animationFrameId: number;
+
+        const initResidualChart = () => {
+            if (!residualChartRef.current) return;
+            const ctx = residualChartRef.current.getContext('2d');
+            if (!ctx) return;
+
+            if (residualChartInstanceRef.current) {
+                residualChartInstanceRef.current.destroy();
+                residualChartInstanceRef.current = null;
+            }
+
+            const points = results.model.residuals.map(r => {
+                const xVal = residualXAxis === 'actual' ? r.actual : r.predicted;
+                return {
+                    x: xVal,
+                    y: r.residual,
+                    id: r.id,
+                    actual: r.actual,
+                    predicted: r.predicted,
+                    residual: r.residual,
+                    absRes: Math.abs(r.residual)
+                };
+            }).filter(p => isFinite(p.x) && isFinite(p.y));
+
+            if (points.length === 0) return;
+
+            const minX = Math.min(...points.map(p => p.x));
+            const maxX = Math.max(...points.map(p => p.x));
+            const xSpan = (maxX - minX) || 1;
+            const xMinPadded = minX - xSpan * 0.06;
+            const xMaxPadded = maxX + xSpan * 0.06;
+
+            const normalPoints = points.filter(p => p.absRes <= sec2);
+            const warningPoints = points.filter(p => p.absRes > sec2 && p.absRes <= sec3);
+            const criticalPoints = points.filter(p => p.absRes > sec3);
+
+            const maxAbsY = Math.max(sec3 * 1.25, ...points.map(p => p.absRes));
+            const yMin = -maxAbsY * 1.15;
+            const yMax = maxAbsY * 1.15;
+
+            const chartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: `Normal (≤ 2×SEC) [${normalPoints.length}]`,
+                            data: normalPoints,
+                            backgroundColor: '#0ea5e9',
+                            borderColor: '#38bdf8',
+                            pointRadius: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? 10 : 5,
+                            pointHoverRadius: 9,
+                            pointBorderWidth: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? 3 : 1,
+                            pointBorderColor: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? '#ffffff' : '#38bdf8',
+                        },
+                        {
+                            label: `Advertencia (2× a 3×SEC) [${warningPoints.length}]`,
+                            data: warningPoints,
+                            backgroundColor: '#f59e0b',
+                            borderColor: '#fbbf24',
+                            pointStyle: 'triangle',
+                            pointRadius: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? 11 : 7,
+                            pointHoverRadius: 10,
+                            pointBorderWidth: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? 3 : 1,
+                            pointBorderColor: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? '#ffffff' : '#fbbf24',
+                        },
+                        {
+                            label: `Crítico / Outlier (> 3×SEC) [${criticalPoints.length}]`,
+                            data: criticalPoints,
+                            backgroundColor: '#ef4444',
+                            borderColor: '#f87171',
+                            pointStyle: 'rectRot',
+                            pointRadius: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? 12 : 8,
+                            pointHoverRadius: 11,
+                            pointBorderWidth: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? 3 : 1,
+                            pointBorderColor: (ctxPt: any) => manualSelection.has(ctxPt.raw?.id) ? '#ffffff' : '#f87171',
+                        },
+                        // Línea Zero (Y = 0)
+                        {
+                            type: 'line',
+                            label: 'Línea Cero (Residuo = 0)',
+                            data: [{ x: xMinPadded, y: 0 }, { x: xMaxPadded, y: 0 }],
+                            borderColor: '#94a3b8',
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            fill: false,
+                        },
+                        // +2 SEC
+                        {
+                            type: 'line',
+                            label: `+2×SEC (+${sec2.toFixed(4)})`,
+                            data: [{ x: xMinPadded, y: sec2 }, { x: xMaxPadded, y: sec2 }],
+                            borderColor: '#f59e0b',
+                            borderDash: [6, 4],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            fill: false,
+                        },
+                        // -2 SEC
+                        {
+                            type: 'line',
+                            label: `-2×SEC (-${sec2.toFixed(4)})`,
+                            data: [{ x: xMinPadded, y: -sec2 }, { x: xMaxPadded, y: -sec2 }],
+                            borderColor: '#f59e0b',
+                            borderDash: [6, 4],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            fill: false,
+                        },
+                        // +3 SEC
+                        {
+                            type: 'line',
+                            label: `+3×SEC (+${sec3.toFixed(4)})`,
+                            data: [{ x: xMinPadded, y: sec3 }, { x: xMaxPadded, y: sec3 }],
+                            borderColor: '#ef4444',
+                            borderDash: [4, 4],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            fill: false,
+                        },
+                        // -3 SEC
+                        {
+                            type: 'line',
+                            label: `-3×SEC (-${sec3.toFixed(4)})`,
+                            data: [{ x: xMinPadded, y: -sec3 }, { x: xMaxPadded, y: -sec3 }],
+                            borderColor: '#ef4444',
+                            borderDash: [4, 4],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            fill: false,
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    animation: false,
+                    onClick: (evt: any) => {
+                        if (!residualChartInstanceRef.current) return;
+                        const pts = residualChartInstanceRef.current.getElementsAtEventForMode(evt, 'point', { intersect: true }, true);
+                        if (pts.length > 0) {
+                            const pt = pts[0];
+                            const ds = residualChartInstanceRef.current.data.datasets[pt.datasetIndex];
+                            const raw = ds.data[pt.index] as any;
+                            if (raw && raw.id !== undefined) {
+                                toggleSampleSelection(raw.id);
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 14,
+                                font: { family: 'Inter', size: 11 },
+                                color: '#94a3b8',
+                                filter: (item: any) => {
+                                    return !item.text.includes('-2×SEC') && !item.text.includes('-3×SEC');
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#f1f5f9',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                title: (items: any) => {
+                                    const raw = items[0]?.raw;
+                                    return raw ? `Muestra: ${raw.id}` : '';
+                                },
+                                label: (item: any) => {
+                                    const raw = item.raw;
+                                    if (!raw || raw.actual === undefined) return item.dataset.label || '';
+                                    const isCrit = raw.absRes > sec3;
+                                    const isWarn = raw.absRes > sec2 && !isCrit;
+                                    const status = isCrit ? '⚠️ CRÍTICO (> 3×SEC)' : isWarn ? '⚡ ADVERTENCIA (> 2×SEC)' : '✅ Normal (±2×SEC)';
+                                    return [
+                                        `Lab Real: ${raw.actual.toFixed(4)}`,
+                                        `Predicho NIR: ${raw.predicted.toFixed(4)}`,
+                                        `Residuo: ${raw.residual > 0 ? '+' : ''}${raw.residual.toFixed(4)}`,
+                                        `Diagnóstico: ${status}`,
+                                        manualSelection.has(raw.id) ? '● Muestra SELECCIONADA para exclusión' : 'Click para seleccionar/deseleccionar'
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            min: xMinPadded,
+                            max: xMaxPadded,
+                            title: {
+                                display: true,
+                                text: residualXAxis === 'actual' ? `Valor Laboratorio Real (${propertyName})` : `Valor Predicho NIR (${propertyName})`,
+                                color: '#94a3b8',
+                                font: { weight: 'bold' }
+                            },
+                            grid: { color: 'rgba(51, 65, 85, 0.4)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y: {
+                            min: yMin,
+                            max: yMax,
+                            title: {
+                                display: true,
+                                text: 'Residuo = Real - NIR Predicho',
+                                color: '#94a3b8',
+                                font: { weight: 'bold' }
+                            },
+                            grid: { color: 'rgba(51, 65, 85, 0.4)' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+
+            residualChartInstanceRef.current = chartInstance;
+        };
+
+        animationFrameId = requestAnimationFrame(() => {
+            initResidualChart();
+        });
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            if (residualChartInstanceRef.current) {
+                residualChartInstanceRef.current.destroy();
+                residualChartInstanceRef.current = null;
+            }
+        };
+    }, [activeTab, results, manualSelection, propertyName, residualXAxis, sec2, sec3]);
+
 
     const handleExportConfig = () => {
         // Calcular espectro de referencia y desviación estándar para muestras limpias
@@ -421,7 +738,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
             <div className="bg-ui-card border-b border-ui-border">
                 <div className="flex overflow-x-auto no-scrollbar">
                     <TabButton tabId="correlation" label="Gráfico" icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18"></path></svg>} />
-                    <TabButton tabId="residuals" label="Residuos" />
+                    <TabButton tabId="residuals" label="Residuos" icon={<Activity className="w-4 h-4" />} />
                     <TabButton tabId="full-data" label="Exportar" />
                 </div>
             </div>
@@ -454,28 +771,344 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 </div>
 
                 <div className={activeTab === 'residuals' ? 'block' : 'hidden'}>
-                     <div className="bg-ui-card rounded-xl border border-ui-border overflow-hidden animate-fade-in">
-                        <table className="w-full text-sm text-left text-slate-100">
-                            <thead className="bg-ui-dark text-slate-400 uppercase text-xs">
-                                <tr>
-                                    <th className="px-6 py-3">ID</th>
-                                    <th className="px-6 py-3 text-right">Real</th>
-                                    <th className="px-6 py-3 text-right">Pred</th>
-                                    <th className="px-6 py-3 text-right">Error</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-ui-darkest">
-                                {residuals.map(r => (
-                                    <tr key={r.id}>
-                                        <td className="px-6 py-3">{r.id}</td>
-                                        <td className="px-6 py-3 text-right font-mono">{r.actual.toFixed(4)}</td>
-                                        <td className="px-6 py-3 text-right font-mono">{r.predicted.toFixed(4)}</td>
-                                        <td className={`px-6 py-3 text-right font-mono ${Math.abs(r.residual) > results.model.sec * 2 ? 'text-red-400 font-bold' : ''}`}>{r.residual.toFixed(4)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                     </div>
+                    <div className="flex flex-col gap-6 animate-fade-in">
+                        {/* Métricas clave de residuales */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                            <StatCard 
+                                label="SEC (Std Error)" 
+                                value={isFinite(sec) ? sec.toFixed(4) : '0.0000'} 
+                                subtext="Error estándar de calibración"
+                                colorClass="text-sky-400" 
+                            />
+                            <StatCard 
+                                label="Sesgo (Bias)" 
+                                value={isFinite(meanBias) ? (meanBias > 0 ? `+${meanBias.toFixed(4)}` : meanBias.toFixed(4)) : '0.0000'} 
+                                subtext="Error medio sistemático"
+                                colorClass={Math.abs(meanBias) < sec * 0.1 ? "text-emerald-400" : "text-amber-400"} 
+                            />
+                            <StatCard 
+                                label="Residuo Máximo" 
+                                value={isFinite(maxAbsResidual) ? maxAbsResidual.toFixed(4) : '0.0000'} 
+                                subtext={`Max desvío observado`}
+                                colorClass="text-purple-400" 
+                            />
+                            <StatCard 
+                                label="Alertas (> 2×SEC)" 
+                                value={warningResiduals.length} 
+                                subtext={`Límite: ±${sec2.toFixed(4)}`}
+                                colorClass={warningResiduals.length > 0 ? "text-amber-400" : "text-emerald-400"} 
+                            />
+                            <StatCard 
+                                label="Críticos (> 3×SEC)" 
+                                value={criticalResiduals.length} 
+                                subtext={`Límite: ±${sec3.toFixed(4)}`}
+                                colorClass={criticalResiduals.length > 0 ? "text-red-400 font-bold" : "text-emerald-400"} 
+                            />
+                        </div>
+
+                        {/* Card del Gráfico de Residuos */}
+                        <div className="bg-ui-card rounded-xl border border-ui-border p-5 flex flex-col gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-ui-border/60 pb-4">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <BarChart3 className="w-5 h-5 text-ui-accent" />
+                                        <h3 className="font-bold text-slate-100 text-lg">
+                                            Gráfico Diagnóstico de Residuos
+                                        </h3>
+                                        <span className="text-xs bg-ui-dark px-2.5 py-1 rounded-full text-slate-300 font-medium">
+                                            {residuals.length} Muestras
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        Inspección de dispersión y homocedasticidad. Haz clic sobre los puntos en el gráfico para marcarlos para exclusión.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-2 bg-ui-darkest p-1 rounded-lg border border-ui-border self-start sm:self-auto">
+                                    <span className="text-xs font-semibold text-slate-400 px-2">Eje X:</span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setResidualXAxis('actual')}
+                                        className={`px-3 py-1 text-xs rounded font-medium transition-all ${residualXAxis === 'actual' ? 'bg-ui-accent text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                                    >
+                                        Lab Real (Ref)
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setResidualXAxis('predicted')}
+                                        className={`px-3 py-1 text-xs rounded font-medium transition-all ${residualXAxis === 'predicted' ? 'bg-ui-accent text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                                    >
+                                        NIR Predicho
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Canvas del Gráfico */}
+                            <div className="bg-ui-darkest p-4 rounded-xl border border-ui-border shadow-inner-dark h-[440px] relative">
+                                <canvas ref={residualChartRef}></canvas>
+                            </div>
+
+                            {/* Barra informativa de límites */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-ui-darkest/70 p-3 rounded-lg border border-ui-border/60 text-slate-300">
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-3 h-3 rounded-full bg-[#0ea5e9] inline-block"></span>
+                                        Normal (Dentro de ±2×SEC)
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-3 h-3 bg-[#f59e0b] inline-block transform rotate-45"></span>
+                                        Advertencia (±2× a ±3×SEC)
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="w-3 h-3 bg-[#ef4444] inline-block"></span>
+                                        Crítico / Outlier (&gt; 3×SEC)
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3 text-slate-400 font-mono">
+                                    <span>2×SEC: <strong className="text-amber-400">±{sec2.toFixed(4)}</strong></span>
+                                    <span>•</span>
+                                    <span>3×SEC: <strong className="text-red-400">±{sec3.toFixed(4)}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Barra de Gestión de Outliers y Selección Rápida */}
+                        <div className="bg-ui-card rounded-xl border border-ui-border p-5 flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${manualSelection.size > 0 ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' : 'bg-ui-dark border border-ui-border text-slate-400'}`}>
+                                    <AlertTriangle className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-slate-100 text-sm">
+                                        Gestión de Muestras Excluidas
+                                    </h4>
+                                    <p className="text-xs text-slate-400">
+                                        {manualSelection.size === 0 
+                                            ? 'Haz clic en los puntos del gráfico o casillas de la tabla para marcar muestras.' 
+                                            : `${manualSelection.size} muestra(s) seleccionada(s) para ser desactivada(s) y recalcular.`}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                {criticalResiduals.length > 0 && (
+                                    <Button 
+                                        type="button"
+                                        onClick={handleSelectAllCritical} 
+                                        variant="secondary" 
+                                        size="sm"
+                                        className="text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                    >
+                                        Marcar Críticos (&gt; 3×SEC) [{criticalResiduals.length}]
+                                    </Button>
+                                )}
+                                {warningResiduals.length > 0 && (
+                                    <Button 
+                                        type="button"
+                                        onClick={handleSelectAllAlerts} 
+                                        variant="secondary" 
+                                        size="sm"
+                                        className="text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+                                    >
+                                        Marcar Todas las Alertas [{alertCount}]
+                                    </Button>
+                                )}
+                                {manualSelection.size > 0 && (
+                                    <Button 
+                                        type="button"
+                                        onClick={handleClearSelection} 
+                                        variant="secondary" 
+                                        size="sm"
+                                    >
+                                        Limpiar Selección
+                                    </Button>
+                                )}
+                                <Button 
+                                    onClick={handleDeactivateManualClick} 
+                                    disabled={manualSelection.size === 0} 
+                                    variant="danger"
+                                    size="sm"
+                                >
+                                    Desactivar ({manualSelection.size}) y Recalcular
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Tabla Diagnóstica con Búsqueda y Filtros */}
+                        <div className="bg-ui-card rounded-xl border border-ui-border overflow-hidden">
+                            <div className="p-4 bg-ui-dark/50 border-b border-ui-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <TableIcon className="w-5 h-5 text-ui-accent" />
+                                    <div>
+                                        <h4 className="font-bold text-slate-100 text-sm">
+                                            Tabla Detallada de Residuos
+                                        </h4>
+                                        <p className="text-xs text-slate-400">
+                                            Mostrando {filteredResiduals.length} de {residuals.length} muestras
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                    {/* Buscador */}
+                                    <div className="relative min-w-[200px]">
+                                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input 
+                                            type="text"
+                                            value={residualSearch}
+                                            onChange={(e) => setResidualSearch(e.target.value)}
+                                            placeholder="Buscar por ID..."
+                                            className="w-full bg-ui-darkest border border-ui-border rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-ui-accent"
+                                        />
+                                    </div>
+
+                                    {/* Filtros rápidos */}
+                                    <div className="flex items-center gap-1 bg-ui-darkest p-1 rounded-lg border border-ui-border">
+                                        <button
+                                            type="button"
+                                            onClick={() => setResidualFilter('all')}
+                                            className={`px-2.5 py-1 text-xs rounded font-medium transition-all ${residualFilter === 'all' ? 'bg-ui-accent text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                                        >
+                                            Todas ({residuals.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setResidualFilter('alerts')}
+                                            className={`px-2.5 py-1 text-xs rounded font-medium transition-all ${residualFilter === 'alerts' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                                        >
+                                            Alertas ({alertCount})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setResidualFilter('critical')}
+                                            className={`px-2.5 py-1 text-xs rounded font-medium transition-all ${residualFilter === 'critical' ? 'bg-red-500/20 text-red-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                                        >
+                                            Críticos ({criticalResiduals.length})
+                                        </button>
+                                        {manualSelection.size > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setResidualFilter('selected')}
+                                                className={`px-2.5 py-1 text-xs rounded font-medium transition-all ${residualFilter === 'selected' ? 'bg-purple-500/20 text-purple-300 font-bold' : 'text-slate-400 hover:text-slate-200'}`}
+                                            >
+                                                Marcadas ({manualSelection.size})
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Botón Colapsar */}
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowResidualTable(!showResidualTable)}
+                                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-ui-darkest rounded-lg transition-colors border border-ui-border"
+                                        title={showResidualTable ? "Ocultar tabla" : "Mostrar tabla"}
+                                    >
+                                        {showResidualTable ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {showResidualTable && (
+                                <div className="max-h-80 overflow-y-auto">
+                                    <table className="w-full text-sm text-left text-slate-100">
+                                        <thead className="bg-ui-dark text-slate-400 uppercase text-xs sticky top-0 z-10 border-b border-ui-border">
+                                            <tr>
+                                                <th className="px-4 py-3 w-10 text-center">
+                                                    <span className="sr-only">Seleccionar</span>
+                                                </th>
+                                                <th className="px-4 py-3 font-semibold">ID Muestra</th>
+                                                <th className="px-4 py-3 text-right font-semibold">Valor Real (Lab)</th>
+                                                <th className="px-4 py-3 text-right font-semibold">Predicho (NIR)</th>
+                                                <th className="px-4 py-3 text-right font-semibold">Residuo (Real - NIR)</th>
+                                                <th className="px-4 py-3 text-right font-semibold">% Error</th>
+                                                <th className="px-4 py-3 text-center font-semibold">Diagnóstico</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-ui-darkest">
+                                            {filteredResiduals.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400 text-sm">
+                                                        No se encontraron muestras que coincidan con el filtro seleccionado.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredResiduals.map(r => {
+                                                    const absRes = Math.abs(r.residual);
+                                                    const isCrit = absRes > sec3;
+                                                    const isWarn = absRes > sec2 && !isCrit;
+                                                    const isSelected = manualSelection.has(r.id);
+                                                    const relError = Math.abs(r.actual) > 1e-6 
+                                                        ? ((absRes / Math.abs(r.actual)) * 100).toFixed(2) 
+                                                        : '0.00';
+
+                                                    return (
+                                                        <tr 
+                                                            key={r.id} 
+                                                            onClick={() => toggleSampleSelection(r.id)}
+                                                            className={`cursor-pointer transition-colors ${
+                                                                isSelected 
+                                                                    ? 'bg-red-500/15 hover:bg-red-500/20' 
+                                                                    : isCrit 
+                                                                        ? 'bg-red-950/20 hover:bg-red-900/30' 
+                                                                        : isWarn 
+                                                                            ? 'bg-amber-950/20 hover:bg-amber-900/30' 
+                                                                            : 'hover:bg-ui-dark/60'
+                                                            }`}
+                                                        >
+                                                            <td className="px-4 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                <input 
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={() => toggleSampleSelection(r.id)}
+                                                                    className="h-4 w-4 rounded text-ui-accent bg-ui-darkest border-ui-border focus:ring-ui-accent focus:ring-offset-0 cursor-pointer"
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-2.5 font-medium text-slate-200">
+                                                                {r.id}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-right font-mono text-slate-300">
+                                                                {r.actual.toFixed(4)}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-right font-mono text-slate-300">
+                                                                {r.predicted.toFixed(4)}
+                                                            </td>
+                                                            <td className={`px-4 py-2.5 text-right font-mono font-bold ${
+                                                                isCrit 
+                                                                    ? 'text-red-400' 
+                                                                    : isWarn 
+                                                                        ? 'text-amber-400' 
+                                                                        : 'text-sky-300'
+                                                            }`}>
+                                                                {r.residual > 0 ? `+${r.residual.toFixed(4)}` : r.residual.toFixed(4)}
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-400">
+                                                                {relError}%
+                                                            </td>
+                                                            <td className="px-4 py-2.5 text-center">
+                                                                {isCrit ? (
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-500/20 text-red-300 border border-red-500/30">
+                                                                        <AlertCircle className="w-3 h-3" /> Crítico (&gt;3×SEC)
+                                                                    </span>
+                                                                ) : isWarn ? (
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                                        <AlertTriangle className="w-3 h-3" /> Advertencia (&gt;2×SEC)
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                                        <Check className="w-3 h-3" /> Normal
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 <div className={activeTab === 'full-data' ? 'block' : 'hidden'}>
