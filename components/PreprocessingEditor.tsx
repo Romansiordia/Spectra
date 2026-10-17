@@ -92,62 +92,74 @@ const PreprocessingEditor: React.FC<PreprocessingEditorProps> = ({ steps, setSte
     };
 
     return (
-        <Card className="h-full">
-            <div className="flex flex-col h-full">
-                <div className="flex items-center justify-between gap-3 mb-4 border-b border-ui-border pb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="h-7 w-7 bg-ui-darkest text-ui-accent border border-ui-accent rounded-lg flex items-center justify-center text-sm font-bold shadow-sm">2</div>
-                        <h3 className="text-lg font-bold text-slate-100">Pre-procesamiento</h3>
+        <Card className="p-3.5">
+            <div className="flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-2.5 border-b border-ui-border pb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 bg-ui-darkest text-ui-accent border border-ui-accent rounded-md flex items-center justify-center text-xs font-bold shadow-sm">2</div>
+                        <h3 className="text-sm font-bold text-slate-100">Pre-procesamiento Manual</h3>
                     </div>
-                    <Button onClick={onVisualize} disabled={disabled} size="sm" variant="primary">
+                    <Button onClick={onVisualize} disabled={disabled} size="sm" variant="primary" className="py-1 px-2.5 text-xs">
                         <VisualizeIcon />
                         Visualizar
                     </Button>
                 </div>
                 
-                <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-2 min-h-[8rem]">
-                    {steps.map((step, index) => {
-                        const methodInfo = PREPROCESSING_METHODS[step.method];
-                        return (
-                            <div key={index} className="p-3 border border-ui-border rounded-lg bg-ui-dark shadow-sm">
-                                <div className="flex items-center justify-between">
-                                    <select
-                                        value={step.method}
-                                        onChange={(e) => handleMethodChange(index, e.target.value as PreprocessingStep['method'])}
-                                        className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm"
-                                    >
-                                        {Object.entries(PREPROCESSING_METHODS).map(([key, value]) => (
-                                            <option key={key} value={key}>{value.name}</option>
-                                        ))}
-                                    </select>
-                                    <button onClick={() => removeStep(index)} className="ml-2 p-1 text-slate-400 hover:text-red-500 transition-colors">
-                                        <RemoveIcon />
-                                    </button>
-                                </div>
-                                 {methodInfo.params.length > 0 && (
-                                    <div className={`grid gap-2 mt-3 ${methodInfo.params.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
-                                        {(methodInfo.params as any[]).map(param => (
-                                            <div key={param.id} className="text-xs">
-                                                <label htmlFor={`${param.id}-${index}`} className="text-slate-400 font-medium mb-1 block truncate" title={param.name}>{param.name}</label>
-                                                <input
-                                                    type={param.type}
-                                                    id={`${param.id}-${index}`}
-                                                    value={step.params[param.id] ?? ''}
-                                                    onChange={(e) => handleParamChange(index, param.id, e.target.value)}
-                                                    className="w-full bg-ui-card border border-ui-border text-slate-100 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono text-center"
-                                                />
-                                            </div>
-                                        ))}
+                <div className="space-y-2 overflow-y-auto custom-scrollbar pr-1 max-h-44">
+                    {steps.length === 0 ? (
+                        <div className="text-center py-3 text-xs text-slate-400 bg-ui-dark/50 rounded-lg border border-dashed border-ui-border">
+                            Sin preprocesamiento manual (Datos Crutos)
+                        </div>
+                    ) : (
+                        steps.map((step, index) => {
+                            const methodInfo = PREPROCESSING_METHODS[step.method] || PREPROCESSING_METHODS['none'];
+                            return (
+                                <div key={index} className="p-2 border border-ui-border rounded-lg bg-ui-dark shadow-sm">
+                                    <div className="flex items-center justify-between gap-1.5">
+                                        <select
+                                            value={step.method}
+                                            onChange={(e) => handleMethodChange(index, e.target.value as PreprocessingStep['method'])}
+                                            className="w-full bg-ui-card border border-ui-border text-slate-100 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 shadow-sm"
+                                        >
+                                            {Object.entries(PREPROCESSING_METHODS).map(([key, value]) => (
+                                                <option key={key} value={key}>{value.name}</option>
+                                            ))}
+                                        </select>
+                                        <button 
+                                            onClick={() => removeStep(index)} 
+                                            className="p-1 text-slate-400 hover:text-red-400 transition-colors shrink-0"
+                                            title="Eliminar paso"
+                                        >
+                                            <RemoveIcon />
+                                        </button>
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                                    {methodInfo.params.length > 0 && (
+                                        <div className={`grid gap-1.5 mt-2 ${methodInfo.params.length === 4 ? 'grid-cols-4' : 'grid-cols-2'}`}>
+                                            {(methodInfo.params as any[]).map(param => (
+                                                <div key={param.id} className="text-[11px]">
+                                                    <label htmlFor={`${param.id}-${index}`} className="text-slate-400 text-[10px] font-medium block truncate" title={param.name}>
+                                                        {param.name}
+                                                    </label>
+                                                    <input
+                                                        type={param.type}
+                                                        id={`${param.id}-${index}`}
+                                                        value={step.params[param.id] ?? ''}
+                                                        onChange={(e) => handleParamChange(index, param.id, e.target.value)}
+                                                        className="w-full bg-ui-card border border-ui-border text-slate-100 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 font-mono text-center"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
                 
-                <div className="pt-4">
-                    <Button variant="secondary" onClick={addStep} disabled={disabled} className="w-full">
-                        <AddIcon />Añadir Paso
+                <div className="pt-2">
+                    <Button variant="secondary" size="sm" onClick={addStep} disabled={disabled} className="w-full py-1 text-xs">
+                        <AddIcon /> Añadir Paso
                     </Button>
                 </div>
             </div>
