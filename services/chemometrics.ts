@@ -1,5 +1,5 @@
 
-import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel, RobpcaSampleType, SpectralDiagnostic } from '../types';
+import { PreprocessingStep, Sample, ModelResults, OptimizationResult, PcaScorePoint, PcaAnalysisModel, RobpcaSampleType, SpectralDiagnostic, RecommendedCombination } from '../types';
 import { Matrix, inverse, solve } from 'ml-matrix';
 
 // ===============================================
@@ -1319,6 +1319,52 @@ export function diagnoseSpectralData(wavelengths: number[], samples: Sample[]): 
 
     // Valores por defecto seguros si no hay datos suficientes
     if (nWl < 5 || activeSamples.length === 0) {
+        const defaultComb1: RecommendedCombination = {
+            id: 'comb-1',
+            rank: 1,
+            rankLabel: '⭐ Mejor Opción (#1)',
+            score: 96,
+            badge: 'Estándar FOSS / Gold Standard • Idoneidad 96%',
+            name: 'SNV + 2ª Derivada FOSS (2,4,4,1)',
+            focus: 'Máxima separación de bandas químicas solapadas y eliminación de línea base.',
+            description: 'La formulación más utilizada en espectroscopía NIR de granos, harinas y forrajes.',
+            rationale: 'SNV normaliza las diferencias de empaque y tamaño de partícula; 2,4,4,1 aísla armónicos C-H, N-H y O-H.',
+            steps: [
+                { method: 'snv', params: {} },
+                { method: 'winisi2441', params: {} }
+            ]
+        };
+        const defaultComb2: RecommendedCombination = {
+            id: 'comb-2',
+            rank: 2,
+            rankLabel: '🥈 2ª Mejor Opción (#2)',
+            score: 88,
+            badge: 'Filtro Robusto / Matrices Complejas • Idoneidad 88%',
+            name: 'SNV + 1ª Derivada FOSS (1,4,4,1)',
+            focus: 'Equilibrio ideal entre eliminación de pendiente y máxima relación señal/ruido.',
+            description: 'Altamente robusta frente a fluctuaciones de temperatura y muestras heterogéneas.',
+            rationale: 'La 1ª derivada neutraliza el corrimiento paralelo sin amplificar el ruido aleatorio como la 2ª derivada.',
+            steps: [
+                { method: 'snv', params: {} },
+                { method: 'winisi1441', params: {} }
+            ]
+        };
+        const defaultComb3: RecommendedCombination = {
+            id: 'comb-3',
+            rank: 3,
+            rankLabel: '🥉 3ª Opción (#3)',
+            score: 81,
+            badge: 'Bajo Ruido / Morfología Directa • Idoneidad 81%',
+            name: 'MSC + Suavizado Savitzky-Golay (w=9)',
+            focus: 'Preservación de perfiles de absorción y reducción de factores latentes PLS.',
+            description: 'Normalización física rigurosa respecto al espectro medio del lote sin artefactos derivados.',
+            rationale: 'MSC alinea la pendiente y offset contra la media grupal; el filtro polinomial elimina ruido instrumental.',
+            steps: [
+                { method: 'msc', params: {} },
+                { method: 'savgolsmooth', params: { windowSize: 9, polynomialOrder: 2 } }
+            ]
+        };
+
         return {
             deltaLambda: 2.0,
             pointsCount: nWl,
@@ -1327,13 +1373,11 @@ export function diagnoseSpectralData(wavelengths: number[], samples: Sample[]): 
             noiseLevel: 'low',
             noiseRatio: 0.001,
             baselineCurvature: false,
-            recommendedSteps: [
-                { method: 'snv', params: {} },
-                { method: 'winisi2441', params: {} }
-            ],
-            title: 'SNV + 2ª Derivada FOSS (2,4,4,1)',
-            description: 'Tratamiento estándar para NIR en muestras sólidas y polvos.',
-            rationale: 'Corrige la dispersión de partículas y separa bandas solapadas.',
+            recommendedSteps: defaultComb1.steps,
+            title: defaultComb1.name,
+            description: defaultComb1.description,
+            rationale: defaultComb1.rationale,
+            combinations: [defaultComb1, defaultComb2, defaultComb3]
         };
     }
 
@@ -1414,53 +1458,202 @@ export function diagnoseSpectralData(wavelengths: number[], samples: Sample[]): 
         }
     }
 
-    // 5. Generación de recomendación quimiométrica
-    const recommendedSteps: PreprocessingStep[] = [];
-    let title = '';
-    let description = '';
-    let rationale = '';
+    // =========================================================================
+    // 5. CÁLCULO DINÁMICO DE LAS 3 COMBINACIONES ÓPTIMAS
+    // =========================================================================
 
-    // A) Corrección de dispersión física / línea base
+    // --- OPCIÓN 1: Estándar de la Industria (Máxima Separación de Bandas) ---
+    const comb1Steps: PreprocessingStep[] = [];
+    let comb1Name = '';
+    let comb1Badge = 'Recomendada (Máxima Resolución)';
+    let comb1Focus = 'Máxima resolución de picos químicos solapados y eliminación de línea base.';
+    let comb1Rationale = '';
+
     if (baselineCurvature && scatterLevel === 'high') {
-        recommendedSteps.push({ method: 'snv', params: {} });
-        recommendedSteps.push({ method: 'detrend', params: {} });
-    } else if (scatterLevel === 'high' || scatterLevel === 'moderate') {
-        recommendedSteps.push({ method: 'snv', params: {} });
+        comb1Steps.push({ method: 'snv', params: {} });
+        comb1Steps.push({ method: 'detrend', params: {} });
+    } else {
+        comb1Steps.push({ method: 'snv', params: {} });
     }
 
-    // B) Derivada y suavizado según resolución (Δλ) y ruido
+    const scatterLabel = comb1Steps.length > 1 ? 'SNV + Detrend' : 'SNV';
+
     if (deltaLambda <= 1.0) {
-        // Alta resolución espectral (ej. 0.5 nm o 1.0 nm)
         if (noiseLevel === 'high') {
-            recommendedSteps.push({
-                method: 'savgol2',
-                params: { windowSize: 17, polynomialOrder: 2 }
-            });
-            title = 'SNV + Savitzky-Golay 2ª Deriv. (Ventana 17)';
-            description = `Espectro de alta densidad (Δλ = ${deltaLambda.toFixed(1)} nm) con ruido detectable.`;
-            rationale = 'La ventana de convolución de 17 puntos amortigua el ruido instrumental de alta frecuencia sin distorsionar las bandas analíticas.';
+            comb1Steps.push({ method: 'savgol2', params: { windowSize: 17, polynomialOrder: 2 } });
+            comb1Name = `${scatterLabel} + 2ª Derivada SG (w=17)`;
+            comb1Rationale = `Para alta densidad (Δλ = ${deltaLambda.toFixed(1)} nm) con ruido detectable (${(noiseRatio * 100).toFixed(2)}%), una ventana de 17 puntos amortigua el ruido instrumental mientras separa bandas estrechas.`;
         } else {
-            recommendedSteps.push({ method: 'winisi1881', params: {} });
-            title = 'SNV + Derivada Norris 1,8,8,1';
-            description = `Espectro de alta resolución (Δλ = ${deltaLambda.toFixed(1)} nm, ${nWl} canales).`;
-            rationale = 'Para resolución de 1 nm o menor, la formulación 1,8,8,1 (Gap 8) previene la sobre-amplificación de ruido y resalta hombros químicos.';
+            comb1Steps.push({ method: 'winisi1881', params: {} });
+            comb1Name = `${scatterLabel} + Derivada Norris 1,8,8,1`;
+            comb1Rationale = `Con alta resolución (Δλ = ${deltaLambda.toFixed(1)} nm, ${nWl} canales), la fórmula Norris 1,8,8,1 (Gap 8) aísla hombros químicos finos sin inflar el ruido base.`;
         }
     } else if (deltaLambda <= 3.5) {
-        // Resolución estándar NIR (ej. 2 nm en FOSS Infratec / NIRS)
-        recommendedSteps.push({ method: 'winisi2441', params: {} });
-        title = 'SNV + 2ª Derivada FOSS (2,4,4,1)';
-        description = `Resolución estándar NIR (Δλ = ${deltaLambda.toFixed(1)} nm).`;
-        rationale = 'La fórmula estándar en quimiometría: SNV neutraliza diferencias de empaque/partícula y 2,4,4,1 elimina la línea base separando picos C-H, N-H y O-H.';
+        if (noiseLevel === 'high') {
+            comb1Steps.push({ method: 'savgol2', params: { windowSize: 13, polynomialOrder: 2 } });
+            comb1Name = `${scatterLabel} + 2ª Derivada SG (w=13)`;
+            comb1Rationale = `Para resolución estándar NIR (Δλ = ${deltaLambda.toFixed(1)} nm) con ruido residual, Savitzky-Golay (w=13) filtra oscilaciones de alta frecuencia y separa picos C-H, N-H y O-H.`;
+        } else {
+            comb1Steps.push({ method: 'winisi2441', params: {} });
+            comb1Name = `${scatterLabel} + 2ª Derivada FOSS (2,4,4,1)`;
+            comb1Badge = 'Recomendada (Gold Standard NIR)';
+            comb1Rationale = `La referencia absoluta en quimiometría NIR (FOSS / WinISI): SNV neutraliza diferencias de empaque y 2,4,4,1 suprime el fondo espectral aislando las bandas analíticas.`;
+        }
     } else {
-        // Cuadrícula amplia o pocos canales (Δλ > 3.5 nm)
-        recommendedSteps.push({
-            method: 'savgol1',
-            params: { windowSize: 7, polynomialOrder: 2 }
-        });
-        title = 'SNV + 1ª Derivada Savitzky-Golay (Ventana 7)';
-        description = `Espaciado amplio entre canales espectrales (Δλ = ${deltaLambda.toFixed(1)} nm).`;
-        rationale = 'Una ventana compacta de 7 puntos preserva la información en los extremos de la cuadrícula espectral sin pérdida excesiva de bordes.';
+        comb1Steps.push({ method: 'savgol2', params: { windowSize: 7, polynomialOrder: 2 } });
+        comb1Name = `${scatterLabel} + 2ª Derivada SG (w=7)`;
+        comb1Rationale = `Para espaciado amplio entre canales (Δλ = ${deltaLambda.toFixed(1)} nm), una ventana compacta de 7 puntos preserva los extremos del espectro sin pérdida excesiva de bordes.`;
     }
+
+    // --- CANDIDATO B: Corrección Física Directa (Bajo Ruido & Preservación de Morfología) ---
+    const comb2Steps: PreprocessingStep[] = [];
+    const useMsc = scatterLevel === 'high';
+    const scatterMethod = useMsc ? 'msc' : 'snv';
+    const scatterMethodName = useMsc ? 'MSC' : 'SNV';
+    comb2Steps.push({ method: scatterMethod, params: {} });
+
+    // Ventana adaptativa de suavizado Savitzky-Golay
+    let smoothWindow = 9;
+    if (noiseLevel === 'high') {
+        smoothWindow = deltaLambda <= 1.5 ? 15 : 11;
+    } else if (noiseLevel === 'moderate') {
+        smoothWindow = deltaLambda <= 1.5 ? 11 : 9;
+    } else {
+        smoothWindow = deltaLambda <= 1.5 ? 9 : 7;
+    }
+    if (smoothWindow % 2 === 0) smoothWindow += 1;
+    smoothWindow = Math.min(smoothWindow, Math.max(5, Math.floor(nWl / 3) * 2 + 1));
+
+    comb2Steps.push({ method: 'savgolsmooth', params: { windowSize: smoothWindow, polynomialOrder: 2 } });
+
+    // --- CANDIDATO C: Filtro Robusto / 1ª Derivada (Matrices Heterogéneas & En Línea) ---
+    const comb3Steps: PreprocessingStep[] = [];
+    if (baselineCurvature) {
+        comb3Steps.push({ method: 'snv', params: {} });
+        comb3Steps.push({ method: 'detrend', params: {} });
+    } else {
+        comb3Steps.push({ method: 'snv', params: {} });
+    }
+    const comb3ScatterLabel = comb3Steps.length > 1 ? 'SNV + Detrend' : 'SNV';
+    let comb3Name = '';
+    let comb3Rationale = '';
+
+    if (deltaLambda <= 1.0) {
+        const sgWindow = noiseLevel === 'high' ? 15 : 11;
+        comb3Steps.push({ method: 'savgol1', params: { windowSize: sgWindow, polynomialOrder: 2 } });
+        comb3Name = `${comb3ScatterLabel} + 1ª Derivada SG (w=${sgWindow})`;
+        comb3Rationale = `La 1ª derivada con ventana de ${sgWindow} puntos suprime el desplazamiento de fondo con mucha mayor tolerancia al ruido que una 2ª derivada en alta resolución.`;
+    } else if (deltaLambda <= 3.5) {
+        comb3Steps.push({ method: 'winisi1441', params: {} });
+        comb3Name = `${comb3ScatterLabel} + 1ª Derivada FOSS (1,4,4,1)`;
+        comb3Rationale = `La 1ª derivada 1,4,4,1 convierte los máximos de absorción en cruces por cero sin cuadruplicar el ruido, ofreciendo máxima robustez ante variaciones térmicas y matrices heterogéneas.`;
+    } else {
+        comb3Steps.push({ method: 'savgol1', params: { windowSize: 7, polynomialOrder: 2 } });
+        comb3Name = `${comb3ScatterLabel} + 1ª Derivada SG (w=7)`;
+        comb3Rationale = `Una 1ª derivada compacta de 7 puntos corrige la deriva de línea base manteniendo los bordes espectrales intactos.`;
+    }
+
+    // =========================================================================
+    // 6. EVALUACIÓN Y ORDENACIÓN QUIMIOMÉTRICA DE LAS MEJORES OPCIONES (1, 2, 3)
+    // =========================================================================
+    // Calculamos la puntuación de idoneidad quimiométrica (0-100) según la física espectral
+    let scoreComb1 = 94; // 2ª Derivada + Corrección de dispersión (Máxima resolución)
+    let scoreComb2 = 82; // Corrección física directa (MSC/SNV + Suavizado Savitzky-Golay)
+    let scoreComb3 = 87; // Filtro Robusto (1ª Derivada)
+
+    if (noiseLevel === 'low') {
+        scoreComb1 += 4; // 98% (Inmejorable para desolapar bandas cuando no hay ruido)
+        scoreComb3 -= 1; // 86%
+        scoreComb2 -= 2; // 80%
+    } else if (noiseLevel === 'moderate') {
+        scoreComb1 -= 3; // 91%
+        scoreComb3 += 4; // 91%
+        scoreComb2 += 3; // 85%
+    } else {
+        // En ruido alto, la 2ª derivada amplifica drásticamente el ruido: penalización estricta
+        scoreComb1 -= 22; // 72%
+        scoreComb3 += 9;  // 96% -> asciende al puesto #1
+        scoreComb2 += 8;  // 90% -> asciende al puesto #2
+    }
+
+    if (scatterLevel === 'high') {
+        scoreComb2 += 4;
+        scoreComb3 += 2;
+    }
+
+    if (baselineCurvature) {
+        scoreComb1 += 2;
+        scoreComb3 += 3;
+        scoreComb2 -= 4; // sin derivada le cuesta más compensar curvatura fuerte
+    }
+
+    if (deltaLambda <= 1.0) {
+        scoreComb1 += 2;
+    } else if (deltaLambda > 5.0) {
+        scoreComb1 -= 4;
+        scoreComb2 += 3;
+    }
+
+    const rawCandidates = [
+        {
+            key: 'comb-deriv2',
+            baseBadge: 'Máxima Resolución de Bandas',
+            name: comb1Name,
+            focus: comb1Focus,
+            description: `Diseñada para resolver sobretonos C-H, N-H y O-H eliminando completamente la pendiente y deriva de fondo.`,
+            rationale: comb1Rationale,
+            steps: comb1Steps,
+            score: Math.min(99, Math.max(65, Math.round(scoreComb1)))
+        },
+        {
+            key: 'comb-direct',
+            baseBadge: 'Morfología Física / Bajo Ruido',
+            name: `${scatterMethodName} + Suavizado Savitzky-Golay (w=${smoothWindow})`,
+            focus: 'Preservación de forma de picos sin artefactos numéricos de derivada.',
+            description: `Normalización física rigurosa respecto al lote que previene la amplificación de ruido residual.`,
+            rationale: `Al omitir derivadas numéricas, se preserva la relación de absorbancia lineal (Beer-Lambert) y se evita inflar el error SECV, permitiendo modelos PLS con menos componentes latentes.`,
+            steps: comb2Steps,
+            score: Math.min(99, Math.max(60, Math.round(scoreComb2)))
+        },
+        {
+            key: 'comb-deriv1',
+            baseBadge: 'Filtro Robusto / Señal Estable',
+            name: comb3Name,
+            focus: 'Compromiso balanceado entre eliminación de pendiente y alta relación señal/ruido.',
+            description: `Excelente estabilidad a largo plazo para muestras heterogéneas o monitoreo en planta.`,
+            rationale: comb3Rationale,
+            steps: comb3Steps,
+            score: Math.min(99, Math.max(60, Math.round(scoreComb3)))
+        }
+    ];
+
+    // ORDENAR RIGUROSAMENTE DE MAYOR A MENOR IDONEIDAD
+    rawCandidates.sort((a, b) => b.score - a.score);
+
+    // Asignar IDs canónicos ('comb-1', 'comb-2', 'comb-3') en orden estricto de mejor opción
+    const sortedCombinations: RecommendedCombination[] = rawCandidates.map((c, index) => {
+        const rank = index + 1;
+        const rankLabel = rank === 1
+            ? '⭐ Opción 1: Mejor Opción Recomendada'
+            : rank === 2
+                ? '🥈 Opción 2: Segunda Mejor Alternativa'
+                : '🥉 Opción 3: Tercera Opción Especializada';
+
+        return {
+            id: `comb-${rank}`,
+            rank,
+            rankLabel,
+            score: c.score,
+            badge: `${c.baseBadge} • Idoneidad ${c.score}%`,
+            name: c.name,
+            focus: c.focus,
+            description: c.description,
+            rationale: c.rationale,
+            steps: c.steps
+        };
+    });
+
+    const bestComb = sortedCombinations[0];
 
     return {
         deltaLambda,
@@ -1470,12 +1663,14 @@ export function diagnoseSpectralData(wavelengths: number[], samples: Sample[]): 
         noiseLevel,
         noiseRatio,
         baselineCurvature,
-        recommendedSteps,
-        title,
-        description,
-        rationale
+        recommendedSteps: bestComb.steps,
+        title: bestComb.name,
+        description: bestComb.description,
+        rationale: bestComb.rationale,
+        combinations: sortedCombinations
     };
 }
+
 
 export interface DivinerResultItem {
     id: string;

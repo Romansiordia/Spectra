@@ -144,6 +144,19 @@ export interface ClassificationResult {
     };
 }
 
+export interface RecommendedCombination {
+    id: string;
+    rank: number;
+    rankLabel: string;
+    score: number;
+    badge: string;
+    name: string;
+    focus: string;
+    description: string;
+    rationale: string;
+    steps: PreprocessingStep[];
+}
+
 export interface SpectralDiagnostic {
     deltaLambda: number;
     pointsCount: number;
@@ -156,4 +169,5 @@ export interface SpectralDiagnostic {
     title: string;
     description: string;
     rationale: string;
+    combinations: RecommendedCombination[];
 }

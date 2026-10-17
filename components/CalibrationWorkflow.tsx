@@ -9,7 +9,6 @@ import {
     AlertCircle, 
     FileText, 
     RefreshCw,
-    Sparkles,
     ChevronRight,
     TrendingUp
 } from 'lucide-react';
@@ -25,9 +24,8 @@ import Card from './Card';
 import Button from './Button';
 import ErrorBoundary from './ErrorBoundary';
 import AnalyticalRecommendationCard from './AnalyticalRecommendationCard';
-import MiniDivinerOptimizer from './MiniDivinerOptimizer';
 
-export type CalibrationTab = 'data' | 'minidiviner' | 'preprocessing' | 'pca' | 'model';
+export type CalibrationTab = 'data' | 'preprocessing' | 'pca' | 'model';
 
 interface CalibrationWorkflowProps {
     wavelengths: number[];
@@ -111,10 +109,6 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         }).join(' + ')
         : 'Espectros Crudos';
 
-    const divinerSummary = modelResults
-        ? `Receta Lista | R²: ${modelResults.r2?.toFixed(3) || '—'}`
-        : 'Cribado y Optimización';
-
     const pcaSummary = inactiveCount > 0
         ? `${inactiveCount} muestra(s) excluida(s)`
         : activeSamples.length >= 3
@@ -135,18 +129,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         onVisualizePreprocessing(recommendedSteps);
     };
 
-    const handleLoadDivinerModel = (steps: PreprocessingStep[], results: ModelResults) => {
-        setPreprocessingSteps(steps);
-        onVisualizePreprocessing(steps);
-    };
-
-    const handleDirectToModel = (steps: PreprocessingStep[], results: ModelResults) => {
-        setPreprocessingSteps(steps);
-        onRunModel({ type: 'pls', nComponents: results.nComponents });
-        setActiveTab('model');
-    };
-
-    // Lista de tarjetas del flujo de calibración
+    // Lista de tarjetas del flujo de calibración (4 pasos directos)
     const flowTabs: {
         id: CalibrationTab;
         number: number;
@@ -166,16 +149,8 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             hasWarning: samples.length > 0 && activeSamples.length < 3
         },
         {
-            id: 'minidiviner',
-            number: 2,
-            title: 'Advisor',
-            subtitle: divinerSummary,
-            icon: <Sparkles className="w-5 h-5" />,
-            isComplete: modelResults !== null,
-        },
-        {
             id: 'preprocessing',
-            number: 3,
+            number: 2,
             title: 'Preprocesamiento',
             subtitle: prepSummary,
             icon: <Sliders className="w-5 h-5" />,
@@ -183,7 +158,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         },
         {
             id: 'pca',
-            number: 4,
+            number: 3,
             title: 'Análisis PCA & Outliers',
             subtitle: pcaSummary,
             icon: <ScatterChart className="w-5 h-5" />,
@@ -192,7 +167,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
         },
         {
             id: 'model',
-            number: 5,
+            number: 4,
             title: 'Modelo PLS & Resultados',
             subtitle: modelSummary,
             icon: <Cpu className="w-5 h-5" />,
@@ -205,7 +180,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             {/* ========================================================================= */}
             {/* 1. BARRA SUPERIOR DE TARJETAS / PESTAÑAS DE FLUJO                         */}
             {/* ========================================================================= */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                 {flowTabs.map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -344,19 +319,12 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                         variant="primary"
                                         size="md"
                                         disabled={activeSamples.length < 3}
-                                        onClick={() => setActiveTab('minidiviner')}
+                                        onClick={() => setActiveTab('preprocessing')}
                                         className="w-full flex items-center justify-center gap-2 font-bold shadow-md cursor-pointer"
                                     >
-                                        Continuar a Advisor (Paso 2)
+                                        Continuar a Preprocesamiento (Paso 2)
                                         <ArrowRight className="w-4 h-4" />
                                     </Button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveTab('preprocessing')}
-                                        className="text-[11px] text-slate-400 hover:text-white underline text-center pt-0.5 cursor-pointer"
-                                    >
-                                        o saltar directo a Preprocesamiento manual (Paso 3)
-                                    </button>
                                     {activeSamples.length < 3 && (
                                         <p className="text-[11px] text-amber-400/90 text-center">
                                             Cargue al menos 3 muestras para avanzar en la calibración.
@@ -397,28 +365,13 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             )}
 
             {/* ------------------------------------------------------------------------- */}
-            {/* PESTAÑA 2: Advicer Industrial (Cribado Rápido para Planta / Laboratorio)   */}
-            {/* ------------------------------------------------------------------------- */}
-            {activeTab === 'minidiviner' && (
-                <div className="flex flex-col gap-6 animate-fade-in">
-                    <MiniDivinerOptimizer
-                        samples={samples}
-                        onLoadModelAndSteps={handleLoadDivinerModel}
-                        onContinueToPreprocessing={() => setActiveTab('preprocessing')}
-                        onBackToData={() => setActiveTab('data')}
-                        onDirectToModel={handleDirectToModel}
-                    />
-                </div>
-            )}
-
-            {/* ------------------------------------------------------------------------- */}
-            {/* PESTAÑA 3: Preprocesamiento Espectral (Inspección & Ajuste Fino)          */}
+            {/* PESTAÑA 2: Preprocesamiento Espectral (Inspección & Ajuste Fino)          */}
             {/* ------------------------------------------------------------------------- */}
             {activeTab === 'preprocessing' && (
                 <div className="flex flex-col gap-6 animate-fade-in">
-                    <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
-                        {/* Lado Izquierdo: Panel de Control de Preprocesamiento */}
-                        <div className="lg:col-span-2 flex flex-col gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* Lado Izquierdo: Panel de Control de Preprocesamiento & 3 Combinaciones Óptimas */}
+                        <div className="lg:col-span-5 flex flex-col gap-4">
                             <PreprocessingEditor
                                 steps={preprocessingSteps}
                                 setSteps={setPreprocessingSteps}
@@ -432,13 +385,13 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 currentSteps={preprocessingSteps}
                                 onApplyRecommendation={handleApplyRecommendation}
                                 onContinueToPca={() => setActiveTab('pca')}
-                                onBackToData={() => setActiveTab('minidiviner')}
+                                onBackToData={() => setActiveTab('data')}
                                 disabled={activeSamples.length === 0}
                             />
                         </div>
 
                         {/* Lado Derecho: Visor Espectral Comparativo Amplio */}
-                        <div className="lg:col-span-5 flex flex-col gap-4">
+                        <div className="lg:col-span-7 flex flex-col gap-4">
                             <SpectraViewer
                                 wavelengths={wavelengths}
                                 samples={spectraToDisplay}
@@ -465,7 +418,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             )}
 
             {/* ------------------------------------------------------------------------- */}
-            {/* PESTAÑA 4: Diagnóstico PCA & Detección de Outliers                         */}
+            {/* PESTAÑA 3: Diagnóstico PCA & Detección de Outliers                         */}
             {/* ------------------------------------------------------------------------- */}
             {activeTab === 'pca' && (
                 <div className="flex flex-col gap-6 animate-fade-in">
@@ -489,7 +442,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                             onClick={() => setActiveTab('preprocessing')}
                             className="text-xs font-semibold"
                         >
-                            ← Volver a Preprocesamiento
+                            ← Volver a Preprocesamiento (Paso 2)
                         </Button>
                         <div className="flex items-center gap-3">
                             <span className="text-xs text-slate-400">
@@ -502,7 +455,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                 onClick={() => setActiveTab('model')}
                                 className="flex items-center gap-2 font-bold shadow-md text-xs"
                             >
-                                Continuar a Generación de Modelo PLS
+                                Continuar a Modelo PLS (Paso 4)
                                 <ArrowRight className="w-4 h-4" />
                             </Button>
                         </div>
@@ -557,7 +510,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                                         onClick={() => setActiveTab('pca')}
                                         className="w-full text-xs text-slate-400 hover:text-white border-ui-border"
                                     >
-                                        ← Volver a Diagnóstico PCA
+                                        ← Volver a Diagnóstico PCA (Paso 3)
                                     </Button>
                                 </div>
                             </Card>
