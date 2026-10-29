@@ -649,3 +649,6 @@ export const parseFOSS = (
     onComplete(null);
   }
 };
+
+export { generateFossEqa, downloadFossEqaFile, extractWinISIMathTreatment } from './fossEqa';
+export type { FossEqaOptions, WinISIMathTreatment } from './fossEqa';
