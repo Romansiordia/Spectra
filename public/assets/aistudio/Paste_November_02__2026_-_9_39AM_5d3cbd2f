@@ -1,0 +1,441 @@
+###################################################
+EDIT_CLIENT                   	Edit Client Information                                                         
+3157                          	Client Number:                                                                  
+3158                          	Client Name:                                                                    
+3159                          	Address:                                                                        
+3275                          	Current Client:                                                                 
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3290                          	Previous Client                                                                 
+3291                          	Next Client                                                                     
+###################################################
+CLIENT_ADD                    	Add Client                                                                      
+3157                          	Client Number:                                                                  
+3158                          	Client Name:                                                                    
+3159                          	Address:                                                                        
+3275                          	New Client Information:                                                         
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+SELECT_CONSTITUENTS           	Select  Constituents                                                            
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+PICKNIR                       	Select Columns For Display                                                      
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3290                          	Select All                                                                      
+3291                          	Clear All                                                                       
+3292                          	Select Range                                                                    
+###################################################
+PREFERENCES                   	Preferences                                                                     
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3143                          	Save Preferences                                                                
+3144                          	Restore Defaults                                                                
+3147                          	Save Options on Changes                                                         
+3146                          	Save Options on File Close                                                      
+3148                          	Save Entry Level on Program Close                                               
+3275                          	Save Options                                                                    
+3276                          	Missing Value                                                                   
+3149                          	Ignore this value in all operations:                                            
+###################################################
+ADDEQNSFROMFILE               	Add Equations From File                                                         
+3210                          	Select All                                                                      
+1                             	Add Selected Items                                                              
+2                             	Cancel                                                                          
+3211                          	De-Select All                                                                   
+3212                          	De-Select All                                                                   
+###################################################
+ADD2SAMPIDS                   	Add Text To Sample ID                                                           
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3213                          	Beginning                                                                       
+3214                          	End                                                                             
+3304                          	Sample ID1                                                                      
+3305                          	Sample ID2                                                                      
+3306                          	Sample ID3                                                                      
+3275                          	Location                                                                        
+3157                          	New Text:                                                                       
+###################################################
+ADD_TO_SAMPLE                 	Add Text To Sample                                                              
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3213                          	Beginning                                                                       
+3214                          	End                                                                             
+3275                          	Location                                                                        
+3157                          	Text:                                                                           
+###################################################
+RENUMBER_SAMPLES              	Renumber Samples                                                                
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3319                          	Starting Value:                                                                 
+3320                          	Increment:                                                                      
+###################################################
+NIR_PICK_COLUMNS              	Select Display Options                                                          
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3218                          	Constituents                                                                    
+3219                          	Statistics                                                                      
+3220                          	Constituent Columns                                                             
+3290                          	NIR Columns                                                                     
+3221                          	NIR / NIT Spectra                                                               
+3229                          	Position                                                                        
+3230                          	Sample Number                                                                   
+3231                          	Product Code                                                                    
+3232                          	Delete Flag                                                                     
+3233                          	Date                                                                            
+3234                          	Time                                                                            
+3235                          	Client Code                                                                     
+3236                          	Operator                                                                        
+3238                          	Sample ID1                                                                      
+3239                          	Sample ID2                                                                      
+3240                          	Sample ID3                                                                      
+3237                          	Standardized                                                                    
+###################################################
+EQA_PICK_COLUMNS              	Display                                                                         
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3325                          	Current Display:                                                                
+3326                          	Equation:                                                                       
+3245                          	Number of Samples                                                               
+3246                          	Mean                                                                            
+3247                          	Original Standard Dev.                                                          
+3248                          	Estimated Minimum                                                               
+3249                          	Estimated Maximum                                                               
+3250                          	SEC                                                                             
+3251                          	R Squared                                                                       
+3252                          	SEC V                                                                           
+3253                          	1 - VR                                                                          
+3254                          	Number of Wavelengths                                                           
+3243                          	Equation Names                                                                  
+3244                          	Equation Type                                                                   
+3255                          	Sequence Number                                                                 
+###################################################
+ANL_PICK_COLUMNS              	Select Display Options                                                          
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3218                          	Constituents                                                                    
+3220                          	Constituent Columns                                                             
+3219                          	Statistics                                                                      
+3229                          	Position                                                                        
+3230                          	Sample Number                                                                   
+3231                          	Product Code                                                                    
+3232                          	Delete Flag                                                                     
+3233                          	Date                                                                            
+3234                          	Time                                                                            
+3235                          	Client Code                                                                     
+3236                          	Operator                                                                        
+3237                          	Standardized                                                                    
+3238                          	Sample ID1                                                                      
+3239                          	Sample ID2                                                                      
+3240                          	Sample ID3                                                                      
+3256                          	Global H                                                                        
+3257                          	Neighborhood H                                                                  
+3208                          	Listing Options                                                                 
+3304                          	List All Samples                                                                
+3305                          	List by Product                                                                 
+3306                          	List by Single Product                                                          
+3307                          	List by Client                                                                  
+3308                          	List by Single Client                                                           
+3321                          	Product Code, # Constituents                                                    
+3322                          	Client Code,  # Constituents                                                    
+###################################################
+SLCT_ITH                      	Select Every Ith Sample                                                         
+3223                          	Number of Samples:                                                              
+3323                          	Sample Interval:                                                                
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3324                          	Starting Position:                                                              
+###################################################
+SLCT_RANDOM                   	Select Random Samples                                                           
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3223                          	Total Number of Samples:                                                        
+3157                          	Num. to Select                                                                  
+3158                          	Seed                                                                            
+###################################################
+SLCT_PRODUCT                  	Select Samples by Product Code                                                  
+3157                          	Product Codes:                                                                  
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+SORTBYPRODUCT                 	Sort by Product Code                                                            
+1                             	Ascending                                                                       
+3226                          	Descending                                                                      
+2                             	Cancel                                                                          
+3227                          	File Name :                                                                     
+3228                          	Total Samples:                                                                  
+3157                          	File Name :                                                                     
+3158                          	Samples :                                                                       
+###################################################
+SORTBYREFVAL                  	Sort By Reference Value                                                         
+1                             	Ascending                                                                       
+3285                          	Sort                                                                            
+2                             	Cancel                                                                          
+3290                          	Descending                                                                      
+3227                          	File Name :                                                                     
+3228                          	Total Samples:                                                                  
+3157                          	File Name :                                                                     
+3158                          	Samples :                                                                       
+3159                          	Reference Values:                                                               
+###################################################
+SORTBYSAMPLE                  	Sort By Sample Number                                                           
+1                             	Ascending                                                                       
+3226                          	Descending                                                                      
+2                             	Cancel                                                                          
+3227                          	File Name :                                                                     
+3228                          	Total Samples:                                                                  
+3157                          	File Name :                                                                     
+3158                          	Samples :                                                                       
+###################################################
+AVEGROUP                      	Average Samples by Group                                                        
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3157                          	Group Size:                                                                     
+3158                          	Total Samples:                                                                  
+###################################################
+DEL_CONSTITUENT               	Delete Constituent                                                              
+1                             	OK                                                                              
+3285                          	Constituents                                                                    
+2                             	Cancel                                                                          
+###################################################
+ADD_CONSTITUENT               	Add Constituents                                                                
+1                             	OK                                                                              
+3285                          	Constituents                                                                    
+2                             	Cancel                                                                          
+###################################################
+ENTER                         	Enter Constituent Name                                                          
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+ACIIOptions                   	File Output Options                                                             
+3161                          	Column Delimiter:                                                               
+3162                          	Text Field Delimiter:                                                           
+3157                          	Output Options:                                                                 
+3158                          	Number of Columns to Average:                                                   
+3159                          	Number of Output Columns:                                                       
+3327                          	Output File Name:                                                               
+3290                          	Special Characters:                                                             
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3294                          	Change File                                                                     
+3163                          	<file name>                                                                     
+3314                          	\040Transpose (Output data in vertical columns)                                 
+3315                          	\040Average NIR data to reduce the number of columns                            
+3160                          	<number>                                                                        
+3295                          	\040Twelve and one tenth is written as 12.1                                     
+3296                          	\040Twelve and one tenth is written as 12,1                                     
+3291                          	Text File Number Format:                                                        
+###################################################
+Import                        	Import Constituents                                                             
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3290                          	Change File                                                                     
+3157                          	Select Constituents:                                                            
+###################################################
+Password                      	Level 2                                                                         
+3157                          	Enter Password:                                                                 
+1                             	OK                                                                              
+###################################################
+Setpswrd                      	Password Setup                                                                  
+3157                          	Level 2 Password:                                                               
+3158                          	Level 3 Password:                                                               
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+CHOOSE_MUTL                   	Choose Selections                                                               
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+CHOOSE_LIST                   	Select Equations                                                                
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+REMSAMPIDS                    	Remove Text From Sample ID                                                      
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3213                          	Beginning                                                                       
+3214                          	End                                                                             
+3304                          	Sample ID1                                                                      
+3305                          	Sample ID2                                                                      
+3306                          	Sample ID3                                                                      
+3275                          	Location                                                                        
+3157                          	Number of Characters to Remove:                                                 
+###################################################
+REMSAMPLE                     	Remove Text From Sample Number                                                  
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3213                          	Beginning                                                                       
+3214                          	End                                                                             
+3275                          	Location                                                                        
+3157                          	Number of Characters to Remove:                                                 
+###################################################
+BIAS_SLOPE_ADJUSTMENT         	Slope and Bias Adjustment                                                       
+3157                          	Select Equation:                                                                
+3292                          	Unbias Equation                                                                 
+3275                          	Slope & Bias Equation:                                                          
+3158                          	Enter Bias Value (Lab-NIR):                                                     
+3276                          	Bias Adjustment:                                                                
+3159                          	Enter Slope Multiplier:                                                         
+3160                          	Enter Mean of Lab Values:                                                       
+3161                          	Enter Mean of NIR Predicted Values:                                             
+3290                          	Adjust Bias Only                                                                
+3291                          	Adjust Slope and Bias                                                           
+1                             	OK                                                                              
+###################################################
+ChkBias                       	Bias Equation                                                                   
+1                             	Bias Equation                                                                   
+2                             	Cancel                                                                          
+3161                          	Equation:                                                                       
+3162                          	Old Coefficient:                                                                
+3163                          	New Coefficient:                                                                
+3164                          	Bias:                                                                           
+###################################################
+KEYBOARD_EQA                  	Enter Equation From Keyboard                                                    
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3275                          	General Information                                                             
+3290                          	Add Coefficient                                                                 
+3293                          	Edit Coefficient                                                                
+3291                          	Delete Coefficient                                                              
+3292                          	Write to File                                                                   
+3157                          	Coefficient      Wavelength       Data Point       Math Treatment               
+3158                          	Instrument Type:                                                                
+3159                          	Equation Name:                                                                  
+3160                          	B( 0 )                                                                          
+###################################################
+AEFKADD                       	Add Coefficient                                                                 
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3157                          	Coefficient                                                                     
+3158                          	Wavelength                                                                      
+3159                          	Data Point                                                                      
+3160                          	Math Treatment                                                                  
+3275                          	Coefficient Information                                                         
+###################################################
+MATCH_CONSTITUENTS            	Match Constituent Data                                                          
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3153                          	Reorder                                                                         
+3290                          	Edit Names                                                                      
+3275                          	Source Constituents               Destination Constituents                      
+###################################################
+EDIT_FINAL_NAMES              	Edit Constituent Names                                                          
+1                             	OK                                                                              
+3192                          	Change Name                                                                     
+3157                          	New Name                                                                        
+3158                          	Constituents:                                                                   
+3275                          	Destination Names                                                               
+###################################################
+CREATELAB                     	Create *.LAB File                                                               
+3209                          	Enter File Information                                                          
+3276                          	Import Values from a Text File                                                  
+1                             	Create                                                                          
+2                             	Cancel                                                                          
+3159                          	Constituents       By       Samples                                             
+3160                          	New File Size:                                                                  
+3207                          	1024                                                                            
+3290                          	Get Constituent Values from a Text File                                         
+3291                          	File Name                                                                       
+3158                          	Number of Rows to Skip:                                                         
+3292                          	Read First Row as Constituent Names                                             
+3293                          	Read First Column as Samples Number                                             
+3275                          	Number Format:                                                                  
+3295                          	\040Twelve and one tenth is written as 12.1                                     
+3296                          	\040Twelve and one tenth is written as 12,1                                     
+###################################################
+EDIT_CONSTITUENTS             	Reorder, Add, & Delete Constituents                                             
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3153                          	Reorder                                                                         
+3150                          	Add                                                                             
+3151                          	Delete                                                                          
+3275                          	Click Constituent to Reorder                                                    
+###################################################
+REORDER_EQA_CONSTITUENTS      	Reorder Equations                                                               
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+3153                          	Reorder                                                                         
+3275                          	Click Constituent to Reorder                                                    
+###################################################
+IM_CONS_FROM_FILE             	Import Constituent Values From Text File                                        
+3276                          	Import Options                                                                  
+3294                          	File Name                                                                       
+3158                          	Number of Rows to Skip:                                                         
+3290                          	\040First Row Contains Constituent Names                                        
+3291                          	\040Match Values to Constituent Names                                           
+3292                          	\040First Column Contains Sample Numbers                                        
+3293                          	\040Match Values to Sample Numbers                                              
+3275                          	Number Format:                                                                  
+3295                          	\040Twelve and one tenth is written as 12.1                                     
+3296                          	\040Twelve and one tenth is written as 12,1                                     
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+OVERWRITE                     	Import Constituent Name Exists                                                  
+3275                          	Protein                                                                         
+3304                          	\040Overwrite all values                                                        
+3305                          	\040Overwrite missing values only                                               
+3306                          	\040Change name and add it as a new constituent                                 
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+RMS                           	Calculate RMS of Subsamples                                                     
+3275                          	Options:                                                                        
+3276                          	Math Treatment:                                                                 
+3158                          	Derivative:                                                                     
+3159                          	Gap:                                                                            
+3160                          	Smooth:                                                                         
+3161                          	Smooth2:                                                                        
+3162                          	RMS Cutoff Limit:                                                               
+3290                          	Output File Name                                                                
+3291                          	\040Mark outliers as deleted                                                    
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+FORM_STRING_VALUE             	Insert Text Value                                                               
+3275                          	Select Text Value :                                                             
+3276                          	Specify the number of characters to Print :                                     
+3157                          	Enter a Value from 1 to <maximum> :                                             
+3290                          	\040Variable Name -- Specify by Position (1-32) :                               
+3291                          	\040Samle Number                                                                
+3292                          	\040Operator                                                                    
+3293                          	\040Sample ID 1                                                                 
+3294                          	\040Sample ID 2                                                                 
+3295                          	\040Sample ID 3                                                                 
+3296                          	\040Date                                                                        
+3303                          	\040Time                                                                        
+3297                          	\040Product Type                                                                
+3298                          	\040Equation Name                                                               
+3299                          	\040Equation File ID                                                            
+3300                          	\040Client Number                                                               
+3301                          	\040Client Name                                                                 
+3302                          	\040Client Address -- Enter Line Number (1 - 4) :                               
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+FORM_NUMERIC_VALUE            	Insert Numeric Value                                                            
+3275                          	Select Numeric Value                                                            
+3208                          	Number Format                                                                   
+3276                          	Choose which Numeric Value to Use                                               
+3157                          	Enter a Value from 1 to <maximum> :                                             
+3158                          	Specify the position of the value to use (1 = first value, etc.).               
+3159                          	If specifying a calculated equation value remember                              
+3160                          	not to include 'if' statments in the count of its position.                     
+3161                          	Numer of Digits before the Decimal place:                                       
+3162                          	Numer of Digits after the Decimal place:                                        
+3163                          	Example:                                                                        
+3290                          	\040Dry Matter Basis                                                            
+3291                          	\040As Received Basis                                                           
+3292                          	\040Global H Value                                                              
+3293                          	\040Eight Closest Neighborhood H Values                                         
+3294                          	\040Weight 1                                                                    
+3295                          	\040Weight 2                                                                    
+3296                          	\040Price                                                                       
+1                             	OK                                                                              
+2                             	Cancel                                                                          
+###################################################
+TopToolbar                    	                                                                                
+###################################################
+StatusLine                    	          

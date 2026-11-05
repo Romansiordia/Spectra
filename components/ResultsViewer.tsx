@@ -24,13 +24,8 @@ import {
     FileCode,
     FileSpreadsheet,
     FileText,
-    Copy,
-    ChevronDown,
-    ChevronUp,
-    Layers,
-    Cpu
+    Layers
 } from 'lucide-react';
-import { generateFossEqa, downloadFossEqaFile, extractWinISIMathTreatment } from '../services/fossEqa';
 
 declare var Chart: any;
 
@@ -83,37 +78,6 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
     const [selectedOutliers, setSelectedOutliers] = useState<Set<string|number>>(new Set());
     const [manualSelection, setManualSelection] = useState<Set<string | number>>(new Set());
 
-    // Estados para exportación FOSS (.EQA)
-    const [showEqaPreview, setShowEqaPreview] = useState(false);
-    const [eqaCopied, setEqaCopied] = useState(false);
-    const [fossProductName, setFossProductName] = useState('Producto_NIR');
-
-    const winisiMath = extractWinISIMathTreatment(preprocessingSteps);
-
-    const getGeneratedEqaText = () => {
-        return generateFossEqa({
-            constituentName: propertyName || 'Propiedad',
-            productName: fossProductName || 'Producto_NIR',
-            modelResults: results,
-            wavelengths: wavelengths,
-            preprocessingSteps: preprocessingSteps,
-            sampleCount: activeSamples.length
-        });
-    };
-
-    const handleDownloadFossEqa = () => {
-        const eqaText = getGeneratedEqaText();
-        const safeName = (propertyName || 'Modelo').replace(/[^\w-]/g, '_');
-        downloadFossEqaFile(eqaText, `${safeName}_PLS.eqa`);
-    };
-
-    const handleCopyEqa = () => {
-        const eqaText = getGeneratedEqaText();
-        navigator.clipboard.writeText(eqaText).then(() => {
-            setEqaCopied(true);
-            setTimeout(() => setEqaCopied(false), 2500);
-        });
-    };
 
     useEffect(() => {
         setSelectedOutliers(new Set());
@@ -1155,132 +1119,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
 
                 <div className={activeTab === 'full-data' ? 'block' : 'hidden'}>
                     <div className="flex flex-col gap-6 animate-fade-in">
-                        {/* 1. Tarjeta Destacada: FOSS (.EQA) */}
-                        <div className="bg-gradient-to-br from-ui-card via-ui-card to-sky-950/30 rounded-xl border border-sky-500/40 p-6 shadow-lg shadow-sky-950/20 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 mb-4">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-                                        <Cpu className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-base font-bold text-white tracking-tight">
-                                                Ecuación de Calibración FOSS (.EQA)
-                                            </h3>
-                                            <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                                                FOSS & WinISI
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                                            Formato estructurado de ecuación estándar para ser importado directamente en instrumentos 
-                                            <strong className="text-white"> FOSS Infratec 1241 / Nova, NIRS DS2500, ProFoss</strong> y suites de software 
-                                            <strong className="text-white"> WinISI II/III/4, ISIscan y FossManager</strong>.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                    <Button
-                                        type="button"
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => setShowEqaPreview(!showEqaPreview)}
-                                        className="text-xs flex items-center gap-1.5 border-slate-600 hover:border-slate-400"
-                                    >
-                                        <FileCode className="w-4 h-4 text-sky-400" />
-                                        {showEqaPreview ? 'Ocultar Código' : 'Previsualizar EQA'}
-                                        {showEqaPreview ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                                    </Button>
-
-                                    <Button
-                                        type="button"
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={handleDownloadFossEqa}
-                                        className="text-xs font-bold flex items-center gap-2 bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 shadow-md text-white"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                        Descargar Ecuación (.EQA)
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Campo de Matriz / Producto y Metadatos Clave */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-ui-border/60">
-                                <div className="md:col-span-1">
-                                    <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                                        Matriz / Producto en Equipo
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={fossProductName}
-                                        onChange={(e) => setFossProductName(e.target.value)}
-                                        placeholder="Ej. Harina, Trigo, Soja..."
-                                        className="w-full bg-ui-darkest border border-ui-border rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-400 font-mono"
-                                    />
-                                </div>
-
-                                <div className="md:col-span-3 flex flex-wrap items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        Tratamiento WinISI: <strong className="text-sky-300 font-bold">{winisiMath.mathCode}</strong>
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        Scatter: <strong className="text-cyan-300 font-bold">{winisiMath.scatter}</strong>
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        Rango: <strong className="text-white font-bold">{wavelengths.length > 0 ? wavelengths[0].toFixed(1) : 0} - {wavelengths.length > 0 ? wavelengths[wavelengths.length - 1].toFixed(1) : 0} nm</strong> ({wavelengths.length} pts)
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        Factores: <strong className="text-purple-300 font-bold">{results.nComponents} LV</strong>
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        B₀: <strong className="text-amber-300 font-bold">{(results.model.plsIntercept ?? results.model.offset ?? 0).toExponential(3)}</strong>
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        R²: <strong className="text-emerald-400 font-bold">{isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'}</strong>
-                                    </span>
-                                    <span className="px-2.5 py-1 rounded-lg bg-ui-darkest/90 border border-ui-border text-[11px] text-slate-300 font-mono">
-                                        SECV: <strong className="text-sky-300 font-bold">{isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'}</strong>
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Caja de Previsualización de Código EQA */}
-                            {showEqaPreview && (
-                                <div className="mt-4 pt-4 border-t border-ui-border/60 animate-fade-in">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
-                                            <FileCode className="w-4 h-4 text-sky-400" />
-                                            <span>Contenido estructurado del archivo .EQA ({wavelengths.length + 42} líneas)</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleCopyEqa}
-                                            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-ui-darkest border border-ui-border hover:border-slate-500 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
-                                        >
-                                            {eqaCopied ? (
-                                                <>
-                                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                                    <span className="text-emerald-400 font-semibold">¡Copiado!</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy className="w-3.5 h-3.5 text-slate-400" />
-                                                    <span>Copiar Contenido</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                    <div className="bg-ui-darkest rounded-xl border border-ui-border p-4 max-h-72 overflow-y-auto font-mono text-[11px] text-slate-300 leading-relaxed shadow-inner">
-                                        <pre className="whitespace-pre">{getGeneratedEqaText()}</pre>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 2. Grid de Otras Opciones de Exportación: JSON, CSV, PDF */}
+                        {/* Grid de Opciones de Exportación: JSON, CSV, PDF */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Tarjeta JSON */}
                             <div className="bg-ui-card rounded-xl border border-ui-border p-5 flex flex-col justify-between hover:border-slate-500 transition-colors">

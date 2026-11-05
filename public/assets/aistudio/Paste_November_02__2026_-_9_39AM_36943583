@@ -1,0 +1,803 @@
+###################################################
+Init_Menu                     	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	Crea&te                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+PCA_PS__Type_Menu             	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Graphics                                                                       
+4044                          	&Spectrum                                                                       
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+NIR_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Reference Values                                                               
+4019                          	&Reorder, Add, && Delete Constituents                                           
+4074                          	&Import Constituents                                                            
+4075                          	Import Values from Text &File                                                   
+4076                          	Import Values from C&lipboard                                                   
+4020                          	&Enter / Edit Values                                                            
+#POP                          	F&unctions                                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4036                          	Remaining &Samples                                                              
+4037                          	N&one / All\tF5/Shift+F5                                                        
+4031                          	By &Position                                                                    
+4032                          	By Sample &Number                                                               
+4033                          	&Ith Sample                                                                     
+4034                          	&Random Samples                                                                 
+4035                          	By Product &Code                                                                
+#POP                          	&Merge                                                                          
+4022                          	&Create new file(s)                                                             
+#POP                          	Merge samples to other file(s)                                                  
+4092                          	Add to &beginning of chosen file                                                
+4089                          	Add to &end of chosen file                                                      
+#POP                          	&Merge file(s) to this file                                                     
+4090                          	Add to &beginning of current file                                               
+4091                          	Add to &end of current file                                                     
+#POP                          	&Delete                                                                         
+4027                          	&Delete Selected Samples                                                        
+4024                          	&Undelete Selected Samples                                                      
+4023                          	&Toggle Delete Flag using Keyboard or Mouse                                     
+4025                          	&Purge Deleted Samples                                                          
+4026                          	&Write Deleted Samples to a File                                                
+#POP                          	&Average All                                                                    
+4038                          	Samples with same &Number                                                       
+4039                          	Samples in same &Group                                                          
+#POP                          	S&ort                                                                           
+4041                          	By &Sample Number                                                               
+4042                          	By &Product Number                                                              
+#POP                          	Add &Text                                                                       
+4055                          	To Sample &Number                                                               
+4056                          	To Sample &ID's                                                                 
+#POP                          	Remove Te&xt                                                                    
+4071                          	From Sample &Number                                                             
+4072                          	From Sample &ID's                                                               
+4073                          	&Calculate RMS of subsamples                                                    
+4054                          	&Renumber All Samples                                                           
+#POP                          	&Graphics                                                                       
+4046                          	&XY Plot                                                                        
+4043                          	&Histogram                                                                      
+4044                          	&Spectrum                                                                       
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+EQA_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	F&unctions                                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4037                          	N&one / All\tF5/Shift+F5                                                        
+4093                          	&Reorder Equations                                                              
+4094                          	&Import Equations                                                               
+4063                          	&Delete Selected Equations                                                      
+4095                          	&Write Equations to a File                                                      
+4047                          	Enter Equation from &Keyboard                                                   
+4045                          	&Slope and Bias Adjustment                                                      
+4020                          	&Enter / Edit Values                                                            
+#POP                          	Change File &Lab Basis                                                          
+4096                          	to \042Dry Matter\042                                                           
+4097                          	to \042As Received\042                                                          
+4078                          	Add Equations &From CLC File.                                                   
+4077                          	Add Selected Equations &to CLC File                                             
+4062                          	&Create a new calculated equation                                               
+#POP                          	Display Equation                                                                
+4105                          	Equation Names                                                                  
+4098                          	Use Standard Equations                                                          
+4099                          	Use Calculated Equations                                                        
+#POP                          	&Graphics                                                                       
+4100                          	&Coefficients                                                                   
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+CAL_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Reference Values                                                               
+4019                          	&Reorder, Add, && Delete Constituents                                           
+4074                          	&Import Constituents                                                            
+4075                          	Import Values from Text &File                                                   
+4076                          	Import Values from C&lipboard                                                   
+4079                          	&Create Variable and Values                                                     
+4020                          	&Enter / Edit Values                                                            
+4058                          	Recompute &Statistics                                                           
+#POP                          	Change File &Lab Basis                                                          
+4096                          	to \042Dry Matter\042                                                           
+4097                          	to \042As Received\042                                                          
+#POP                          	F&unctions                                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4036                          	Remaining &Samples                                                              
+4037                          	N&one / All\tF5/Shift+F5                                                        
+4031                          	By &Position                                                                    
+4032                          	By Sample &Number                                                               
+4033                          	&Ith Sample                                                                     
+4034                          	&Random Samples                                                                 
+4035                          	By Product &Code                                                                
+#POP                          	&Merge                                                                          
+4022                          	&Create new file(s)                                                             
+#POP                          	Merge samples to other file(s)                                                  
+4092                          	Add to &beginning of chosen file                                                
+4089                          	Add to &end of chosen file                                                      
+#POP                          	&Merge file(s) to this file                                                     
+4090                          	Add to &beginning of current file                                               
+4091                          	Add to &end of current file                                                     
+#POP                          	&Delete                                                                         
+4027                          	&Delete Selected Samples                                                        
+4024                          	&Undelete Selected Samples                                                      
+4023                          	&Toggle Delete Flag using Keyboard or Mouse                                     
+4025                          	&Purge Deleted Samples                                                          
+4026                          	&Write Deleted Samples to a File                                                
+#POP                          	&Average All                                                                    
+4038                          	Samples with same &Number                                                       
+4039                          	Samples in same &Group                                                          
+#POP                          	S&ort                                                                           
+4040                          	By &Reference Value                                                             
+4041                          	By &Sample Number                                                               
+4042                          	By &Product Number                                                              
+#POP                          	Add &Text                                                                       
+4055                          	To Sample &Number                                                               
+4056                          	To Sample &ID's                                                                 
+#POP                          	Remove Te&xt                                                                    
+4071                          	From Sample &Number                                                             
+4072                          	From Sample &ID's                                                               
+4073                          	&Calculate RMS of subsamples                                                    
+4054                          	&Renumber All Samples                                                           
+#POP                          	&Graphics                                                                       
+4046                          	&XY Plot                                                                        
+4043                          	&Histogram                                                                      
+4044                          	&Spectrum                                                                       
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+DEC_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Graphics                                                                       
+4046                          	&XY Plot                                                                        
+4043                          	&Histogram                                                                      
+4044                          	&Spectrum                                                                       
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+ACC_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+#POP                          	&Choose Display                                                                 
+4050                          	&Short Format                                                                   
+4051                          	&Long Format                                                                    
+4052                          	&Invoice List                                                                   
+4053                          	&Sort By Client Number                                                          
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	F&unctions                                                                      
+4048                          	&Add Client Information                                                         
+4049                          	&Delete Selected Clients                                                        
+4101                          	&Edit Client Information                                                        
+4081                          	&Purge Invoice Information                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4102                          	Remaining &Clients                                                              
+4037                          	N&one / All\tF5/Shift+F5                                                        
+#POP                          	&Merge                                                                          
+4022                          	&Create new file(s)                                                             
+#POP                          	Merge clients to other file(s)                                                  
+4092                          	Add to &beginning of chosen file                                                
+4089                          	Add to &end of chosen file                                                      
+#POP                          	&Merge file(s) to this file                                                     
+4090                          	Add to &beginning of current file                                               
+4091                          	Add to &end of current file                                                     
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+LAB_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Reference Values                                                               
+4019                          	&Reorder, Add, && Delete Constituents                                           
+4074                          	&Import Constituents                                                            
+4075                          	Import Values from Text &File                                                   
+4076                          	Import Values from C&lipboard                                                   
+4079                          	&Create Variable and Values                                                     
+4020                          	&Enter / Edit Values                                                            
+4058                          	Recompute &Statistics                                                           
+#POP                          	Change File &Lab Basis                                                          
+4096                          	to \042Dry Matter\042                                                           
+4097                          	to \042As Received\042                                                          
+#POP                          	F&unctions                                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4036                          	Remaining &Samples                                                              
+4037                          	N&one / All\tF5/Shift+F5                                                        
+4031                          	By &Position                                                                    
+4032                          	By Sample &Number                                                               
+4033                          	&Ith Sample                                                                     
+4034                          	&Random Samples                                                                 
+#POP                          	&Merge                                                                          
+4022                          	&Create new file(s)                                                             
+#POP                          	Merge samples to other file(s)                                                  
+4092                          	Add to &beginning of chosen file                                                
+4089                          	Add to &end of chosen file                                                      
+#POP                          	&Merge file(s) to this file                                                     
+4090                          	Add to &beginning of current file                                               
+4091                          	Add to &end of current file                                                     
+#POP                          	&Delete                                                                         
+4027                          	&Delete Selected Samples                                                        
+4024                          	&Undelete Selected Samples                                                      
+4023                          	&Toggle Delete Flag using Keyboard or Mouse                                     
+4025                          	&Purge Deleted Samples                                                          
+4026                          	&Write Deleted Samples to a File                                                
+#POP                          	&Average All                                                                    
+4038                          	Samples with same &Number                                                       
+4039                          	Samples in same &Group                                                          
+#POP                          	S&ort                                                                           
+4040                          	By &Reference Value                                                             
+4041                          	By &Sample Number                                                               
+#POP                          	Add &Text                                                                       
+4055                          	To Sample &Number                                                               
+#POP                          	Remove Te&xt                                                                    
+4071                          	From Sample &Number                                                             
+4054                          	&Renumber All Samples                                                           
+4064                          	Add Samples to &File                                                            
+#POP                          	&Graphics                                                                       
+4046                          	&XY Plot                                                                        
+4043                          	&Histogram                                                                      
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+ANL_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Reference Values                                                               
+4019                          	&Reorder, Add, && Delete Constituents                                           
+4074                          	&Import Constituents                                                            
+4075                          	Import Values from Text &File                                                   
+4076                          	Import Values from C&lipboard                                                   
+4079                          	&Create Variable and Values                                                     
+4020                          	&Enter / Edit Values                                                            
+4058                          	Recompute &Statistics                                                           
+#POP                          	Change File &Lab Basis                                                          
+4096                          	to \042Dry Matter\042                                                           
+4097                          	to \042As Received\042                                                          
+4103                          	to \042Fixed Percent\042                                                        
+#POP                          	F&unctions                                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4036                          	Remaining &Samples                                                              
+4037                          	N&one / All\tF5/Shift+F5                                                        
+4031                          	By &Position                                                                    
+4032                          	By Sample &Number                                                               
+4033                          	&Ith Sample                                                                     
+4034                          	&Random Samples                                                                 
+4035                          	By Product &Code                                                                
+#POP                          	&Merge                                                                          
+4022                          	&Create new file(s)                                                             
+#POP                          	Merge samples to other file(s)                                                  
+4092                          	Add to &beginning of chosen file                                                
+4089                          	Add to &end of chosen file                                                      
+#POP                          	&Merge file(s) to this file                                                     
+4090                          	Add to &beginning of current file                                               
+4091                          	Add to &end of current file                                                     
+#POP                          	&Delete                                                                         
+4027                          	&Delete Selected Samples                                                        
+4024                          	&Undelete Selected Samples                                                      
+4023                          	&Toggle Delete Flag using Keyboard or Mouse                                     
+4025                          	&Purge Deleted Samples                                                          
+4026                          	&Write Deleted Samples to a File                                                
+#POP                          	&Average All                                                                    
+4038                          	Samples with same &Number                                                       
+4039                          	Samples in same &Group                                                          
+#POP                          	S&ort                                                                           
+4040                          	By &Reference Value                                                             
+4041                          	By &Sample Number                                                               
+4042                          	By &Product Number                                                              
+#POP                          	Add &Text                                                                       
+4055                          	To Sample &Number                                                               
+4056                          	To Sample &ID's                                                                 
+#POP                          	Remove Te&xt                                                                    
+4071                          	From Sample &Number                                                             
+4072                          	From Sample &ID's                                                               
+4054                          	&Renumber All Samples                                                           
+#POP                          	&Graphics                                                                       
+4046                          	&XY Plot                                                                        
+4043                          	&Histogram                                                                      
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+LIB_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+4018                          	Choose &Display                                                                 
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Reference Values                                                               
+4019                          	&Reorder, Add, && Delete Constituents                                           
+4074                          	&Import Constituents                                                            
+4075                          	Import Values from Text &File                                                   
+4076                          	Import Values from C&lipboard                                                   
+4079                          	&Create Variable and Values                                                     
+4020                          	&Enter / Edit Values                                                            
+4058                          	Recompute &Statistics                                                           
+#POP                          	Change File &Lab Basis                                                          
+4096                          	to \042Dry Matter\042                                                           
+4097                          	to \042As Received\042                                                          
+#POP                          	&Graphics                                                                       
+4059                          	&2D Display                                                                     
+4060                          	&3D Display                                                                     
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+CLC_Type_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	&Equations                                                                      
+#POP                          	&Select                                                                         
+4028                          	By &Keyboard or Mouse                                                           
+4036                          	Remaining &Samples                                                              
+4037                          	N&one / All\tF5/Shift+F5                                                        
+4061                          	&Export Selected Equations to a File                                            
+4104                          	&Create a New Equation                                                          
+4063                          	&Delete Selected Equations                                                      
+4020                          	&Enter / Edit Values                                                            
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+ASCII_Type_Menu               	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+4065                          	Word Wrap                                                                       
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+STD_VV_Type_Menu              	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+4021                          	Show &Header                                                                    
+4002                          	P&references                                                                    
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+FORM_OUT_Menu                 	                                                                                
+#POP                          	&File                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+4002                          	P&references                                                                    
+4080                          	Product / &Instrument Setup                                                     
+#POP                          	&Export                                                                         
+4082                          	To a &File                                                                      
+4083                          	To the &Clipboard                                                               
+4004                          	Print &Setup                                                                    
+4005                          	Print Pre&view                                                                  
+4003                          	&Print...                                                                       
+4001                          	&Close                                                                          
+4006                          	E&xit to Project Manager                                                        
+#POP                          	Entry &Level                                                                    
+4011                          	Level &1                                                                        
+4012                          	Level &2                                                                        
+4013                          	Level &3                                                                        
+4014                          	&Set Passwords                                                                  
+#POP                          	&Window                                                                         
+4007                          	&Cascade\tShift+F5                                                              
+4008                          	&Tile\tShift+F4                                                                 
+4009                          	Arrange &Icons                                                                  
+4010                          	Close &All                                                                      
+#POP                          	&Help                                                                           
+4015                          	&Contents                                                                       
+4016                          	&How to Use Help                                                                
+4017                          	&About                                                                          
+###################################################
+Open_Tool_Menu                	                                                                                
+#POP                          	&Open                                                                           
+4084                          	Spectra &Files                                                                  
+4085                          	Cali&bration Equation && Support Files                                          
+4086                          	Product &Library && Support Files                                               
+4087                          	&Other Files                                                                    
+4088                          	&All File Types                                                                 
+#POP                          	&Create                                                                         
+4066                          	&Client File                                                                    
+4067                          	C&alculations File                                                              
+4068                          	&Equations File from Keyboard                                                   
+4069                          	&LAB File                                                                       
+4070                          	&Form?.out File                                                                 
+#POP                          	&Choose Display                                                                 
+4050                          	&Short Format                                                                   
+4051                          	&Long Format                                                                    
+4052                          	&Invoice List                                                                   
+4053                          	&Sort By Client Number                                                          
+###################################################
+                              	                                                                                
