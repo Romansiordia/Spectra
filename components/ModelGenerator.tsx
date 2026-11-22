@@ -18,13 +18,20 @@ import {
 } from 'lucide-react';
 
 export type ModelParams = 
-    | { type: 'pls'; nComponents: number };
+    | { 
+        type: 'pls'; 
+        nComponents: number; 
+        useKennardStone?: boolean; 
+        trainRatio?: number; 
+      };
 
 interface ModelGeneratorProps {
     onRunModel: (params: ModelParams) => void;
     disabled: boolean;
     activeSamples?: Sample[];
     preprocessingSteps?: PreprocessingStep[];
+    useKennardStone: boolean;
+    trainRatio: number;
 }
 
 const RunIcon: React.FC = () => (
@@ -39,7 +46,7 @@ const OptimizeIcon: React.FC = () => (
     </svg>
 );
 
-const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, activeSamples, preprocessingSteps }) => {
+const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, activeSamples, preprocessingSteps, useKennardStone, trainRatio }) => {
     const [nComponents, setNComponents] = useState('5');
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [suggestedLV, setSuggestedLV] = useState<number | null>(null);
@@ -51,7 +58,12 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
     const handleRun = () => {
         const lv = parseInt(nComponents);
         if (!isNaN(lv) && lv > 0 && lv <= 20) {
-            onRunModel({ type: 'pls', nComponents: lv });
+            onRunModel({ 
+                type: 'pls', 
+                nComponents: lv, 
+                useKennardStone, 
+                trainRatio 
+            });
         } else {
             alert('Por favor, introduzca un número válido de variables latentes (1-20).');
         }
@@ -468,7 +480,20 @@ const ModelGenerator: React.FC<ModelGeneratorProps> = ({ onRunModel, disabled, a
                     </div>
 
                     {/* Static Footer with Final Button */}
-                    <div className="pt-4 border-t border-ui-border">
+                    <div className="pt-3 border-t border-ui-border space-y-3">
+                        <div className="bg-ui-darkest/70 px-3 py-2.5 rounded-lg border border-ui-border flex items-center justify-between text-xs">
+                            <span className="text-slate-400">División (Paso 4):</span>
+                            {useKennardStone ? (
+                                <span className="font-mono font-bold text-amber-300">
+                                    KS {(trainRatio * 100).toFixed(0)}% Cal / {(100 - trainRatio * 100).toFixed(0)}% Val
+                                </span>
+                            ) : (
+                                <span className="font-mono font-semibold text-slate-300">
+                                    100% Calibración (CV)
+                                </span>
+                            )}
+                        </div>
+
                         <Button onClick={handleRun} disabled={disabled} className="w-full font-bold shadow-md">
                             <RunIcon />
                             Generar Modelo PLS ({nComponents} LVs)

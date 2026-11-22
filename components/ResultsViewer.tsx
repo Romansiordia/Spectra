@@ -104,7 +104,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                                 const point = points[0];
                                 const dataset = chartInstanceRef.current.data.datasets[point.datasetIndex];
                                 const dataPoint = (dataset.data[point.index] as any);
-                                if (dataPoint && dataPoint.id !== undefined) {
+                                if (dataPoint && dataPoint.id !== undefined && !dataPoint.isTestSet) {
                                     const sampleId = dataPoint.id;
                                     setManualSelection(prev => {
                                         const newSet = new Set(prev);
@@ -128,7 +128,11 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                                 borderWidth: 1,
                                 padding: 10,
                                 callbacks: {
-                                    title: (context: any) => `Muestra: ${context[0].dataset.data[context[0].dataIndex].id}`,
+                                    title: (context: any) => {
+                                        const pt = context[0]?.dataset?.data?.[context[0]?.dataIndex];
+                                        if (!pt) return '';
+                                        return pt.isTestSet ? `Validación Externa: ${pt.id}` : `Muestra: ${pt.id}`;
+                                    },
                                     label: (context: any) => `Ref ${context.parsed.x.toFixed(2)} / Pred ${context.parsed.y.toFixed(2)}`
                                 }
                             }
@@ -155,17 +159,28 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 x: act,
                 y: results.model.correlation.predicted[i],
                 id: results.model.residuals[i].id,
-                isOutlier: results.mahalanobis.distances.find(d => d.id === results.model.residuals[i].id)?.isOutlier || false
+                isOutlier: results.mahalanobis.distances.find(d => d.id === results.model.residuals[i].id)?.isOutlier || false,
+                isTestSet: false
             })).filter(p => isFinite(p.x) && isFinite(p.y));
 
-            if (allDataPoints.length > 0) {
+            const testDataPoints = (results.model.testSet?.actual || []).map((act, i) => ({
+                x: act,
+                y: results.model.testSet!.predicted[i],
+                id: results.model.testSet!.ids?.[i] ?? `Test-${i + 1}`,
+                isOutlier: false,
+                isTestSet: true
+            })).filter(p => isFinite(p.x) && isFinite(p.y));
+
+            const combinedPoints = [...allDataPoints, ...testDataPoints];
+
+            if (combinedPoints.length > 0) {
                 const inliersData = allDataPoints.filter(p => !p.isOutlier);
                 const outliersData = allDataPoints.filter(p => p.isOutlier);
 
                 let minVal = Infinity;
                 let maxVal = -Infinity;
-                for (let i = 0; i < allDataPoints.length; i++) {
-                    const p = allDataPoints[i];
+                for (let i = 0; i < combinedPoints.length; i++) {
+                    const p = combinedPoints[i];
                     if (p.x < minVal) minVal = p.x;
                     if (p.y < minVal) minVal = p.y;
                     if (p.x > maxVal) maxVal = p.x;
@@ -175,11 +190,53 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 if (!isFinite(maxVal)) maxVal = 1;
                 const padding = (maxVal - minVal) * 0.1 || 1;
 
-                chartInstance.data.datasets = [
-                    { label: 'Válidas', data: inliersData, backgroundColor: '#0ea5e9', pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 8 : 5 },
-                    { label: 'Outliers', data: outliersData, backgroundColor: '#ef4444', pointStyle: 'triangle', pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 9 : 6 },
-                    { type: 'line', label: '1:1', data: [{x: minVal - padding, y: minVal - padding}, {x: maxVal + padding, y: maxVal + padding}], borderColor: '#64748b', borderDash: [6, 6], pointRadius: 0, fill: false }
+                const hasTestSet = testDataPoints.length > 0;
+                const datasets: any[] = [
+                    {
+                        label: 'Calibración (Válidas)',
+                        data: inliersData,
+                        backgroundColor: hasTestSet ? 'rgba(14, 165, 233, 0.35)' : '#0ea5e9',
+                        borderColor: hasTestSet ? 'rgba(56, 189, 248, 0.5)' : 'transparent',
+                        borderWidth: hasTestSet ? 1 : 0,
+                        pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 8 : (hasTestSet ? 4.5 : 5),
+                        order: 3
+                    },
+                    {
+                        label: 'Outliers',
+                        data: outliersData,
+                        backgroundColor: '#ef4444',
+                        pointStyle: 'triangle',
+                        pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 9 : 6,
+                        order: 2
+                    }
                 ];
+
+                if (hasTestSet) {
+                    datasets.push({
+                        label: `Validación Externa KS (${testDataPoints.length})`,
+                        data: testDataPoints,
+                        backgroundColor: '#f59e0b',
+                        borderColor: '#0f172a',
+                        borderWidth: 2,
+                        pointStyle: 'rectRot',
+                        pointRadius: 6.5,
+                        pointHoverRadius: 9,
+                        order: 1
+                    });
+                }
+
+                datasets.push({
+                    type: 'line',
+                    label: '1:1',
+                    data: [{ x: minVal - padding, y: minVal - padding }, { x: maxVal + padding, y: maxVal + padding }],
+                    borderColor: '#64748b',
+                    borderDash: [6, 6],
+                    pointRadius: 0,
+                    fill: false,
+                    order: 4
+                });
+
+                chartInstance.data.datasets = datasets;
                 
                 chartInstance.options.scales.x.min = minVal - padding;
                 chartInstance.options.scales.x.max = maxVal + padding;
@@ -610,9 +667,14 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 ['R² (Coeficiente de Determinación)', results.model.r2.toFixed(4)],
                 ['Q² (Validación Cruzada)', results.model.q2.toFixed(4)],
                 ['SEC (Error Estándar de Calibración)', results.model.sec.toFixed(4)],
-                ['SECV (Error Estándar de Validación)', results.model.secv.toFixed(4)],
+                ['SECV (Error Estándar de Validación Cruzada)', results.model.secv.toFixed(4)],
                 ['Pendiente (Slope)', results.model.slope.toFixed(4)],
-                ['Offset (Intersección)', results.model.offset.toFixed(4)]
+                ['Offset (Intersección)', results.model.offset.toFixed(4)],
+                ...(results.model.testSet ? [
+                    ['R² Validación Externa (Kennard-Stone)', results.model.testSet.r2.toFixed(4)],
+                    ['SEP (Error Estándar de Predicción)', results.model.testSet.sep.toFixed(4)],
+                    ['Bias Validación Externa', results.model.testSet.bias.toFixed(4)]
+                ] : [])
             ];
             
             autoTable(doc, {
@@ -759,6 +821,58 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                             <StatCard label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-ui-success" />
                             <StatCard label="Offset" value={results.model.offset != null && isFinite(results.model.offset) ? results.model.offset.toFixed(4) : '0.0000'} colorClass="text-amber-400" />
                         </div>
+
+                        {results.model.testSet && results.model.testSet.actual.length > 0 && (() => {
+                            const ts = results.model.testSet!;
+                            const nTest = ts.actual.length;
+                            const meanTest = ts.actual.reduce((a, b) => a + b, 0) / nTest;
+                            const sdTest = nTest > 1
+                                ? Math.sqrt(ts.actual.reduce((s, v) => s + Math.pow(v - meanTest, 2), 0) / (nTest - 1))
+                                : 0;
+                            const rpd = ts.sep > 1e-9 ? sdTest / ts.sep : 0;
+
+                            return (
+                                <div className="bg-amber-950/15 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4 text-amber-400" />
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                                                Validación Externa Ciega (Kennard-Stone)
+                                            </h4>
+                                        </div>
+                                        <span className="text-xs font-mono bg-amber-500/15 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/30">
+                                            {nTest} muestras independientes
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                        <StatCard
+                                            label="R² Validación"
+                                            value={isFinite(ts.r2) ? ts.r2.toFixed(4) : '0.0000'}
+                                            subtext="Predicción ciega"
+                                            colorClass="text-amber-400"
+                                        />
+                                        <StatCard
+                                            label="SEP"
+                                            value={isFinite(ts.sep) ? ts.sep.toFixed(4) : '0.0000'}
+                                            subtext="Error de predicción"
+                                            colorClass="text-amber-300"
+                                        />
+                                        <StatCard
+                                            label="Bias Externo"
+                                            value={isFinite(ts.bias) ? (ts.bias > 0 ? `+${ts.bias.toFixed(4)}` : ts.bias.toFixed(4)) : '0.0000'}
+                                            subtext="Sesgo medio test"
+                                            colorClass={Math.abs(ts.bias) <= ts.sep * 0.25 ? "text-emerald-400" : "text-rose-400"}
+                                        />
+                                        <StatCard
+                                            label="RPD (SD / SEP)"
+                                            value={isFinite(rpd) ? rpd.toFixed(2) : '0.00'}
+                                            subtext={rpd >= 3 ? "Excelente control" : rpd >= 2 ? "Uso cuantitativo" : "Capacidad limitada"}
+                                            colorClass={rpd >= 3 ? "text-emerald-400" : rpd >= 2 ? "text-sky-400" : "text-amber-400"}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="bg-ui-darkest p-4 rounded-xl border border-ui-border shadow-inner-dark h-[450px] relative">
                             <canvas ref={chartRef}></canvas>

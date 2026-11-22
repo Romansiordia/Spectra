@@ -409,12 +409,16 @@ function calculateStats(actual: number[], predicted: number[]) {
     const slope = (N * sumY2 - sumY * sumY === 0) ? 1 : (N * sumYPred - sumY * sumPred) / (N * sumY2 - sumY * sumY);
     const offset = (sumPred - slope * sumY) / N;
 
+    const sumDiff = actual.reduce((sum, act, i) => sum + (predicted[i] - act), 0);
+    const bias = sumDiff / N;
+
     return { 
         r: isFinite(r) ? r : 0, 
         r2: isFinite(r*r) ? r*r : 0, 
         rmse: isFinite(rmse) ? rmse : 0, 
         slope: isFinite(slope) ? slope : 1, 
-        offset: isFinite(offset) ? offset : 0 
+        offset: isFinite(offset) ? offset : 0,
+        bias: isFinite(bias) ? bias : 0
     };
 }
 
@@ -444,34 +448,152 @@ export function runPlsOptimization(
     return results;
 }
 
+export interface KennardStoneSplitResult {
+    trainSamples: Sample[];
+    testSamples: Sample[];
+}
+
+export function kennardStoneSplit(
+    samples: Sample[],
+    trainRatio: number = 0.75,
+    preprocessingSteps: PreprocessingStep[] = []
+): KennardStoneSplitResult {
+    const activeSamples = samples.filter(s => s.active);
+    const n = activeSamples.length;
+    if (n < 4) {
+        return { trainSamples: samples, testSamples: [] };
+    }
+
+    const k = Math.max(2, Math.min(n - 1, Math.round(n * trainRatio)));
+    let vectors = activeSamples.map(s => s.values);
+    if (preprocessingSteps.length > 0) {
+        let referenceSpectrum: number[] | undefined = undefined;
+        if (preprocessingSteps.some(step => step.method === 'msc')) {
+            const nPoints = vectors[0].length;
+            referenceSpectrum = new Array(nPoints).fill(0);
+            vectors.forEach(v => {
+                v.forEach((val, idx) => { referenceSpectrum![idx] += val; });
+            });
+            referenceSpectrum = referenceSpectrum.map(val => val / n);
+        }
+        vectors = vectors.map(v => applyPreprocessingLogic(v, preprocessingSteps, referenceSpectrum));
+    }
+    const dim = vectors[0].length;
+
+    const distMatrix: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            let sumSq = 0;
+            for (let d = 0; d < dim; d++) {
+                const diff = vectors[i][d] - vectors[j][d];
+                sumSq += diff * diff;
+            }
+            const dist = Math.sqrt(sumSq);
+            distMatrix[i][j] = dist;
+            distMatrix[j][i] = dist;
+        }
+    }
+
+    let maxDist = -1;
+    let idx1 = 0;
+    let idx2 = 1;
+    for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+            if (distMatrix[i][j] > maxDist) {
+                maxDist = distMatrix[i][j];
+                idx1 = i;
+                idx2 = j;
+            }
+        }
+    }
+
+    const trainIndices = new Set<number>([idx1, idx2]);
+    const remainingIndices = new Set<number>();
+    for (let i = 0; i < n; i++) {
+        if (i !== idx1 && i !== idx2) {
+            remainingIndices.add(i);
+        }
+    }
+
+    while (trainIndices.size < k && remainingIndices.size > 0) {
+        let maxMinDist = -1;
+        let selectedCandidate = -1;
+
+        for (const r of remainingIndices) {
+            let minDistToTrain = Infinity;
+            for (const t of trainIndices) {
+                const d = distMatrix[r][t];
+                if (d < minDistToTrain) {
+                    minDistToTrain = d;
+                }
+            }
+            if (minDistToTrain > maxMinDist) {
+                maxMinDist = minDistToTrain;
+                selectedCandidate = r;
+            }
+        }
+
+        if (selectedCandidate !== -1) {
+            trainIndices.add(selectedCandidate);
+            remainingIndices.delete(selectedCandidate);
+        } else {
+            break;
+        }
+    }
+
+    const trainSamples: Sample[] = [];
+    const testSamples: Sample[] = [];
+
+    activeSamples.forEach((s, idx) => {
+        if (trainIndices.has(idx)) {
+            trainSamples.push(s);
+        } else {
+            testSamples.push(s);
+        }
+    });
+
+    return { trainSamples, testSamples };
+}
+
 export function runPlsAnalysis(
     activeSamples: Sample[],
     preprocessingSteps: PreprocessingStep[],
-    nComponents: number
+    nComponents: number,
+    useKennardStone: boolean = false,
+    trainRatio: number = 0.75
 ): ModelResults {
-    const N = activeSamples.length;
-    if (N === 0) throw new Error("No hay muestras activas.");
+    let samplesToUse = activeSamples;
+    let testSplitSamples: Sample[] = [];
+
+    if (useKennardStone && activeSamples.length >= 5) {
+        const split = kennardStoneSplit(activeSamples, trainRatio, preprocessingSteps);
+        samplesToUse = split.trainSamples;
+        testSplitSamples = split.testSamples;
+    }
+
+    const N = samplesToUse.length;
+    if (N === 0) throw new Error("No hay muestras activas para entrenamiento.");
 
     // Calcular espectro de referencia (media) para MSC si es necesario
     let referenceSpectrum: number[] | undefined = undefined;
     const hasMsc = preprocessingSteps.some(s => s.method === 'msc');
     if (hasMsc) {
-        const nPoints = activeSamples[0].values.length;
+        const nPoints = samplesToUse[0].values.length;
         referenceSpectrum = new Array(nPoints).fill(0);
-        activeSamples.forEach(s => {
+        samplesToUse.forEach(s => {
             s.values.forEach((v, i) => referenceSpectrum![i] += v);
         });
         referenceSpectrum = referenceSpectrum.map(v => v / N);
     }
 
-    const Y_raw = activeSamples.map(s => s.analyticalValue);
-    const X_raw_array = activeSamples.map(s => applyPreprocessingLogic(s.values, preprocessingSteps, referenceSpectrum));
+    const Y_raw = samplesToUse.map(s => s.analyticalValue);
+    const X_raw_array = samplesToUse.map(s => applyPreprocessingLogic(s.values, preprocessingSteps, referenceSpectrum));
     
     const M = X_raw_array[0].length;
     
     // safeNComponents para el modelo de calibración
     const safeNComponents = Math.min(nComponents, N - 1);
-    if (safeNComponents < 1) throw new Error("Se necesitan al menos 3 muestras activas para un cálculo estable.");
+    if (safeNComponents < 1) throw new Error("Se necesitan al menos 3 muestras de entrenamiento para un cálculo estable.");
     
     const X_matrix = new Matrix(X_raw_array);
     const Y_matrix = new Matrix(Y_raw.map(v => [v]));
@@ -481,12 +603,25 @@ export function runPlsAnalysis(
     const calPredictions = calPredictionsData.map(p => p.prediction);
     const statsCal = calculateStats(Y_raw, calPredictions);
 
+    // Validación Externa si se usó Kennard-Stone
+    let testSetMetrics: any = undefined;
+    if (testSplitSamples.length > 0) {
+        const yTestRaw = testSplitSamples.map(s => s.analyticalValue);
+        const xTestRawArray = testSplitSamples.map(s => applyPreprocessingLogic(s.values, preprocessingSteps, referenceSpectrum));
+        const testPreds = xTestRawArray.map(spec => predictPLS(calModel, spec).prediction);
+        const testStats = calculateStats(yTestRaw, testPreds);
+        testSetMetrics = {
+            ids: testSplitSamples.map(s => s.id),
+            actual: yTestRaw,
+            predicted: testPreds,
+            r2: testStats.r2,
+            sep: testStats.rmse,
+            bias: testStats.bias || 0
+        };
+    }
+
     // Para validación cruzada, usamos un componente menos si es crítico
     const cvComponents = Math.min(safeNComponents, N - 2);
-    if (cvComponents < 1) {
-        // Si no podemos hacer CV con los componentes pedidos, bajamos a 1 solo para el reporte
-        console.warn("N muestras muy bajo para CV con LVs solicitadas. Ajustando CV a 1 LV.");
-    }
     const finalCvComponents = Math.max(1, cvComponents);
 
     const cvPredictions = new Array(N);
@@ -517,9 +652,7 @@ export function runPlsAnalysis(
     const q2 = ssy > 1e-9 ? 1 - (press / ssy) : 0;
 
     const residuals = Y_raw.map((y, i) => y - calPredictions[i]);
-    const stdRes = statsCal.rmse || 1;
-    const mahalanobisDistances = activeSamples.map((s, i) => {
-        // Usar el GH calculado por el modelo
+    const mahalanobisDistances = samplesToUse.map((s, i) => {
         const dist = calPredictionsData[i].gh; 
         return { id: s.id, distance: isFinite(dist) ? dist : 0, isOutlier: dist > 3.5 };
     });
@@ -541,7 +674,7 @@ export function runPlsAnalysis(
                 predicted: calPredictions,
                 predictedCV: cvPredictions
             },
-            residuals: activeSamples.map((s, i) => ({
+            residuals: samplesToUse.map((s, i) => ({
                 id: s.id,
                 actual: Y_raw[i],
                 predicted: calPredictions[i],
@@ -551,10 +684,10 @@ export function runPlsAnalysis(
             coefficients: calModel.coefficients,
             processedSpectra: X_raw_array,
             referenceSpectrum: referenceSpectrum,
-            // Exportar metadata de Mahalanobis para predicción futura
             xMean: calModel.xMean,
             W: calModel.W,
-            T_inv_var: calModel.T_inv_var
+            T_inv_var: calModel.T_inv_var,
+            testSet: testSetMetrics
         },
         mahalanobis: {
             distances: mahalanobisDistances,

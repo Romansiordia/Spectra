@@ -26,6 +26,8 @@ const App: React.FC = () => {
     const [preprocessingSteps, setPreprocessingSteps] = useState<PreprocessingStep[]>([]);
     const [modelResults, setModelResults] = useState<ModelResults | null>(null);
     const [processedSpectra, setProcessedSpectra] = useState<{ id: string | number; values: number[] }[] | null>(null);
+    const [useKennardStone, setUseKennardStone] = useState<boolean>(false);
+    const [trainRatio, setTrainRatio] = useState<number>(0.75);
 
     const handleDataLoaded = (data: { wavelengths: number[]; samples: Sample[]; analyticalProperty: string }) => {
         const samplesWithRaw = data.samples.map(s => ({
@@ -207,12 +209,21 @@ const App: React.FC = () => {
             return;
         }
 
-        setLoadingMessage(`Generando modelo ${params.type.toUpperCase()}...`);
+        const ksEnabled = params.useKennardStone ?? useKennardStone;
+        const ksRatio = params.trainRatio ?? trainRatio;
+
+        setLoadingMessage(`Generando modelo ${params.type.toUpperCase()}${ksEnabled ? ' con Kennard-Stone' : ''}...`);
         
         // Timeout para permitir que el loader se muestre antes de la carga pesada de CPU
         setTimeout(() => {
             try {
-                const results = runPlsAnalysis(activeSamplesToUse, preprocessingSteps, params.nComponents);
+                const results = runPlsAnalysis(
+                    activeSamplesToUse, 
+                    preprocessingSteps, 
+                    params.nComponents, 
+                    ksEnabled, 
+                    ksRatio
+                );
                 setModelResults(results);
             } catch (error) {
                 console.error(`Error during ${params.type} run:`, error);
@@ -236,7 +247,12 @@ const App: React.FC = () => {
 
          if (modelResults) {
              // Iniciar el recálculo inmediatamente con los nuevos datos inyectados
-             const params: ModelParams = { type: 'pls', nComponents: modelResults.nComponents };
+             const params: ModelParams = { 
+                 type: 'pls', 
+                 nComponents: modelResults.nComponents,
+                 useKennardStone,
+                 trainRatio
+             };
              handleRunModel(params, updatedSamples);
          }
     };
@@ -391,7 +407,7 @@ const App: React.FC = () => {
                     <button 
                         onClick={() => setCurrentView('calibration')}
                         className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${currentView === 'calibration' ? 'bg-ui-card border border-ui-accent text-ui-accent shadow-lg shadow-ui-accent/10' : 'text-slate-400 hover:text-white'}`}
-                        title="Entrenamiento & Calibración (4 Fases)"
+                        title="Entrenamiento & Calibración (5 Fases)"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h5"/><path d="M17 12h5"/><path d="M7 12a5 5 0 0 1 5-5 5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5Z"/></svg>
                     </button>
@@ -439,6 +455,10 @@ const App: React.FC = () => {
                                 onResetWavelengthRange={handleResetWavelengthRange}
                                 isRangeTrimmed={rawWavelengths.length > 0 && wavelengths.length < rawWavelengths.length}
                                 fullWavelengthRange={rawWavelengths.length > 0 ? { min: rawWavelengths[0], max: rawWavelengths[rawWavelengths.length - 1], count: rawWavelengths.length } : undefined}
+                                useKennardStone={useKennardStone}
+                                setUseKennardStone={setUseKennardStone}
+                                trainRatio={trainRatio}
+                                setTrainRatio={setTrainRatio}
                             />
                         </ErrorBoundary>
                     )}

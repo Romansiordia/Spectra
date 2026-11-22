@@ -108,6 +108,14 @@ export interface ModelResults {
         xMean?: number[];
         W?: number[][];
         T_inv_var?: number[];
+        testSet?: {
+            ids?: (string | number)[];
+            actual: number[];
+            predicted: number[];
+            r2: number;
+            sep: number;
+            bias: number;
+        };
     };
     mahalanobis: {
         distances: {
