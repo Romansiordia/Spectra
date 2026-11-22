@@ -42,11 +42,15 @@ interface ResultsViewerProps {
     fullWavelengthRange?: { min: number; max: number; count: number };
 }
 
-const StatCard = ({ label, value, subtext, colorClass }: { label: string, value: string | number, subtext?: string, colorClass: string }) => (
-    <div className="bg-ui-dark p-5 rounded-xl border border-ui-border shadow-sm flex flex-col items-center justify-center hover:translate-y-[-2px] transition-transform duration-200">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{label}</span>
-        <span className={`text-3xl font-bold font-mono ${colorClass}`}>{value}</span>
-        {subtext && <span className="text-xs text-slate-400 mt-2 bg-ui-darkest px-2 py-0.5 rounded-full">{subtext}</span>}
+const StatCard = ({ label, value, subtext, colorClass, compact = false }: { label: string, value: string | number, subtext?: string, colorClass: string, compact?: boolean }) => (
+    <div className={`bg-ui-dark rounded-xl border border-ui-border shadow-sm flex flex-col items-center justify-center hover:translate-y-[-2px] transition-transform duration-200 ${compact ? 'px-2 py-2.5' : 'p-4 sm:p-5'}`}>
+        <span className={`font-bold text-slate-400 uppercase tracking-wider text-center leading-tight ${compact ? 'text-[10px] mb-1' : 'text-xs mb-2'}`}>{label}</span>
+        <span className={`font-bold font-mono leading-none ${compact ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'} ${colorClass}`}>{value}</span>
+        {subtext && (
+            <span className={`text-slate-400 bg-ui-darkest rounded-full text-center leading-tight ${compact ? 'text-[9px] mt-1.5 px-1.5 py-0.5' : 'text-xs mt-2 px-2 py-0.5'}`}>
+                {subtext}
+            </span>
+        )}
     </div>
 );
 
@@ -65,6 +69,9 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
     const [activeTab, setActiveTab] = useState('correlation');
     const chartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<any>(null);
+    const valChartRef = useRef<HTMLCanvasElement>(null);
+    const valChartInstanceRef = useRef<any>(null);
+    const hasTestSet = Boolean(results.model.testSet && results.model.testSet.actual.length > 0);
     
     // Residuals chart & table states
     const residualChartRef = useRef<HTMLCanvasElement>(null);
@@ -87,73 +94,142 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
     useEffect(() => {
         if (typeof Chart === 'undefined' || !chartRef.current) return;
 
-        if (!chartInstanceRef.current) {
-            const ctx = chartRef.current.getContext('2d');
-            if (ctx) {
-                const chartInstance = new Chart(ctx, {
-                    type: 'scatter',
-                    data: { datasets: [] },
-                    options: {
-                        maintainAspectRatio: false,
-                        responsive: true,
-                        animation: false,
-                        onClick: (evt: any) => {
-                            if (!chartInstanceRef.current) return;
-                            const points = chartInstanceRef.current.getElementsAtEventForMode(evt, 'point', { intersect: true }, true);
-                            if (points.length > 0) {
-                                const point = points[0];
-                                const dataset = chartInstanceRef.current.data.datasets[point.datasetIndex];
-                                const dataPoint = (dataset.data[point.index] as any);
-                                if (dataPoint && dataPoint.id !== undefined && !dataPoint.isTestSet) {
-                                    const sampleId = dataPoint.id;
-                                    setManualSelection(prev => {
-                                        const newSet = new Set(prev);
-                                        if (newSet.has(sampleId)) newSet.delete(sampleId);
-                                        else newSet.add(sampleId);
-                                        return newSet;
-                                    });
-                                }
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+            chartInstanceRef.current = null;
+        }
+
+        const ctx = chartRef.current.getContext('2d');
+        if (ctx) {
+            const chartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    animation: false,
+                    onClick: (evt: any) => {
+                        if (!chartInstanceRef.current) return;
+                        const points = chartInstanceRef.current.getElementsAtEventForMode(evt, 'point', { intersect: true }, true);
+                        if (points.length > 0) {
+                            const point = points[0];
+                            const dataset = chartInstanceRef.current.data.datasets[point.datasetIndex];
+                            const dataPoint = (dataset.data[point.index] as any);
+                            if (dataPoint && dataPoint.id !== undefined && !dataPoint.isTestSet) {
+                                const sampleId = dataPoint.id;
+                                setManualSelection(prev => {
+                                    const newSet = new Set(prev);
+                                    if (newSet.has(sampleId)) newSet.delete(sampleId);
+                                    else newSet.add(sampleId);
+                                    return newSet;
+                                });
                             }
-                        },
-                        plugins: {
-                            legend: { 
-                                position: 'bottom',
-                                labels: { usePointStyle: true, padding: 20, font: { family: 'Inter', size: 12 }, color: '#94a3b8' }
-                            },
-                            tooltip: {
-                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                titleColor: '#f8fafc',
-                                bodyColor: '#f1f5f9',
-                                borderColor: '#1e293b',
-                                borderWidth: 1,
-                                padding: 10,
-                                callbacks: {
-                                    title: (context: any) => {
-                                        const pt = context[0]?.dataset?.data?.[context[0]?.dataIndex];
-                                        if (!pt) return '';
-                                        return pt.isTestSet ? `Validación Externa: ${pt.id}` : `Muestra: ${pt.id}`;
-                                    },
-                                    label: (context: any) => `Ref ${context.parsed.x.toFixed(2)} / Pred ${context.parsed.y.toFixed(2)}`
-                                }
-                            }
-                        },
-                        scales: {
-                            x: { title: { display: true, text: `Ref (${propertyName})`, color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                            y: { title: { display: true, text: 'Pred (NIR)', color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
                         }
+                    },
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 14, font: { family: 'Inter', size: 11 }, color: '#94a3b8' }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f8fafc',
+                            bodyColor: '#f1f5f9',
+                            borderColor: '#1e293b',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                title: (context: any) => {
+                                    const pt = context[0]?.dataset?.data?.[context[0]?.dataIndex];
+                                    return pt ? `Muestra Cal: ${pt.id}` : '';
+                                },
+                                label: (context: any) => `Ref ${context.parsed.x.toFixed(2)} / Pred ${context.parsed.y.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: `Ref (${propertyName})`, color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        y: { title: { display: true, text: 'Pred (NIR)', color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
                     }
-                });
-                chartInstanceRef.current = chartInstance;
-            }
+                }
+            });
+            chartInstanceRef.current = chartInstance;
         }
 
         return () => {
-            // Cleanup on unmount
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+                chartInstanceRef.current = null;
+            }
         };
-    }, [propertyName]); // Re-init if property changes (to update axis titles)
+    }, [propertyName, hasTestSet]);
+
+    useEffect(() => {
+        if (typeof Chart === 'undefined') return;
+
+        if (!hasTestSet || !valChartRef.current) {
+            if (valChartInstanceRef.current) {
+                valChartInstanceRef.current.destroy();
+                valChartInstanceRef.current = null;
+            }
+            return;
+        }
+
+        if (valChartInstanceRef.current) {
+            valChartInstanceRef.current.destroy();
+            valChartInstanceRef.current = null;
+        }
+
+        const ctx = valChartRef.current.getContext('2d');
+        if (ctx) {
+            const valChartInstance = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets: [] },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    animation: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 14, font: { family: 'Inter', size: 11 }, color: '#94a3b8' }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#fbbf24',
+                            bodyColor: '#f1f5f9',
+                            borderColor: '#78350f',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                title: (context: any) => {
+                                    const pt = context[0]?.dataset?.data?.[context[0]?.dataIndex];
+                                    return pt ? `Validación Externa: ${pt.id}` : '';
+                                },
+                                label: (context: any) => `Ref ${context.parsed.x.toFixed(2)} / Pred ${context.parsed.y.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: `Ref (${propertyName})`, color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        y: { title: { display: true, text: 'Pred (NIR)', color: '#94a3b8' }, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+            valChartInstanceRef.current = valChartInstance;
+        }
+
+        return () => {
+            if (valChartInstanceRef.current) {
+                valChartInstanceRef.current.destroy();
+                valChartInstanceRef.current = null;
+            }
+        };
+    }, [propertyName, hasTestSet]);
 
     useEffect(() => {
         const chartInstance = chartInstanceRef.current;
+        const valChartInstance = valChartInstanceRef.current;
         if (chartInstance && results) {
             const allDataPoints = results.model.correlation.actual.map((act, i) => ({
                 x: act,
@@ -189,63 +265,76 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 if (!isFinite(minVal)) minVal = 0;
                 if (!isFinite(maxVal)) maxVal = 1;
                 const padding = (maxVal - minVal) * 0.1 || 1;
+                const axisMin = minVal - padding;
+                const axisMax = maxVal + padding;
+                const line1to1 = [{ x: axisMin, y: axisMin }, { x: axisMax, y: axisMax }];
 
-                const hasTestSet = testDataPoints.length > 0;
-                const datasets: any[] = [
+                chartInstance.data.datasets = [
                     {
-                        label: 'Calibración (Válidas)',
+                        label: `Calibración (${inliersData.length})`,
                         data: inliersData,
-                        backgroundColor: hasTestSet ? 'rgba(14, 165, 233, 0.35)' : '#0ea5e9',
-                        borderColor: hasTestSet ? 'rgba(56, 189, 248, 0.5)' : 'transparent',
-                        borderWidth: hasTestSet ? 1 : 0,
-                        pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 8 : (hasTestSet ? 4.5 : 5),
-                        order: 3
+                        backgroundColor: '#0ea5e9',
+                        pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 8 : 5,
+                        order: 2
                     },
                     {
-                        label: 'Outliers',
+                        label: `Outliers (${outliersData.length})`,
                         data: outliersData,
                         backgroundColor: '#ef4444',
                         pointStyle: 'triangle',
                         pointRadius: (ctx: any) => manualSelection.has(ctx.raw?.id) ? 9 : 6,
-                        order: 2
+                        order: 1
+                    },
+                    {
+                        type: 'line',
+                        label: '1:1',
+                        data: line1to1,
+                        borderColor: '#64748b',
+                        borderDash: [6, 6],
+                        pointRadius: 0,
+                        fill: false,
+                        order: 3
                     }
                 ];
-
-                if (hasTestSet) {
-                    datasets.push({
-                        label: `Validación Externa KS (${testDataPoints.length})`,
-                        data: testDataPoints,
-                        backgroundColor: '#f59e0b',
-                        borderColor: '#0f172a',
-                        borderWidth: 2,
-                        pointStyle: 'rectRot',
-                        pointRadius: 6.5,
-                        pointHoverRadius: 9,
-                        order: 1
-                    });
-                }
-
-                datasets.push({
-                    type: 'line',
-                    label: '1:1',
-                    data: [{ x: minVal - padding, y: minVal - padding }, { x: maxVal + padding, y: maxVal + padding }],
-                    borderColor: '#64748b',
-                    borderDash: [6, 6],
-                    pointRadius: 0,
-                    fill: false,
-                    order: 4
-                });
-
-                chartInstance.data.datasets = datasets;
-                
-                chartInstance.options.scales.x.min = minVal - padding;
-                chartInstance.options.scales.x.max = maxVal + padding;
-                chartInstance.options.scales.y.min = minVal - padding;
-                chartInstance.options.scales.y.max = maxVal + padding;
+                chartInstance.options.scales.x.min = axisMin;
+                chartInstance.options.scales.x.max = axisMax;
+                chartInstance.options.scales.y.min = axisMin;
+                chartInstance.options.scales.y.max = axisMax;
                 chartInstance.update('none');
+
+                if (valChartInstance && testDataPoints.length > 0) {
+                    valChartInstance.data.datasets = [
+                        {
+                            label: `Validación Externa KS (${testDataPoints.length})`,
+                            data: testDataPoints,
+                            backgroundColor: '#f59e0b',
+                            borderColor: '#fef3c7',
+                            borderWidth: 1.5,
+                            pointStyle: 'rectRot',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            order: 1
+                        },
+                        {
+                            type: 'line',
+                            label: '1:1',
+                            data: line1to1,
+                            borderColor: '#64748b',
+                            borderDash: [6, 6],
+                            pointRadius: 0,
+                            fill: false,
+                            order: 2
+                        }
+                    ];
+                    valChartInstance.options.scales.x.min = axisMin;
+                    valChartInstance.options.scales.x.max = axisMax;
+                    valChartInstance.options.scales.y.min = axisMin;
+                    valChartInstance.options.scales.y.max = axisMax;
+                    valChartInstance.update('none');
+                }
             }
         }
-    }, [results, manualSelection, activeTab, propertyName]);
+    }, [results, manualSelection, activeTab, propertyName, hasTestSet]);
 
     // Métricas y análisis estadístico de residuos
     const sec = results.model.sec || 0.0001;
@@ -698,59 +787,61 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
             doc.setFontSize(16);
             doc.text('3. Gráfico de Correlación (NIR vs Referencia)', 14, currentY);
 
+            const captureChartImage = (canvas: HTMLCanvasElement, chartInstance: any) => {
+                const originalOptions = JSON.parse(JSON.stringify({
+                    xTicks: chartInstance.options.scales.x.ticks.color,
+                    xTitle: chartInstance.options.scales.x.title.color,
+                    xGrid: chartInstance.options.scales.x.grid.color,
+                    yTicks: chartInstance.options.scales.y.ticks.color,
+                    yTitle: chartInstance.options.scales.y.title.color,
+                    yGrid: chartInstance.options.scales.y.grid.color,
+                    legend: chartInstance.options.plugins.legend.labels.color
+                }));
+
+                chartInstance.options.scales.x.ticks.color = '#1e293b';
+                chartInstance.options.scales.x.title.color = '#1e293b';
+                chartInstance.options.scales.x.grid.color = '#e2e8f0';
+                chartInstance.options.scales.y.ticks.color = '#1e293b';
+                chartInstance.options.scales.y.title.color = '#1e293b';
+                chartInstance.options.scales.y.grid.color = '#e2e8f0';
+                chartInstance.options.plugins.legend.labels.color = '#1e293b';
+                chartInstance.update('none');
+
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                let dataUrl = '';
+                if (tempCtx) {
+                    tempCtx.fillStyle = '#FFFFFF';
+                    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                    tempCtx.drawImage(canvas, 0, 0);
+                    dataUrl = tempCanvas.toDataURL('image/jpeg', 1.0);
+                }
+
+                chartInstance.options.scales.x.ticks.color = originalOptions.xTicks;
+                chartInstance.options.scales.x.title.color = originalOptions.xTitle;
+                chartInstance.options.scales.x.grid.color = originalOptions.xGrid;
+                chartInstance.options.scales.y.ticks.color = originalOptions.yTicks;
+                chartInstance.options.scales.y.title.color = originalOptions.yTitle;
+                chartInstance.options.scales.y.grid.color = originalOptions.yGrid;
+                chartInstance.options.plugins.legend.labels.color = originalOptions.legend;
+                chartInstance.update('none');
+                return dataUrl;
+            };
+
             if (chartRef.current && chartInstanceRef.current) {
                 try {
-                    const chartInstance = chartInstanceRef.current;
-                    
-                    // Guardar colores originales
-                    const originalOptions = JSON.parse(JSON.stringify({
-                        xTicks: chartInstance.options.scales.x.ticks.color,
-                        xTitle: chartInstance.options.scales.x.title.color,
-                        xGrid: chartInstance.options.scales.x.grid.color,
-                        yTicks: chartInstance.options.scales.y.ticks.color,
-                        yTitle: chartInstance.options.scales.y.title.color,
-                        yGrid: chartInstance.options.scales.y.grid.color,
-                        legend: chartInstance.options.plugins.legend.labels.color
-                    }));
-
-                    // Aplicar colores de alto contraste para el PDF
-                    chartInstance.options.scales.x.ticks.color = '#1e293b';
-                    chartInstance.options.scales.x.title.color = '#1e293b';
-                    chartInstance.options.scales.x.grid.color = '#e2e8f0';
-                    chartInstance.options.scales.y.ticks.color = '#1e293b';
-                    chartInstance.options.scales.y.title.color = '#1e293b';
-                    chartInstance.options.scales.y.grid.color = '#e2e8f0';
-                    chartInstance.options.plugins.legend.labels.color = '#1e293b';
-                    
-                    chartInstance.update('none');
-
-                    // Capturar con fondo blanco
-                    const canvas = chartRef.current;
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = canvas.width;
-                    tempCanvas.height = canvas.height;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    
-                    if (tempCtx) {
-                        tempCtx.fillStyle = '#FFFFFF';
-                        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                        tempCtx.drawImage(canvas, 0, 0);
-                        
-                        const chartImage = tempCanvas.toDataURL('image/jpeg', 1.0);
-                        doc.addImage(chartImage, 'JPEG', 14, currentY + 5, 180, 100);
+                    const calImage = captureChartImage(chartRef.current, chartInstanceRef.current);
+                    if (valChartRef.current && valChartInstanceRef.current) {
+                        const valImage = captureChartImage(valChartRef.current, valChartInstanceRef.current);
+                        if (calImage) doc.addImage(calImage, 'JPEG', 14, currentY + 5, 88, 65);
+                        if (valImage) doc.addImage(valImage, 'JPEG', 108, currentY + 5, 88, 65);
+                        currentY += 75;
+                    } else if (calImage) {
+                        doc.addImage(calImage, 'JPEG', 14, currentY + 5, 180, 100);
                         currentY += 110;
                     }
-
-                    // Restaurar colores
-                    chartInstance.options.scales.x.ticks.color = originalOptions.xTicks;
-                    chartInstance.options.scales.x.title.color = originalOptions.xTitle;
-                    chartInstance.options.scales.x.grid.color = originalOptions.xGrid;
-                    chartInstance.options.scales.y.ticks.color = originalOptions.yTicks;
-                    chartInstance.options.scales.y.title.color = originalOptions.yTitle;
-                    chartInstance.options.scales.y.grid.color = originalOptions.yGrid;
-                    chartInstance.options.plugins.legend.labels.color = originalOptions.legend;
-                    chartInstance.update('none');
-
                 } catch (chartError) {
                     console.error("Error capturando gráfico:", chartError);
                     doc.setFontSize(10);
@@ -811,19 +902,12 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 </div>
             </div>
 
-            <div className="p-6 bg-ui-darkest min-h-[400px]">
+            <div className="p-4 sm:p-5 bg-ui-darkest min-h-[400px]">
                 <div className={activeTab === 'correlation' ? 'block' : 'hidden'}>
-                    <div className="flex flex-col gap-6 animate-fade-in">
-                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                            <StatCard label="R²" value={isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'} colorClass="text-sky-400" />
-                            <StatCard label="Q²" value={isFinite(results.model.q2) ? results.model.q2.toFixed(4) : '0.0000'} colorClass="text-purple-400" />
-                            <StatCard label="SEC" value={isFinite(results.model.sec) ? results.model.sec.toFixed(4) : '0.0000'} colorClass="text-ui-accent" />
-                            <StatCard label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-ui-success" />
-                            <StatCard label="Offset" value={results.model.offset != null && isFinite(results.model.offset) ? results.model.offset.toFixed(4) : '0.0000'} colorClass="text-amber-400" />
-                        </div>
-
-                        {results.model.testSet && results.model.testSet.actual.length > 0 && (() => {
+                    <div className="flex flex-col gap-5 animate-fade-in">
+                        {hasTestSet && results.model.testSet ? (() => {
                             const ts = results.model.testSet!;
+                            const nCal = results.model.correlation.actual.length;
                             const nTest = ts.actual.length;
                             const meanTest = ts.actual.reduce((a, b) => a + b, 0) / nTest;
                             const sdTest = nTest > 1
@@ -832,58 +916,107 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                             const rpd = ts.sep > 1e-9 ? sdTest / ts.sep : 0;
 
                             return (
-                                <div className="bg-amber-950/15 border border-amber-500/30 rounded-xl p-4 space-y-3">
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <Sparkles className="w-4 h-4 text-amber-400" />
-                                            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                                                Validación Externa Ciega (Kennard-Stone)
-                                            </h4>
+                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                    {/* Columna Izquierda: Calibración Interna */}
+                                    <div className="bg-sky-950/15 border border-sky-500/25 rounded-xl p-4 flex flex-col gap-3.5">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block" />
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-sky-300">
+                                                    Calibración Interna (Entrenamiento)
+                                                </h4>
+                                            </div>
+                                            <span className="text-[11px] font-mono bg-sky-500/15 text-sky-200 px-2.5 py-0.5 rounded border border-sky-500/30">
+                                                {nCal} muestras
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-mono bg-amber-500/15 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/30">
-                                            {nTest} muestras independientes
-                                        </span>
+
+                                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                            <StatCard compact label="R²" value={isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'} colorClass="text-sky-400" />
+                                            <StatCard compact label="Q²" value={isFinite(results.model.q2) ? results.model.q2.toFixed(4) : '0.0000'} colorClass="text-purple-400" />
+                                            <StatCard compact label="SEC" value={isFinite(results.model.sec) ? results.model.sec.toFixed(4) : '0.0000'} colorClass="text-ui-accent" />
+                                            <StatCard compact label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-ui-success" />
+                                            <StatCard compact label="Offset" value={results.model.offset != null && isFinite(results.model.offset) ? results.model.offset.toFixed(4) : '0.0000'} colorClass="text-amber-400" />
+                                        </div>
+
+                                        <div className="bg-ui-darkest p-3 rounded-xl border border-ui-border shadow-inner-dark h-[360px] relative">
+                                            <canvas ref={chartRef}></canvas>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                        <StatCard
-                                            label="R² Validación"
-                                            value={isFinite(ts.r2) ? ts.r2.toFixed(4) : '0.0000'}
-                                            subtext="Predicción ciega"
-                                            colorClass="text-amber-400"
-                                        />
-                                        <StatCard
-                                            label="SEP"
-                                            value={isFinite(ts.sep) ? ts.sep.toFixed(4) : '0.0000'}
-                                            subtext="Error de predicción"
-                                            colorClass="text-amber-300"
-                                        />
-                                        <StatCard
-                                            label="Bias Externo"
-                                            value={isFinite(ts.bias) ? (ts.bias > 0 ? `+${ts.bias.toFixed(4)}` : ts.bias.toFixed(4)) : '0.0000'}
-                                            subtext="Sesgo medio test"
-                                            colorClass={Math.abs(ts.bias) <= ts.sep * 0.25 ? "text-emerald-400" : "text-rose-400"}
-                                        />
-                                        <StatCard
-                                            label="RPD (SD / SEP)"
-                                            value={isFinite(rpd) ? rpd.toFixed(2) : '0.00'}
-                                            subtext={rpd >= 3 ? "Excelente control" : rpd >= 2 ? "Uso cuantitativo" : "Capacidad limitada"}
-                                            colorClass={rpd >= 3 ? "text-emerald-400" : rpd >= 2 ? "text-sky-400" : "text-amber-400"}
-                                        />
+
+                                    {/* Columna Derecha: Validación Externa Ciega (Kennard-Stone) */}
+                                    <div className="bg-amber-950/15 border border-amber-500/30 rounded-xl p-4 flex flex-col gap-3.5">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4 text-amber-400" />
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                                                    Validación Externa Ciega (Kennard-Stone)
+                                                </h4>
+                                            </div>
+                                            <span className="text-[11px] font-mono bg-amber-500/15 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/30">
+                                                {nTest} muestras independientes
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                            <StatCard
+                                                compact
+                                                label="R² Validación"
+                                                value={isFinite(ts.r2) ? ts.r2.toFixed(4) : '0.0000'}
+                                                subtext="Predicción ciega"
+                                                colorClass="text-amber-400"
+                                            />
+                                            <StatCard
+                                                compact
+                                                label="SEP"
+                                                value={isFinite(ts.sep) ? ts.sep.toFixed(4) : '0.0000'}
+                                                subtext="Error predicción"
+                                                colorClass="text-amber-300"
+                                            />
+                                            <StatCard
+                                                compact
+                                                label="Bias Externo"
+                                                value={isFinite(ts.bias) ? (ts.bias > 0 ? `+${ts.bias.toFixed(4)}` : ts.bias.toFixed(4)) : '0.0000'}
+                                                subtext="Sesgo test"
+                                                colorClass={Math.abs(ts.bias) <= ts.sep * 0.25 ? "text-emerald-400" : "text-rose-400"}
+                                            />
+                                            <StatCard
+                                                compact
+                                                label="RPD (SD / SEP)"
+                                                value={isFinite(rpd) ? rpd.toFixed(2) : '0.00'}
+                                                subtext={rpd >= 3 ? "Excelente" : rpd >= 2 ? "Cuantitativo" : "Limitado"}
+                                                colorClass={rpd >= 3 ? "text-emerald-400" : rpd >= 2 ? "text-sky-400" : "text-amber-400"}
+                                            />
+                                        </div>
+
+                                        <div className="bg-ui-darkest p-3 rounded-xl border border-ui-border shadow-inner-dark h-[360px] relative">
+                                            <canvas ref={valChartRef}></canvas>
+                                        </div>
                                     </div>
                                 </div>
                             );
-                        })()}
+                        })() : (
+                            <>
+                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                                    <StatCard label="R²" value={isFinite(results.model.r2) ? results.model.r2.toFixed(4) : '0.0000'} colorClass="text-sky-400" />
+                                    <StatCard label="Q²" value={isFinite(results.model.q2) ? results.model.q2.toFixed(4) : '0.0000'} colorClass="text-purple-400" />
+                                    <StatCard label="SEC" value={isFinite(results.model.sec) ? results.model.sec.toFixed(4) : '0.0000'} colorClass="text-ui-accent" />
+                                    <StatCard label="SECV" value={isFinite(results.model.secv) ? results.model.secv.toFixed(4) : '0.0000'} colorClass="text-ui-success" />
+                                    <StatCard label="Offset" value={results.model.offset != null && isFinite(results.model.offset) ? results.model.offset.toFixed(4) : '0.0000'} colorClass="text-amber-400" />
+                                </div>
 
-                        <div className="bg-ui-darkest p-4 rounded-xl border border-ui-border shadow-inner-dark h-[450px] relative">
-                            <canvas ref={chartRef}></canvas>
-                        </div>
+                                <div className="bg-ui-darkest p-4 rounded-xl border border-ui-border shadow-inner-dark h-[440px] relative">
+                                    <canvas ref={chartRef}></canvas>
+                                </div>
+                            </>
+                        )}
 
-                        <div className="bg-ui-card rounded-xl border border-ui-border p-6 flex justify-between items-center">
+                        <div className="bg-ui-card rounded-xl border border-ui-border p-4 sm:p-5 flex flex-wrap justify-between items-center gap-3">
                             <div>
-                                <h4 className="font-bold text-slate-100">Gestión de Outliers</h4>
-                                <p className="text-sm text-slate-400">Seleccionados: {manualSelection.size}</p>
+                                <h4 className="font-bold text-slate-100 text-sm">Gestión de Outliers (Calibración)</h4>
+                                <p className="text-xs text-slate-400">Haz clic en los puntos del gráfico de calibración para marcarlos. Seleccionados: {manualSelection.size}</p>
                             </div>
-                            <Button onClick={handleDeactivateManualClick} disabled={manualSelection.size === 0} variant="danger">
+                            <Button onClick={handleDeactivateManualClick} disabled={manualSelection.size === 0} variant="danger" size="sm">
                                 Desactivar y Recalcular
                             </Button>
                         </div>

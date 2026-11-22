@@ -281,7 +281,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
     ];
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-in w-full max-w-7xl mx-auto">
+        <div className="flex flex-col gap-6 animate-fade-in w-full max-w-[1440px] mx-auto">
             {/* ========================================================================= */}
             {/* 1. BARRA SUPERIOR DE TARJETAS / PESTAÑAS DE FLUJO                         */}
             {/* ========================================================================= */}
@@ -913,9 +913,9 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
             {/* ------------------------------------------------------------------------- */}
             {activeTab === 'model' && (
                 <div className="flex flex-col gap-6 animate-fade-in">
-                    <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                         {/* Panel Lateral: Generador de Modelo PLS y Optimización */}
-                        <div className="lg:col-span-2 flex flex-col gap-4">
+                        <div className="lg:col-span-4 xl:col-span-3 flex flex-col gap-4">
                             <ModelGenerator
                                 onRunModel={onRunModel}
                                 disabled={activeSamples.length < 3 || (useKennardStone && ksSplit.trainSamples.length < 3)}
@@ -974,7 +974,7 @@ export const CalibrationWorkflow: React.FC<CalibrationWorkflowProps> = ({
                         </div>
 
                         {/* Panel Central: Visor de Resultados Estadísticos y Gráficos */}
-                        <div className="lg:col-span-5 flex flex-col gap-6">
+                        <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-6">
                             {modelResults ? (
                                 <ErrorBoundary fallbackTitle="Error al renderizar los resultados de calibración.">
                                     <ResultsViewer
