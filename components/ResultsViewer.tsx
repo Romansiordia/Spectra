@@ -305,7 +305,7 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                 if (valChartInstance && testDataPoints.length > 0) {
                     valChartInstance.data.datasets = [
                         {
-                            label: `Validación Externa KS (${testDataPoints.length})`,
+                            label: `Validación Externa (${testDataPoints.length})`,
                             data: testDataPoints,
                             backgroundColor: '#f59e0b',
                             borderColor: '#fef3c7',
@@ -919,14 +919,14 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                     {/* Columna Izquierda: Calibración Interna */}
                                     <div className="bg-sky-950/15 border border-sky-500/25 rounded-xl p-4 flex flex-col gap-3.5">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block" />
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-sky-300">
-                                                    Calibración Interna (Entrenamiento)
+                                        <div className="flex items-center justify-between gap-2 min-h-[28px]">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0" />
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-sky-300 truncate">
+                                                    Calibración Interna
                                                 </h4>
                                             </div>
-                                            <span className="text-[11px] font-mono bg-sky-500/15 text-sky-200 px-2.5 py-0.5 rounded border border-sky-500/30">
+                                            <span className="text-[11px] font-mono bg-sky-500/15 text-sky-200 px-2.5 py-0.5 rounded border border-sky-500/30 whitespace-nowrap shrink-0">
                                                 {nCal} muestras
                                             </span>
                                         </div>
@@ -939,57 +939,53 @@ const ResultsViewer: React.FC<ResultsViewerProps> = ({
                                             <StatCard compact label="Offset" value={results.model.offset != null && isFinite(results.model.offset) ? results.model.offset.toFixed(4) : '0.0000'} colorClass="text-amber-400" />
                                         </div>
 
-                                        <div className="bg-ui-darkest p-3 rounded-xl border border-ui-border shadow-inner-dark h-[360px] relative">
+                                        <div className="bg-ui-darkest p-3 rounded-xl border border-ui-border shadow-inner-dark h-[360px] relative mt-auto">
                                             <canvas ref={chartRef}></canvas>
                                         </div>
                                     </div>
 
-                                    {/* Columna Derecha: Validación Externa Ciega (Kennard-Stone) */}
+                                    {/* Columna Derecha: Validación Externa */}
                                     <div className="bg-amber-950/15 border border-amber-500/30 rounded-xl p-4 flex flex-col gap-3.5">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <Sparkles className="w-4 h-4 text-amber-400" />
-                                                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                                                    Validación Externa Ciega (Kennard-Stone)
+                                        <div className="flex items-center justify-between gap-2 min-h-[28px]">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300 truncate">
+                                                    Validación Externa
                                                 </h4>
                                             </div>
-                                            <span className="text-[11px] font-mono bg-amber-500/15 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/30">
-                                                {nTest} muestras independientes
+                                            <span className="text-[11px] font-mono bg-amber-500/15 text-amber-200 px-2.5 py-0.5 rounded border border-amber-500/30 whitespace-nowrap shrink-0">
+                                                {nTest} muestras
                                             </span>
                                         </div>
 
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             <StatCard
                                                 compact
-                                                label="R² Validación"
+                                                label="R² Val"
                                                 value={isFinite(ts.r2) ? ts.r2.toFixed(4) : '0.0000'}
-                                                subtext="Predicción ciega"
                                                 colorClass="text-amber-400"
                                             />
                                             <StatCard
                                                 compact
                                                 label="SEP"
                                                 value={isFinite(ts.sep) ? ts.sep.toFixed(4) : '0.0000'}
-                                                subtext="Error predicción"
                                                 colorClass="text-amber-300"
                                             />
                                             <StatCard
                                                 compact
-                                                label="Bias Externo"
+                                                label="Bias"
                                                 value={isFinite(ts.bias) ? (ts.bias > 0 ? `+${ts.bias.toFixed(4)}` : ts.bias.toFixed(4)) : '0.0000'}
-                                                subtext="Sesgo test"
                                                 colorClass={Math.abs(ts.bias) <= ts.sep * 0.25 ? "text-emerald-400" : "text-rose-400"}
                                             />
                                             <StatCard
                                                 compact
-                                                label="RPD (SD / SEP)"
+                                                label="RPD"
                                                 value={isFinite(rpd) ? rpd.toFixed(2) : '0.00'}
-                                                subtext={rpd >= 3 ? "Excelente" : rpd >= 2 ? "Cuantitativo" : "Limitado"}
                                                 colorClass={rpd >= 3 ? "text-emerald-400" : rpd >= 2 ? "text-sky-400" : "text-amber-400"}
                                             />
                                         </div>
 
-                                        <div className="bg-ui-darkest p-3 rounded-xl border border-ui-border shadow-inner-dark h-[360px] relative">
+                                        <div className="bg-ui-darkest p-3 rounded-xl border border-ui-border shadow-inner-dark h-[360px] relative mt-auto">
                                             <canvas ref={valChartRef}></canvas>
                                         </div>
                                     </div>

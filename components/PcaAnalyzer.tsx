@@ -6,10 +6,11 @@ import {
 import { 
     Activity, AlertTriangle, CheckCircle2, XCircle, Filter, 
     Trash2, RotateCcw, ShieldAlert, Sparkles, SlidersHorizontal, 
-    Info, Eye, Layers, Compass, HelpCircle, Target, ArrowRight, ShieldCheck
+    Info, Eye, Layers, Compass, HelpCircle, Target, ArrowRight, ShieldCheck, Box
 } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
+import Pca3DPlot, { Pca3DPoint } from './Pca3DPlot';
 import { Sample, PreprocessingStep, PcaAnalysisModel, PcaScorePoint, RobpcaSampleType } from '../types';
 import { runComprehensivePca } from '../services/chemometrics';
 
@@ -23,7 +24,7 @@ interface PcaAnalyzerProps {
     analyticalProperty?: string;
 }
 
-export type PcaChartTab = 'scores' | 'robpca' | 'lof' | 'influence' | 'variance';
+export type PcaChartTab = 'scores' | 'scores3d' | 'robpca' | 'lof' | 'influence' | 'variance';
 
 const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
     samples,
@@ -36,6 +37,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
 }) => {
     const [selectedPCX, setSelectedPCX] = useState<number>(1);
     const [selectedPCY, setSelectedPCY] = useState<number>(2);
+    const [selectedPCZ, setSelectedPCZ] = useState<number>(3);
     const [activeTab, setActiveTab] = useState<PcaChartTab>('scores');
     const [selectedPoint, setSelectedPoint] = useState<PcaScorePoint | null>(null);
     const [outlierFilterTab, setOutlierFilterTab] = useState<'all' | 'robpca_critical' | 'lof' | 'good_leverage'>('all');
@@ -88,6 +90,49 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
             };
         });
     }, [pcaModel, selectedPCX, selectedPCY]);
+
+    // 1b. Datos para el gráfico de dispersión de Scores 3D
+    const scores3DData: Pca3DPoint[] = useMemo(() => {
+        if (!pcaModel) return [];
+        const getPcVal = (s: PcaScorePoint, pcIdx: number) =>
+            pcIdx === 1 ? s.pc1 : (pcIdx === 2 ? s.pc2 : (s.pc3 || 0));
+
+        return pcaModel.scores.map(s => {
+            let color = '#10b981';
+            if (!s.active) {
+                color = '#64748b';
+            } else if (s.robpcaType === 'bad_leverage' || (s.isLofOutlier && s.isOutlier)) {
+                color = '#f43f5e';
+            } else if (s.robpcaType === 'orthogonal') {
+                color = '#f59e0b';
+            } else if (s.robpcaType === 'good_leverage') {
+                color = '#0284c7';
+            } else if (s.isLofOutlier || s.gh > 2.0) {
+                color = '#fbbf24';
+            }
+
+            return {
+                id: s.id,
+                x: Number(getPcVal(s, selectedPCX).toFixed(4)),
+                y: Number(getPcVal(s, selectedPCY).toFixed(4)),
+                z: Number(getPcVal(s, selectedPCZ).toFixed(4)),
+                gh: Number(s.gh.toFixed(2)),
+                hotellingT2: Number(s.hotellingT2.toFixed(2)),
+                qResidual: Number(s.qResidual.toFixed(4)),
+                sd: Number(s.robpcaSD.toFixed(2)),
+                od: Number(s.robpcaOD.toFixed(4)),
+                robpcaType: s.robpcaType,
+                lofScore: Number(s.lofScore.toFixed(2)),
+                isOutlier: s.isOutlier,
+                isRobpcaOutlier: s.isRobpcaOutlier,
+                isLofOutlier: s.isLofOutlier,
+                outlierReason: s.outlierReason,
+                active: s.active,
+                color,
+                analyticalValue: s.analyticalValue
+            };
+        });
+    }, [pcaModel, selectedPCX, selectedPCY, selectedPCZ]);
 
     // 2. Datos para el gráfico de diagnóstico ROBPCA (Hubert SD vs OD)
     const robpcaChartData = useMemo(() => {
@@ -238,6 +283,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
 
     const varX = pcaModel.varianceExplained[selectedPCX - 1] || 0;
     const varY = pcaModel.varianceExplained[selectedPCY - 1] || 0;
+    const varZ = pcaModel.varianceExplained[selectedPCZ - 1] || 0;
 
     // Obtener badge según tipo ROBPCA
     const getRobpcaBadge = (type: RobpcaSampleType) => {
@@ -426,7 +472,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
                             <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
                                     onClick={() => setActiveTab('scores')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                                         activeTab === 'scores' 
                                             ? 'bg-ui-accent text-slate-900 shadow' 
                                             : 'text-slate-400 hover:text-white bg-ui-dark'
@@ -435,8 +481,19 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
                                     Scores 2D
                                 </button>
                                 <button
+                                    onClick={() => setActiveTab('scores3d')}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        activeTab === 'scores3d' 
+                                            ? 'bg-ui-accent text-slate-900 shadow' 
+                                            : 'text-slate-400 hover:text-white bg-ui-dark'
+                                    }`}
+                                >
+                                    <Box className="w-3.5 h-3.5" />
+                                    Scores 3D
+                                </button>
+                                <button
                                     onClick={() => setActiveTab('robpca')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                                         activeTab === 'robpca' 
                                             ? 'bg-emerald-500 text-slate-950 font-black shadow' 
                                             : 'text-slate-400 hover:text-white bg-ui-dark'
@@ -447,7 +504,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('lof')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                                         activeTab === 'lof' 
                                             ? 'bg-purple-500 text-white font-bold shadow' 
                                             : 'text-slate-400 hover:text-white bg-ui-dark'
@@ -458,7 +515,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('influence')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                                         activeTab === 'influence' 
                                             ? 'bg-ui-accent text-slate-900 shadow' 
                                             : 'text-slate-400 hover:text-white bg-ui-dark'
@@ -468,7 +525,7 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('variance')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                                         activeTab === 'variance' 
                                             ? 'bg-ui-accent text-slate-900 shadow' 
                                             : 'text-slate-400 hover:text-white bg-ui-dark'
@@ -478,39 +535,79 @@ const PcaAnalyzer: React.FC<PcaAnalyzerProps> = ({
                                 </button>
                             </div>
 
-                            {activeTab === 'scores' && (
-                                <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-slate-400 font-medium">Eje X:</span>
-                                    <select 
-                                        value={selectedPCX} 
-                                        onChange={(e) => setSelectedPCX(Number(e.target.value))}
-                                        className="bg-ui-dark border border-ui-border rounded px-2 py-1 text-slate-200"
-                                    >
-                                        <option value={1}>PC 1 ({(pcaModel.varianceExplained[0] || 0).toFixed(1)}%)</option>
-                                        <option value={2}>PC 2 ({(pcaModel.varianceExplained[1] || 0).toFixed(1)}%)</option>
-                                        {pcaModel.varianceExplained.length > 2 && (
-                                            <option value={3}>PC 3 ({(pcaModel.varianceExplained[2] || 0).toFixed(1)}%)</option>
-                                        )}
-                                    </select>
+                            {(activeTab === 'scores' || activeTab === 'scores3d') && (
+                                <div className="flex flex-wrap items-center gap-2 text-xs">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-400 font-medium">Eje X:</span>
+                                        <select 
+                                            value={selectedPCX} 
+                                            onChange={(e) => setSelectedPCX(Number(e.target.value))}
+                                            className="bg-ui-dark border border-ui-border rounded px-2 py-1 text-slate-200"
+                                        >
+                                            <option value={1}>PC 1 ({(pcaModel.varianceExplained[0] || 0).toFixed(1)}%)</option>
+                                            <option value={2}>PC 2 ({(pcaModel.varianceExplained[1] || 0).toFixed(1)}%)</option>
+                                            {pcaModel.varianceExplained.length > 2 && (
+                                                <option value={3}>PC 3 ({(pcaModel.varianceExplained[2] || 0).toFixed(1)}%)</option>
+                                            )}
+                                        </select>
+                                    </div>
 
-                                    <span className="text-slate-400 font-medium ml-1">Eje Y:</span>
-                                    <select 
-                                        value={selectedPCY} 
-                                        onChange={(e) => setSelectedPCY(Number(e.target.value))}
-                                        className="bg-ui-dark border border-ui-border rounded px-2 py-1 text-slate-200"
-                                    >
-                                        <option value={1}>PC 1 ({(pcaModel.varianceExplained[0] || 0).toFixed(1)}%)</option>
-                                        <option value={2}>PC 2 ({(pcaModel.varianceExplained[1] || 0).toFixed(1)}%)</option>
-                                        {pcaModel.varianceExplained.length > 2 && (
-                                            <option value={3}>PC 3 ({(pcaModel.varianceExplained[2] || 0).toFixed(1)}%)</option>
-                                        )}
-                                    </select>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-slate-400 font-medium">Eje Y:</span>
+                                        <select 
+                                            value={selectedPCY} 
+                                            onChange={(e) => setSelectedPCY(Number(e.target.value))}
+                                            className="bg-ui-dark border border-ui-border rounded px-2 py-1 text-slate-200"
+                                        >
+                                            <option value={1}>PC 1 ({(pcaModel.varianceExplained[0] || 0).toFixed(1)}%)</option>
+                                            <option value={2}>PC 2 ({(pcaModel.varianceExplained[1] || 0).toFixed(1)}%)</option>
+                                            {pcaModel.varianceExplained.length > 2 && (
+                                                <option value={3}>PC 3 ({(pcaModel.varianceExplained[2] || 0).toFixed(1)}%)</option>
+                                            )}
+                                        </select>
+                                    </div>
+
+                                    {activeTab === 'scores3d' && (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-slate-400 font-medium">Eje Z:</span>
+                                            <select 
+                                                value={selectedPCZ} 
+                                                onChange={(e) => setSelectedPCZ(Number(e.target.value))}
+                                                className="bg-ui-dark border border-ui-border rounded px-2 py-1 text-slate-200"
+                                            >
+                                                <option value={1}>PC 1 ({(pcaModel.varianceExplained[0] || 0).toFixed(1)}%)</option>
+                                                <option value={2}>PC 2 ({(pcaModel.varianceExplained[1] || 0).toFixed(1)}%)</option>
+                                                {pcaModel.varianceExplained.length > 2 && (
+                                                    <option value={3}>PC 3 ({(pcaModel.varianceExplained[2] || 0).toFixed(1)}%)</option>
+                                                )}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
                         {/* RENDERIZADO DEL GRÁFICO ACTIVO */}
-                        <div className="h-96 w-full relative">
+                        <div className={`${activeTab === 'scores3d' ? 'h-[450px]' : 'h-96'} w-full relative`}>
+                            {/* TAB 1B: SCORES 3D */}
+                            {activeTab === 'scores3d' && (
+                                <Pca3DPlot
+                                    points={scores3DData}
+                                    xLabel={`PC ${selectedPCX} (${varX.toFixed(1)}% Varianza)`}
+                                    yLabel={`PC ${selectedPCY} (${varY.toFixed(1)}% Varianza)`}
+                                    zLabel={`PC ${selectedPCZ} (${varZ.toFixed(1)}% Varianza)`}
+                                    xShort={`PC${selectedPCX}`}
+                                    yShort={`PC${selectedPCY}`}
+                                    zShort={`PC${selectedPCZ}`}
+                                    selectedId={selectedPoint?.id ?? null}
+                                    onSelectPoint={(id) => {
+                                        const pt = pcaModel.scores.find(s => s.id === id);
+                                        if (pt) setSelectedPoint(pt);
+                                    }}
+                                    analyticalProperty={analyticalProperty}
+                                />
+                            )}
+
                             {/* TAB 1: SCORES 2D */}
                             {activeTab === 'scores' && (
                                 <ResponsiveContainer width="100%" height="100%">
